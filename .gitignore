@@ -1,0 +1,21 @@
+#
+# .gitignore
+# mosaic
+#
+# Created by Christian Bator on 03/11/2025
+#
+
+# Magic
+.magic
+
+# XCode
+*.xcodeproj
+
+# Build artifacts
+build/artifacts
+lib
+bin
+package
+
+# Custom
+libcodec/*.h

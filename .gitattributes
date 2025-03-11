@@ -1,0 +1,9 @@
+#
+# .gitattributes
+# mosaic
+#
+# Created by Christian Bator on 03/11/2025
+#
+
+# SCM syntax highlighting & preventing 3-way merges
+pixi.lock merge=binary linguist-language=YAML linguist-generated=true

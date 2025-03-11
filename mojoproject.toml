@@ -1,0 +1,20 @@
+#
+# mojoproject.toml
+# mosaic
+#
+# Created by Christian Bator on 03/11/2025
+#
+
+[project]
+name = "mosaic"
+version = "0.1.0"
+description = "Vision of the future"
+authors = ["Christian Bator <christian@bator.co>"]
+platforms = ["osx-arm64"]
+channels = ["https://conda.modular.com/max-nightly", "https://conda.modular.com/max", "https://repo.prefix.dev/modular-community", "conda-forge"]
+
+[dependencies]
+max = "*"
+
+[tasks]
+build = "build/build.sh"
