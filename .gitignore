@@ -13,9 +13,10 @@
 
 # Build artifacts
 build/artifacts
-lib
-bin
-package
 
-# Custom
+# Examples
+examples/*.mojopkg
+examples/lib
+
+# External source files
 libcodec/*.h
