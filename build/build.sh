@@ -22,9 +22,9 @@ reset="\033[0m"
 #
 build_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 artifact_dir=$build_dir/artifacts
+mkdir -p $artifact_dir
 lib_dir=$artifact_dir/lib
-package_dir=$artifact_dir/package
-mkdir -p $lib_dir $package_dir
+mkdir -p $lib_dir
 
 #
 # Build codecs
@@ -47,19 +47,17 @@ swift_source_files=$(find mosaic/visualizer/backend/mac/MacVisualizer -name "*.s
 swiftc -emit-library -o $lib_dir/libmac-visualizer.dylib $swift_source_files
 
 #
-# Build Mosaic
+# Build mosaic
 #
 echo -e "> Building ${cyan}mosaic${reset} ..."
 
-mojo package mosaic -o $package_dir/mosaic.mojopkg
+mojo package mosaic -o $artifact_dir/mosaic.mojopkg
 
 #
 # Build examples
 #
 echo -e "> Building ${cyan}examples${reset} ..."
 
-cp $package_dir/mosaic.mojopkg examples/mosaic.mojopkg
-cp -r $lib_dir examples
-# mojo build examples/basic.mojo -o bin/basic
+cp -r $artifact_dir/* examples
 
 echo -e "> Build succeeded (package: ${cyan}package/mosaic.mojopkg${reset}) ${green}✔${reset}"

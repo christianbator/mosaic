@@ -6,6 +6,6 @@
 #
 
 from .image import Image, ImagePointer
+from .image_file_type import ImageFileType
 from .color_space import ColorSpace
 from .border import Border
-from .image_codec import ImageFileType

@@ -12,22 +12,20 @@ from mosaic.image import Image, ImagePointer, ColorSpace
 from mosaic.video import VideoCapture
 
 #
-# Backend
-#
-var _libmac_visualizer: DLHandle = DLHandle("lib/libmac-visualizer.dylib")
-
-var _show = _libmac_visualizer.get_function[
-    fn (data: UnsafePointer[UInt8], width: c_int, height: c_int, channels: c_int, window_title: UnsafePointer[c_char]) -> None
-]("show")
-
-var _wait = _libmac_visualizer.get_function[fn (timeout: c_float) -> Bool]("wait")
-
-#
 # Visualizer
 #
 struct Visualizer:
 
     alias display_dtype = DType.uint8
+
+    @staticmethod
+    fn _libvisualizer() -> DLHandle:
+        return DLHandle("lib/libmac-visualizer.dylib")
+
+    @staticmethod
+    fn _close():
+        var libvisualizer = Self._libvisualizer()
+        libvisualizer.close()
 
     #
     # Image
@@ -44,13 +42,19 @@ struct Visualizer:
 
     @staticmethod
     fn _show[color_space: ColorSpace, dtype: DType, //](image: Image[dtype, color_space], window_title: String):
-        _show(
+        var show = Self._libvisualizer().get_function[
+            fn (data: UnsafePointer[UInt8], width: c_int, height: c_int, channels: c_int, window_title: UnsafePointer[c_char]) -> None
+        ]("show")
+
+        show(
             data = image.unsafe_uint8_ptr(),
             width = c_int(image.width()),
             height = c_int(image.height()),
             channels = c_int(image.channels()),
             window_title = window_title.unsafe_cstr_ptr(),
         )
+
+        Self._close()
 
     #
     # Video
@@ -91,8 +95,13 @@ struct Visualizer:
     #
     @staticmethod
     fn wait():
-        _ = _wait(c_float.MAX_FINITE)
+        _ = Self.wait(c_float.MAX_FINITE)
 
     @staticmethod
     fn wait(timeout: Float32) -> Bool:
-        return _wait(c_float(timeout))
+        var wait = Self._libvisualizer().get_function[fn (timeout: c_float) -> Bool]("wait")
+
+        var result = wait(c_float(timeout))
+        Self._close()
+
+        return result

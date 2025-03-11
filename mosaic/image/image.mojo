@@ -13,7 +13,8 @@ from algorithm import vectorize, parallelize
 from mosaic.matrix import Matrix, Number, ScalarNumber
 from mosaic.utilities import optimal_simd_width
 
-from .image_codec import ImageReader, ImageWriter
+from .image_reader import ImageReader
+from .image_writer import ImageWriter
 
 #
 # Image
@@ -28,10 +29,10 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     # Initialization
     #
     fn __init__(out self, path: String) raises:
-        self._matrix = ImageReader[color_space, dtype](Path(path)).read()
+        self = Self(Path(path))
 
     fn __init__(out self, path: Path) raises:
-        self._matrix = ImageReader[color_space, dtype](path).read()
+        self = ImageReader[dtype, color_space](path).read()
 
     fn __init__(out self, width: Int, height: Int):
         self._matrix = Matrix[dtype, color_space.channels()](rows = height, cols = width)
