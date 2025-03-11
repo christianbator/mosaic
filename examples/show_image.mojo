@@ -16,7 +16,7 @@ fn main():
         # Step 2: Request the Visualizer to show the image in a window titled "Image"
         Visualizer.show(image = image, window_title = "Image")
 
-        # Step 3: Wait for user interaction (CMD+W to closes the window)
+        # Step 3: Wait for user interaction (CMD+W closes the window)
         Visualizer.wait()
 
     except error:

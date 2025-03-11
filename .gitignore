@@ -15,7 +15,7 @@
 build/artifacts
 
 # Examples
-examples/*.mojopkg
+examples/mosaic.mojopkg
 examples/lib
 
 # External source files
