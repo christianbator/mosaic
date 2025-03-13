@@ -5,7 +5,7 @@
 # Created by Christian Bator on 01/02/2025
 #
 
-name: "CodeQL Advanced"
+name: "CodeQL"
 
 on:
   workflow_dispatch:
@@ -15,7 +15,7 @@ on:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    runs-on: macos-latest
+    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
     permissions:
       security-events: write
       packages: read
@@ -39,17 +39,17 @@ jobs:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
     - if: matrix.language == 'c-cpp'
-      name: Compile c-cpp
+      name: Compile (c-cpp)
       shell: bash
       run: |
-        - cp external/stb/{stb_image.h,stb_image_write.h} libcodec
-        - clang -fPIC -shared -Wall -Werror -DSTBI_NEON libcodec/libcodec.c
+        cp external/stb/{stb_image.h,stb_image_write.h} libcodec
+        clang -fPIC -shared -Wall -Werror -DSTBI_NEON libcodec/libcodec.c
     - if: matrix.language == 'swift'
-      name: Compile swift
+      name: Compile (swift)
       shell: bash
       run: |
-        - swift_source_files=$(find libvisualizer/mac/MacVisualizer -name "*.swift")
-        - swiftc -emit-library $swift_source_files
+        swift_source_files=$(find libvisualizer/mac/MacVisualizer -name "*.swift")
+        swiftc -emit-library $swift_source_files
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
       with:
