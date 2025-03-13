@@ -6,22 +6,21 @@
 #
 
 name: "CodeQL"
-
 on:
   workflow_dispatch:
   schedule:
-    - cron: '44 17 * * 0'
-
+    - cron: "44 17 * * 0"
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
+    runs-on: ${{ (matrix.language == "swift" && "macos-latest") || "ubuntu-latest" }}
     permissions:
       security-events: write
       packages: read
       actions: read
       contents: read
     strategy:
+      fail-fast: false
       matrix:
         include:
         - language: c-cpp
@@ -32,19 +31,19 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        submodules: 'true'
+        submodules: true
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
-    - if: matrix.language == 'c-cpp'
+    - if: matrix.language == "c-cpp"
       name: Compile (c-cpp)
       shell: bash
       run: |
         cp external/stb/{stb_image.h,stb_image_write.h} libcodec
-        clang -fPIC -shared -Wall -Werror -DSTBI_NEON libcodec/libcodec.c
-    - if: matrix.language == 'swift'
+        clang -fPIC -shared -Wall -Werror libcodec/libcodec.c
+    - if: matrix.language == "swift"
       name: Compile (swift)
       shell: bash
       run: |

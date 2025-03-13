@@ -38,7 +38,11 @@ echo -e "> Building ${cyan}libcodec${reset} ..."
 
 cp external/stb/{stb_image.h,stb_image_write.h} libcodec
 
-clang -fPIC -shared -Wall -Werror -DSTBI_NEON -o $lib_dir/libcodec.dylib libcodec/libcodec.c
+if [[ "$os" == "Darwin" ]]; then
+    clang -fPIC -shared -Wall -Werror -DSTBI_NEON -o $lib_dir/libcodec.dylib libcodec/libcodec.c
+else
+    clang -fPIC -shared -Wall -Werror -o $lib_dir/libcodec.dylib libcodec/libcodec.c
+fi
 
 #
 # Build libvisualizer

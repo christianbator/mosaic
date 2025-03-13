@@ -17,7 +17,12 @@ mkdir -p $PREFIX/lib/mosaic
 # Build libcodec
 #
 cp external/stb/{stb_image.h,stb_image_write.h} libcodec
-clang -fPIC -shared -Wall -Werror -DSTBI_NEON -o $PREFIX/lib/mosaic/libcodec.dylib libcodec/libcodec.c
+
+if [ -n "$OSX_ARCH" ]; then
+    clang -fPIC -shared -Wall -Werror -DSTBI_NEON -o $PREFIX/lib/mosaic/libcodec.dylib libcodec/libcodec.c
+else
+    clang -fPIC -shared -Wall -Werror -o $PREFIX/lib/mosaic/libcodec.dylib libcodec/libcodec.c
+fi
 
 #
 # Build libvisualizer
