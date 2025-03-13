@@ -10,18 +10,14 @@ from testing import assert_equal
 from mosaic.matrix import Matrix
 from mosaic.image import Image, ColorSpace
 
-#
-# Basic tests
-#
-fn test_image_construction() raises:
+fn test_image_matrix_construction() raises:
     var matrix = Matrix[DType.uint8, ColorSpace.greyscale.channels()].ascending(rows = 256, cols = 256)
 
     var image = Image[DType.uint8, ColorSpace.greyscale](matrix^)
 
-    assert_equal(image[127, 127, 0], 127)
+    assert_equal(image[127, 127], 127)
 
-#
-# Main
-#
-fn main() raises:
-    test_image_construction()
+fn test_image_png_construction() raises:
+    var image = Image[DType.uint8, ColorSpace.greyscale]("data/mandrill.png")
+
+    assert_equal(image[120, 240], 44)

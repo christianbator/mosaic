@@ -16,3 +16,6 @@ build/artifacts
 
 # External source files
 libcodec/*.h
+
+# Rattler-build
+rattler-build/output

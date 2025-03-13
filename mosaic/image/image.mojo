@@ -80,8 +80,18 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     #
     # Public Access
     #
+    fn __getitem__(self, y: Int, x: Int) -> Scalar[dtype]:
+        constrained[color_space.channels() == 1, "Must specify channel for image in color space with channels > 1"]()
+
+        return self._matrix[y, x, 0].value
+
     fn __getitem__(self, y: Int, x: Int, channel: Int) -> Scalar[dtype]:
         return self._matrix[y, x, channel].value
+
+    fn __setitem__(mut self, y: Int, x: Int, value: Scalar[dtype]):
+        constrained[color_space.channels() == 1, "Must specify channel for image in color space with channels > 1"]()
+
+        self._matrix[y, x, 0] = value
 
     fn __setitem__(mut self, y: Int, x: Int, channel: Int, value: Scalar[dtype]):
         self._matrix[y, x, channel] = value

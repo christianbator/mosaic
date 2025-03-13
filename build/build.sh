@@ -23,7 +23,7 @@ reset="\033[0m"
 build_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 artifact_dir=$build_dir/artifacts
 mkdir -p $artifact_dir
-lib_dir=$artifact_dir/lib
+lib_dir=$artifact_dir/mosaic
 mkdir -p $lib_dir
 
 #
@@ -40,11 +40,11 @@ clang -fPIC -shared -Wall -Werror -DSTBI_NEON -o $lib_dir/libcodec.dylib libcode
 #
 
 # Mac visualizer
-echo -e "> Building ${cyan}libmac-visualizer${reset} ..."
+echo -e "> Building ${cyan}libvisualizer${reset} ..."
 
-swift_source_files=$(find mosaic/visualizer/backend/mac/MacVisualizer -name "*.swift")
+swift_source_files=$(find libvisualizer/mac/MacVisualizer -name "*.swift")
 
-swiftc -emit-library -o $lib_dir/libmac-visualizer.dylib $swift_source_files
+swiftc -emit-library -o $lib_dir/libvisualizer.dylib $swift_source_files
 
 #
 # Build mosaic

@@ -12,8 +12,6 @@
 </p>
 <br>
 
-![CodeQL](https://github.com/christianbator/mosaic/workflows/CodeQL/badge.svg)
-
 ## Features
 
 - Type-safe, memory-safe computer vision library
@@ -47,12 +45,12 @@ The library provides methods to decode and encode image files, represent images 
 
 ## Installation
 
-### Prerequisites
+#### Prerequisites
 
 - [Magic](https://docs.modular.com/magic/)
   - Mojo environment and dependency manager
 
-### Add to project
+#### Using Magic CLI
 
 ```bash
 magic add mosaic

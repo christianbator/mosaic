@@ -20,7 +20,7 @@ struct Visualizer:
 
     @staticmethod
     fn _libvisualizer() -> DLHandle:
-        return DLHandle("lib/libmac-visualizer.dylib")
+        return DLHandle("mosaic/libvisualizer.dylib")
 
     @staticmethod
     fn _close():

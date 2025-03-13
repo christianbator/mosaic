@@ -42,7 +42,7 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
         self._path = path
 
     fn read(self) raises -> Image[dtype, color_space]:
-        var libcodec = DLHandle("lib/libcodec.dylib")
+        var libcodec = DLHandle("mosaic/libcodec.dylib")
 
         # Read raw file data
         var raw_data = self._path.read_bytes()

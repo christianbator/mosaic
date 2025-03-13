@@ -22,7 +22,7 @@ struct ImageWriter:
         self._path = path
 
     fn write[dtype: DType, //, file_type: ImageFileType](self, image: Image[dtype, _]) raises:
-        var libcodec = DLHandle("lib/libcodec.dylib")
+        var libcodec = DLHandle("mosaic/libcodec.dylib")
 
         var path_string = self._path.__fspath__()
         if not path_string.endswith(file_type.extension()):
