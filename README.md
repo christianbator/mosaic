@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/logo.png" alt="Mosaic Logo" width="280" height="100">
+  <img src="assets/logo.svg" alt="Mosaic Logo" width="280" height="100">
   <p>
     An open source computer vision library in Mojo
     
