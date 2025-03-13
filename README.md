@@ -1,18 +1,23 @@
-<h1 align="center">
-  Mosaic
-</h1>
-
-<h4 align="center">An open source computer vision library in <a href="https://github.com/modular/max/tree/main/mojo">Mojo</a></h4>
+<div align="center">
+  <img src="assets/logo.png" alt="Mosaic Logo" width="280" height="100">
+  <p>
+    An open source computer vision library in Mojo
+    
+  ![Language Badge](https://img.shields.io/badge/language-mojo-orange)
+  ![GitHub License Badge](https://img.shields.io/github/license/christianbator/mosaic)
+  ![CodeQL](https://github.com/christianbator/mosaic/workflows/CodeQL/badge.svg)
+  </p>
+</div>
 
 <p align="center">
-  <a href="#features">Features</a> •
+  <a href="#overview">Overview</a> •
   <a href="#installation">Installation</a> •
-  <a href="#examples">Examples</a> •
-  <a href="#related">Related</a>
+  <a href="#examples">Examples</a>
 </p>
+
 <br>
 
-## Features
+## Overview
 
 - Type-safe, memory-safe computer vision library
 - One language for prototyping and production
@@ -37,30 +42,31 @@
   - [x] macOS visualizer
   - [ ] Linux visualizer
 
-### Description
+#### Description
 
 Mosaic is a cross-platform (currently only macOS) library for computer vision prototyping and production.
 
 The library provides methods to decode and encode image files, represent images in various color spaces and with various numeric data types, process images, visualize results, and more.
 
+<br>
+
 ## Installation
 
 #### Prerequisites
 
-- [Magic](https://docs.modular.com/magic/)
-  - Mojo environment and dependency manager
+- [Magic](https://docs.modular.com/magic/) (Mojo environment and package manager)
 
-#### Using Magic CLI
+#### Using the magic cli:
 
 ```bash
 magic add mosaic
 ```
 
-**NOTE: not currently available in the modular community channel. Coming soon...**
+<br>
 
 ## Examples
 
-To run the examples, clone the repo and build Mosaic:
+Clone the repo and build Mosaic:
 
 ```bash
 git clone git@github.com:christianbator/mosaic.git
@@ -75,13 +81,6 @@ cd examples
 magic run mojo show_image.mojo
 ```
 
-The following examples are available:
+#### Example List
 
 - [Show image](examples/show_image.mojo)
-    - Decodes a PNG into a UInt8 representation in the RGB color space and displays it on screen
-    - Usage: `magic run mojo show_image.mojo`
-
-## Related
-
-- [Mosaic website](https://mosaiclib.org)
-- [Mojo website](https://docs.modular.com/mojo/manual/get-started/)
