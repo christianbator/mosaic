@@ -53,11 +53,4 @@ echo -e "> Building ${cyan}mosaic${reset} ..."
 
 mojo package mosaic -o $artifact_dir/mosaic.mojopkg
 
-#
-# Build examples
-#
-echo -e "> Building ${cyan}examples${reset} ..."
-
-cp -r $artifact_dir/* examples
-
 echo -e "> Build succeeded (package: ${cyan}package/mosaic.mojopkg${reset}) ${green}✔${reset}"

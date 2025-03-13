@@ -14,9 +14,5 @@
 # Build artifacts
 build/artifacts
 
-# Examples
-examples/mosaic.mojopkg
-examples/lib
-
 # External source files
 libcodec/*.h

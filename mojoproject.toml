@@ -14,7 +14,7 @@ platforms = ["osx-arm64"]
 channels = ["https://conda.modular.com/max-nightly", "https://conda.modular.com/max", "https://repo.prefix.dev/modular-community", "conda-forge"]
 
 [dependencies]
-max = ">=25.2.0.dev2025031105,<26"
+max = "*"
 
 [tasks]
 build = "build/build.sh"

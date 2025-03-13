@@ -12,6 +12,8 @@
 </p>
 <br>
 
+![CodeQL](https://github.com/christianbator/mosaic/workflows/CodeQL/badge.svg)
+
 ## Features
 
 - Type-safe, memory-safe computer vision library
@@ -72,14 +74,14 @@ Then you can run the examples:
 
 ```zsh
 cd examples
-magic run mojo run show_image.mojo
+magic run mojo show_image.mojo
 ```
 
 The following examples are available:
 
 - [Show image](examples/show_image.mojo)
     - Decodes a PNG into a UInt8 representation in the RGB color space and displays it on screen
-    - Usage: `magic run mojo run show_image.mojo`
+    - Usage: `magic run mojo show_image.mojo`
 
 ## Related
 
