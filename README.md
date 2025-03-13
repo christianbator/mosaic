@@ -17,40 +17,30 @@
 
 ## Overview
 
-- Type-safe, memory-safe computer vision library
-- One language for prototyping and production
-  - Faster than python, simpler than c++
-- Image reading / writing
-  - [x] PNG
-  - [x] JPEG
-  - [x] HDR (linear float32)
-- Data types and color spaces
-  - [x] Any Mojo `DType` (UInt8, Int32, Float64, etc.) 
-  - [x] Greyscale
-  - [x] RGB
-- Image processing
-  - Transforms
-    - [x] Flipping
-  - Filtering
-    - [x] 2D filtering with any kernel
-- Video capture
-  - [ ] macOS video capture
-  - [ ] Linux video capture
-- Visualization
-  - [x] macOS visualizer
-  - [ ] Linux visualizer
-
 #### Description
 
-Mosaic is a cross-platform (currently only macOS) library for computer vision prototyping and production.
+Mosaic is a cross-platform (currently only macOS) computer vision library for prototyping and production.
 
-The library provides methods to decode and encode image files, represent images in various color spaces and with various numeric data types, process images, visualize results, and more.
+The library provides methods to decode and encode image files, represent images in various color spaces, process images, visualize results, and more.
+
+#### Features
+
+- Type-safe
+- Memory-safe
+- Image file reading / writing
+- Data type conversion
+- Color space conversion
+- Image processing
+  - Transforms
+  - Filtering
+- Video capture
+- Visualization
 
 ## Installation
 
 #### Prerequisites
 
-- [Magic](https://docs.modular.com/magic/) (Mojo environment and package manager)
+- [Magic](https://docs.modular.com/magic/) (the Mojo environment and package manager)
 
 #### Using the magic cli:
 
