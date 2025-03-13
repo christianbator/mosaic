@@ -15,8 +15,6 @@
   <a href="#examples">Examples</a>
 </p>
 
-<br>
-
 ## Overview
 
 - Type-safe, memory-safe computer vision library
@@ -48,8 +46,6 @@ Mosaic is a cross-platform (currently only macOS) library for computer vision pr
 
 The library provides methods to decode and encode image files, represent images in various color spaces and with various numeric data types, process images, visualize results, and more.
 
-<br>
-
 ## Installation
 
 #### Prerequisites
@@ -61,8 +57,6 @@ The library provides methods to decode and encode image files, represent images 
 ```bash
 magic add mosaic
 ```
-
-<br>
 
 ## Examples
 

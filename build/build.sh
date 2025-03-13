@@ -18,6 +18,11 @@ bright_red="\033[91m"
 reset="\033[0m"
 
 #
+# System Info
+#
+os=$(uname)
+
+#
 # Locations
 #
 build_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
@@ -27,7 +32,7 @@ lib_dir=$artifact_dir/mosaic
 mkdir -p $lib_dir
 
 #
-# Build codecs
+# Build libcodec
 #
 echo -e "> Building ${cyan}libcodec${reset} ..."
 
@@ -36,15 +41,16 @@ cp external/stb/{stb_image.h,stb_image_write.h} libcodec
 clang -fPIC -shared -Wall -Werror -DSTBI_NEON -o $lib_dir/libcodec.dylib libcodec/libcodec.c
 
 #
-# Build visualizer
+# Build libvisualizer
 #
-
-# Mac visualizer
 echo -e "> Building ${cyan}libvisualizer${reset} ..."
 
-swift_source_files=$(find libvisualizer/mac/MacVisualizer -name "*.swift")
-
-swiftc -emit-library -o $lib_dir/libvisualizer.dylib $swift_source_files
+if [[ "$os" == "Darwin" ]]; then
+    swift_source_files=$(find libvisualizer/mac/MacVisualizer -name "*.swift")
+    swiftc -emit-library -o $lib_dir/libvisualizer.dylib $swift_source_files
+else
+    echo -e "> Unsupported platform for libvisualizer: ${bright_red}$os${reset}"
+fi
 
 #
 # Build mosaic
