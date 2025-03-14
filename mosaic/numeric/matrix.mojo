@@ -12,7 +12,7 @@ from random import rand
 from math import ceildiv, isclose
 from collections import InlineArray
 
-from mosaic.utilities import optimal_simd_width
+from mosaic.utility import optimal_simd_width
 
 #
 # Matrix

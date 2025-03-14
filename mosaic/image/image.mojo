@@ -10,8 +10,8 @@ from pathlib import Path
 from memory import UnsafePointer
 from algorithm import vectorize, parallelize
 
-from mosaic.matrix import Matrix, Number, ScalarNumber
-from mosaic.utilities import optimal_simd_width
+from mosaic.numeric import Matrix, Number, ScalarNumber
+from mosaic.utility import optimal_simd_width
 
 from .image_reader import ImageReader
 from .image_writer import ImageWriter

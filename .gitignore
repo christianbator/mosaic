@@ -19,3 +19,6 @@ libcodec/*.h
 
 # Rattler-build
 rattler-build/output
+
+# Development
+main.mojo

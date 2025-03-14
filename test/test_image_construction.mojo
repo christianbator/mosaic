@@ -7,7 +7,7 @@
 
 from testing import assert_equal
 
-from mosaic.matrix import Matrix
+from mosaic.numeric import Matrix
 from mosaic.image import Image, ColorSpace
 
 fn test_image_matrix_construction() raises:
