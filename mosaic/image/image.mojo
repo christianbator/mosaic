@@ -187,7 +187,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
             parallelize[convert_row](num_work_items = self.height())
 
     #
-    # Orientation
+    # Transformations
     #
     fn flip_horizontally(mut self):
         self._matrix.flip_horizontally()
@@ -210,6 +210,16 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     #
     # Filtering
     #
+    fn box_blur[border: Border](mut self, size: Int):
+        self.filter[border](
+            Matrix[dtype, color_space.channels()](rows = size, cols = size, number = (1 / (size * size)).cast[dtype]())
+        )
+    
+    fn box_blurred[border: Border](self, size: Int) -> Self:
+        return self.filtered[border](
+            Matrix[dtype, color_space.channels()](rows = size, cols = size, number = (1 / (size * size)).cast[dtype]())
+        )
+
     fn filter[border: Border](mut self, kernel: Matrix[dtype, color_space.channels()]):
         self.filtered[border](kernel)._matrix.copy_into(self._matrix)
 
@@ -239,7 +249,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
         elif count <= 128:
             self._direct_convolution[border, 128](dest = dest, kernel = kernel.flipped())
         else:
-            abort("Direct convolution for kernels with plane counts greater than 512 is not supported")        
+            abort("Direct convolution for kernels with planar counts greater than 128 is not supported yet")        
 
     fn _direct_convolution[border: Border, width: Int](self, mut dest: Self, kernel: Matrix[dtype, color_space.channels()]):
         var half_kernel_width = kernel.cols() // 2

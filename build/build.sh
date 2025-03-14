@@ -54,6 +54,7 @@ if [[ "$os" == "Darwin" ]]; then
     swiftc -emit-library -o $lib_dir/libvisualizer.dylib $swift_source_files
 else
     echo -e "> Unsupported platform for libvisualizer: ${bright_red}$os${reset}"
+    exit 1
 fi
 
 #

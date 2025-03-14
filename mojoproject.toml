@@ -11,7 +11,12 @@ version = "0.0.1"
 description = "Vision of the future"
 authors = ["Christian Bator <christian@bator.co>"]
 platforms = ["osx-arm64"]
-channels = ["https://conda.modular.com/max-nightly", "https://conda.modular.com/max", "https://repo.prefix.dev/modular-community", "conda-forge"]
+channels = [
+    "https://conda.modular.com/max-nightly",
+    "https://conda.modular.com/max", 
+    "https://repo.prefix.dev/modular-community", 
+    "conda-forge"
+]
 
 [dependencies]
 max = "*"

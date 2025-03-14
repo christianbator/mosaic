@@ -16,42 +16,58 @@
 </p>
 
 ## Overview
-
 #### Description
-
 Mosaic is a cross-platform (currently only macOS) computer vision library for prototyping and production.
 
-The library provides methods to decode and encode image files, represent images in various color spaces, process images, visualize results, and more.
+By transparently leveraging hardware acceleration and using the latest MLIR compiler technology, Mosaic is the first computer vision library built specifically for heterogenous compute: CPUs, GPUs, XPUs.
+
+It unifies the computer vision workflow into one language that runs on any hardware.
+
+#### Principles
+1. Easy to use
+2. Type-safe, memory-safe
+3. Performant
 
 #### Features
-
-- Type-safe
-- Memory-safe
-- Image file reading / writing
-- Data type conversion
-- Color space conversion
+- Image representation
+  - Image file encoding and decoding
+  - Data type specification (at compile time)
+  - Color space specification (at compile time)
 - Image processing
-  - Transforms
   - Filtering
+  - Geometric transforms
+  - Fourier transforms
 - Video capture
+  - Coming soon...
+- Video processing
+  - Coming soon...
 - Visualization
+  - Native image and video rendering
+- Hardware acceleration
+  - Parallelization and SIMD on CPUs
+  - GPU acceleration when available
 
 ## Installation
-
 #### Prerequisites
-
 - [Magic](https://docs.modular.com/magic/) (the Mojo environment and package manager)
 
-#### Using the magic cli:
-
+#### Using the magic cli
 ```bash
 magic add mosaic
 ```
 
+#### After installation
+The `mojoproject.toml` file should include the Modular community channel and the Mosaic dependency:
+```toml
+[project]
+channels = ["https://repo.prefix.dev/modular-community"]
+
+[dependencies]
+mosaic = "*"
+```
+
 ## Examples
-
 Clone the repo and build Mosaic:
-
 ```bash
 git clone git@github.com:christianbator/mosaic.git
 cd mosaic
@@ -59,12 +75,22 @@ magic run build
 ```
 
 Then you can run the examples:
-
 ```zsh
 cd examples
 magic run mojo show_image.mojo
 ```
 
-#### Example List
+#### Descriptions
+- Show image
+  - Reads an image file into a UInt8, RGB representation and displays it in the visualizer
+  - Source: [examples/show_image.mojo](examples/show_image.mojo)
+<div align="center">
+  <img src="data/mandrill.png" alt="Mandrill" width="256" height="256">
+</div>
 
-- [Show image](examples/show_image.mojo)
+- Blur image
+  - Reads an image file, converts the data type, and applies a box filter to blur the image
+  - Source: [examples/blur_image.mojo](examples/blur_image.mojo)
+<div align="center">
+  <img src="data/mandrill-blurred.png" alt="Mandrill blurred" width="256" height="256">
+</div>

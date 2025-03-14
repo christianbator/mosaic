@@ -4,7 +4,7 @@
 #
 # Created by Christian Bator on 03/11/2025
 #
-from mosaic.matrix import Matrix
+
 from mosaic.image import Image, ColorSpace
 from mosaic.visualizer import Visualizer
 
