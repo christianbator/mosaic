@@ -39,6 +39,17 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
         self._cols = cols
         self._data = UnsafeNumberPointer[dtype, complex](rows * cols * depth)
         self.fill(value)
+    
+    fn __init__(out self, rows: Int, cols: Int, *values: ScalarNumber[dtype, complex]):
+        # TODO: Make this a compile-time check when possible
+        debug_assert(rows * cols * depth == len(values), "mismatch in the number of values in the Matrix variadic constructor")
+
+        self._rows = rows
+        self._cols = cols
+        self._data = UnsafeNumberPointer[dtype, complex](rows * cols * depth)
+        
+        for index in range(len(values)):
+            self.store(index = index, value = values[index])
 
     fn __init__(out self, rows: Int, cols: Int, owned data: UnsafeNumberPointer[dtype, complex]):
         self._rows = rows
@@ -88,6 +99,16 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
         )
 
         return Self(rows = rows, cols = cols, data = data)
+
+    @staticmethod
+    fn strided_replication(rows: Int, cols: Int, *values: ScalarNumber[dtype, complex]) -> Self:
+        var result = Self(rows = rows, cols = cols)
+
+        for row in range(rows):
+            for col in range(cols):
+                result.store_full_depth(row = row, col = col, value = result.create_full_depth_value(values[row * cols + col]))
+
+        return result^
     
     #
     # Properties
@@ -105,7 +126,7 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
         return self._rows * self._cols * depth
     
     @always_inline
-    fn planar_count(self) -> Int:
+    fn strided_count(self) -> Int:
         return self._rows * self._cols
 
     @always_inline
@@ -296,49 +317,49 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
         fn add[width: Int](value: Number[dtype, complex, width]) -> Number[dtype, complex, width]:
             return value + rhs
         
-        self._for_each[add]()
+        self.for_each[add]()
     
     fn __isub__(mut self, rhs: ScalarNumber[dtype, complex]):
         @parameter
         fn sub[width: Int](value: Number[dtype, complex, width]) -> Number[dtype, complex, width]:
             return value - rhs
         
-        self._for_each[sub]()
+        self.for_each[sub]()
 
     fn __imul__(mut self, rhs: ScalarNumber[dtype, complex]):
         @parameter
         fn mul[width: Int](value: Number[dtype, complex, width]) -> Number[dtype, complex, width]:
             return value * rhs
         
-        self._for_each[mul]()
+        self.for_each[mul]()
     
     fn __itruediv__(mut self, rhs: ScalarNumber[dtype, complex]):
         @parameter
         fn truediv[width: Int](value: Number[dtype, complex, width]) -> Number[dtype, complex, width]:
             return value / rhs
         
-        self._for_each[truediv]()
+        self.for_each[truediv]()
     
     fn __ifloordiv__(mut self, rhs: ScalarNumber[dtype, complex]):
         @parameter
         fn floordiv[width: Int](value: Number[dtype, complex, width]) -> Number[dtype, complex, width]:
             return value // rhs
         
-        self._for_each[floordiv]()
+        self.for_each[floordiv]()
     
     fn __imod__(mut self, rhs: ScalarNumber[dtype, complex]):
         @parameter
         fn mod[width: Int](value: Number[dtype, complex, width]) -> Number[dtype, complex, width]:
             return value % rhs
         
-        self._for_each[mod]()
+        self.for_each[mod]()
     
     fn __ipow__(mut self, rhs: ScalarNumber[dtype, complex]):
         @parameter
         fn pow[width: Int](value: Number[dtype, complex, width]) -> Number[dtype, complex, width]:
             return value ** rhs
         
-        self._for_each[pow]()
+        self.for_each[pow]()
 
     fn __imatmul__(mut self, other: Self):
         if self._rows != self._cols or self._rows != other._rows or self._cols != other._cols:
@@ -348,7 +369,31 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
 
     #
     # Numeric Methods
-    #    
+    #
+    fn strided_sum(self, component: Int) -> ScalarNumber[dtype, complex]:
+        var result = ScalarNumber[dtype, complex](0)
+
+        for row in range(self._rows):
+            @parameter
+            fn process_cols[width: Int](col: Int):
+                result += self.strided_load[width](row = row, col = col, component = component).reduce_add()
+
+            vectorize[process_cols, Self.optimal_simd_width, unroll_factor = Self._unroll_factor](self._cols)
+        
+        return result
+    
+    fn strided_normalize(mut self):
+        @parameter
+        for component in range(depth):
+            var strided_sum = self.strided_sum(component)
+            
+            @parameter
+            @__copy_capture(strided_sum)
+            fn normalize[width: Int](value: Number[dtype, complex, width]) -> Number[dtype, complex, width]:
+                return value / strided_sum
+
+            self.strided_for_each[normalize](component)
+
     fn matmul_into(self, mut dest: Self, rhs: Self):
         if self._cols != rhs._rows or dest._rows != self._rows or dest._cols != rhs._cols:
             abort("Dimension mismatch for matrix multiplication: ", self._rows, "x", self._cols, "@", rhs._rows, "x", rhs._cols, "->", dest._rows, "x", dest._cols)
@@ -405,12 +450,12 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
             @parameter
             fn iterate_over_row(row: Int):
                 for col in range(row + 1, self._cols):
-                    var original_index = self.index(row = row, col = col, component = 0)
-                    var transposed_index = self.transposed_index(row = row, col = col, component = 0)
-                    var original_element = self._load_planar_element(original_index)
+                    # var original_index = self.index(row = row, col = col, component = 0)
+                    # var transposed_index = self.transposed_index(row = row, col = col, component = 0)
+                    var original_value = self.load_full_depth(row = row, col = col)
                     
-                    self._store_planar_element(index = original_index, element = self._load_planar_element(transposed_index))
-                    self._store_planar_element(index = transposed_index, element = original_element)
+                    self.store_full_depth(row = row, col = col, value = self.load_full_depth(row = col, col = row))
+                    self.store_full_depth(row = col, col = row, value = original_value)
 
             parallelize[iterate_over_row](self._rows)
         else:
@@ -424,10 +469,12 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
             @parameter
             fn tranpose_row(row: Int):
                 for col in range(self._cols):
-                    self._store_planar_element(
-                        index = self.index(row = row, col = col, component = 0),
-                        element = copy._load_planar_element(
-                            self.transposed_index(row = row, col = col, component = 0)
+                    self.store_full_depth(
+                        row = row,
+                        col = col,
+                        value = copy.load_full_depth(
+                            row = col,
+                            col = row
                         )
                     )
 
@@ -447,10 +494,12 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
             @parameter
             fn tranpose_row(row: Int):
                 for col in range(copy._cols):
-                    copy._store_planar_element(
-                        index = copy.index(row = row, col = col, component = 0),
-                        element = self._load_planar_element(
-                            copy.transposed_index(row = row, col = col, component = 0)
+                    copy.store_full_depth(
+                        row = row,
+                        col = col,
+                        value = self.load_full_depth(
+                            row = col,
+                            col = row
                         )
                     )
 
@@ -462,13 +511,9 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
         @parameter
         fn process_row(row: Int):
             for col in range(self._cols // 2):
-                var index = self.index(row = row, col = col, component = 0)
-                var element = self._load_planar_element(index)
-                var mirror_index = self.index(row = row, col = self.col_end_index() - col, component = 0)
-
-                var mirror_element = self._load_planar_element(mirror_index)
-                self._store_planar_element(index = index, element = mirror_element)
-                self._store_planar_element(index = mirror_index, element = element)
+                var original_value = self.load_full_depth(row = row, col = col)
+                self.store_full_depth(row = row, col = col, value = self.load_full_depth(row = row, col = self.col_end_index() - col))
+                self.store_full_depth(row = row, col = self.col_end_index() - col, value = original_value)
 
         parallelize[process_row](self._rows)
     
@@ -482,12 +527,9 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
         @parameter
         fn process_row(row: Int):
             for col in range(self._cols):
-                var index = self.index(row = row, col = col, component = 0)
-                var element = self._load_planar_element(index)
-                var mirror_index = self.index(row = self.row_end_index() - row, col = col, component = 0)
-
-                self._store_planar_element(index = index, element = self._load_planar_element(mirror_index))
-                self._store_planar_element(index = mirror_index, element = element)
+                var original_value = self.load_full_depth(row = row, col = col)
+                self.store_full_depth(row = row, col = col, value = self.load_full_depth(row = self.row_end_index() - row, col = col))
+                self.store_full_depth(row = self.row_end_index() - row, col = col, value = original_value)
 
         parallelize[process_row](self._rows // 2)
     
@@ -497,7 +539,7 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
         
         return result^
 
-    fn flip(mut self):
+    fn rotate_180(mut self):
         var row_range = ceildiv(self._rows, 2)
 
         @parameter
@@ -509,18 +551,15 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
                 col_range = self._cols if row < row_range - 1 else self._cols // 2
 
             for col in range(col_range):
-                var index = self.index(row = row, col = col, component = 0)
-                var element = self._load_planar_element(index)
-                var mirror_index = self.index(row = self.row_end_index() - row, col = self.col_end_index() - col, component = 0)
-
-                self._store_planar_element(index = index, element = self._load_planar_element(mirror_index))
-                self._store_planar_element(index = mirror_index, element = element)
+                var original_value = self.load_full_depth(row = row, col = col)
+                self.store_full_depth(row = row, col = col, value = self.load_full_depth(row = self.row_end_index() - row, col = self.col_end_index() - col))
+                self.store_full_depth(row = self.row_end_index() - row, col = self.col_end_index() - col, value = original_value)
 
         parallelize[process_row](row_range)
 
-    fn flipped(self) -> Self:
+    fn rotated_180(self) -> Self:
         var result = self.copy()
-        result.flip()
+        result.rotate_180()
 
         return result^
 
@@ -529,27 +568,24 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
         fn fill[width: Int](value: Number[dtype, complex, width]) -> Number[dtype, complex, width]:
             return scalar
         
-        self._for_each[fill]()
-
-    #
-    # Private Numeric Utilities
-    #
-    @always_inline
-    fn _load_planar_element(self, index: Int) -> InlineArray[ScalarNumber[dtype, complex], depth]:
-        var result = InlineArray[ScalarNumber[dtype, complex], depth](uninitialized = True)
-        @parameter
-        for i in range(depth):
-            result[i] = self.load[1](index + i)
-
-        return result
+        self.for_each[fill]()
     
-    @always_inline
-    fn _store_planar_element(mut self, index: Int, element: InlineArray[ScalarNumber[dtype, complex], depth]):
+    fn strided_for_each[transformer: fn[width: Int](value: Number[dtype, complex, width]) capturing -> Number[dtype, complex, width]](mut self, component: Int):
         @parameter
-        for i in range(depth):
-            self.store(index = index + i, value = element[i])
+        fn transform_row(row: Int):
+            @parameter
+            fn transform_col[width: Int](col: Int):
+                self.strided_store(
+                    row = row,
+                    col = col,
+                    component = component,
+                    value = transformer[width](value = self.strided_load[width](row = row, col = col, component = component))
+                )
 
-    fn _for_each[transformer: fn[width: Int](value: Number[dtype, complex, width]) capturing -> Number[dtype, complex, width]](mut self):
+            vectorize[transform_col, Self.optimal_simd_width, unroll_factor = Self._unroll_factor](self._cols)
+        parallelize[transform_row](self._rows)
+    
+    fn for_each[transformer: fn[width: Int](value: Number[dtype, complex, width]) capturing -> Number[dtype, complex, width]](mut self):
         @parameter
         fn transform_row(row: Int):
             @parameter
@@ -563,6 +599,38 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
 
             vectorize[transform_flattened_elements, Self.optimal_simd_width, unroll_factor = Self._unroll_factor](self._cols * depth)
         parallelize[transform_row](self._rows)
+
+    fn load_full_depth(self, row: Int, col: Int) -> InlineArray[ScalarNumber[dtype, complex], depth]:
+        var result = InlineArray[ScalarNumber[dtype, complex], depth](uninitialized = True)
+        @parameter
+        for component in range(depth):
+            result[component] = self.strided_load[1](row = row, col = col, component = component)
+
+        return result
+    
+    fn store_full_depth(mut self, row: Int, col: Int, value: InlineArray[ScalarNumber[dtype, complex], depth]):
+        @parameter
+        for component in range(depth):
+            self.strided_store(row = row, col = col, component = component, value = value[component])
+
+    fn create_full_depth_value(self, value: ScalarNumber[dtype, complex]) -> InlineArray[ScalarNumber[dtype, complex], depth]:
+        var result = InlineArray[ScalarNumber[dtype, complex], depth](uninitialized = True)
+        @parameter
+        for component in range(depth):
+            result[component] = value
+
+        return result
+    
+    fn create_full_depth_value(self, *values: ScalarNumber[dtype, complex]) -> InlineArray[ScalarNumber[dtype, complex], depth]:
+        # TODO: Make this a compile-time check when possible
+        debug_assert(depth == len(values), "mismatch in the number of values in the full depth element variadic constructor")
+
+        var result = InlineArray[ScalarNumber[dtype, complex], depth](uninitialized = True)
+        @parameter
+        for component in range(depth):
+            result[component] = values[component]
+
+        return result
 
     #
     # Type Conversion

@@ -9,12 +9,14 @@ from os import abort
 from pathlib import Path
 from memory import UnsafePointer
 from algorithm import vectorize, parallelize
+from collections import Optional
 
 from mosaic.numeric import Matrix, Number, ScalarNumber
 from mosaic.utility import optimal_simd_width
 
 from .image_reader import ImageReader
 from .image_writer import ImageWriter
+from .filters import Filters
 
 #
 # Image
@@ -59,7 +61,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
 
     @always_inline
     fn pixels(self) -> Int:
-        return self._matrix.planar_count()
+        return self._matrix.strided_count()
 
     @always_inline
     fn channels(self) -> Int:
@@ -187,7 +189,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
             parallelize[convert_row](num_work_items = self.height())
 
     #
-    # Transformations
+    # Geometric Transformations
     #
     fn flip_horizontally(mut self):
         self._matrix.flip_horizontally()
@@ -201,25 +203,38 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     fn flipped_vertically(self) -> Self:
         return Self(matrix = self._matrix.flipped_vertically())
 
-    fn flip(mut self):
-        self._matrix.flip()
+    fn rotate_180(mut self):
+        self._matrix.rotate_180()
 
-    fn flipped(self) -> Self:
-        return Self(matrix = self._matrix.flipped())
+    fn rotated_180(self) -> Self:
+        return Self(matrix = self._matrix.rotated_180())
 
     #
-    # Filtering
+    # Common Filters
     #
     fn box_blur[border: Border](mut self, size: Int):
         self.filter[border](
-            Matrix[dtype, color_space.channels()](rows = size, cols = size, value = (1 / (size * size)).cast[dtype]())
+            Filters.box_kernel[dtype, color_space.channels()](size)
         )
     
     fn box_blurred[border: Border](self, size: Int) -> Self:
         return self.filtered[border](
-            Matrix[dtype, color_space.channels()](rows = size, cols = size, value = (1 / (size * size)).cast[dtype]())
+            Filters.box_kernel[dtype, color_space.channels()](size)
+        )
+    
+    fn gaussian_blur[border: Border](mut self, size: Int, std_dev: Optional[Float64] = None):
+        self.filter[border](
+            Filters.gaussian_kernel_2D[dtype, color_space.channels()](size = size, std_dev = std_dev)
+        )
+    
+    fn gaussian_blurred[border: Border](mut self, size: Int, std_dev: Optional[Float64] = None) -> Self:
+        return self.filtered[border](
+            Filters.gaussian_kernel_2D[dtype, color_space.channels()](size = size, std_dev = std_dev)
         )
 
+    #
+    # Filtering
+    #
     fn filter[border: Border](mut self, kernel: Matrix[dtype, color_space.channels()]):
         self.filtered[border](kernel)._matrix.copy_into(self._matrix)
 
@@ -230,26 +245,26 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
         return result^
 
     fn filtered_into[border: Border](self, mut dest: Self, kernel: Matrix[dtype, color_space.channels()]):
-        var count = kernel.planar_count()
+        var count = kernel.strided_count()
 
         if count == 1:
-            self._direct_convolution[border, 1](dest = dest, kernel = kernel.flipped())
+            self._direct_convolution[border, 1](dest = dest, kernel = kernel.rotated_180())
         elif count == 2:
-            self._direct_convolution[border, 2](dest = dest, kernel = kernel.flipped())
+            self._direct_convolution[border, 2](dest = dest, kernel = kernel.rotated_180())
         elif count <= 4:
-            self._direct_convolution[border, 4](dest = dest, kernel = kernel.flipped())
+            self._direct_convolution[border, 4](dest = dest, kernel = kernel.rotated_180())
         elif count <= 8:
-            self._direct_convolution[border, 8](dest = dest, kernel = kernel.flipped())
+            self._direct_convolution[border, 8](dest = dest, kernel = kernel.rotated_180())
         elif count <= 16:
-            self._direct_convolution[border, 16](dest = dest, kernel = kernel.flipped())
+            self._direct_convolution[border, 16](dest = dest, kernel = kernel.rotated_180())
         elif count <= 32:
-            self._direct_convolution[border, 32](dest = dest, kernel = kernel.flipped())
+            self._direct_convolution[border, 32](dest = dest, kernel = kernel.rotated_180())
         elif count <= 64:
-            self._direct_convolution[border, 64](dest = dest, kernel = kernel.flipped())
+            self._direct_convolution[border, 64](dest = dest, kernel = kernel.rotated_180())
         elif count <= 128:
-            self._direct_convolution[border, 128](dest = dest, kernel = kernel.flipped())
+            self._direct_convolution[border, 128](dest = dest, kernel = kernel.rotated_180())
         else:
-            abort("Direct convolution for kernels with planar counts greater than 128 is not supported yet")        
+            abort("Direct convolution for kernels with strided counts greater than 128 is not supported yet")        
 
     fn _direct_convolution[border: Border, width: Int](self, mut dest: Self, kernel: Matrix[dtype, color_space.channels()]):
         var half_kernel_width = kernel.cols() // 2
@@ -271,7 +286,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
 
         @parameter
         for channel in range(color_space.channels()):
-            # TODO: Create planar slice of kernel data and fill the kernel vector from that, or create an as_simd() method on Matrix?
+            # TODO: Create strided slice of kernel data and fill the kernel vector from that, or create an as_simd() method on Matrix?
             for row in range(kernel.rows()):
                 for col in range(kernel.cols()):
                     kernel_vector[row * kernel.cols() + col] = kernel.strided_load[1](row = row, col = col, component = channel).value
@@ -301,7 +316,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
 
             parallelize[process_row](dest.height())
 
-    fn _filter_dft[border: Border, new_dtype: DType](self, mut dest: Image[new_dtype, color_space], flipped_kernel: Matrix[dtype, color_space.channels()]):
+    fn _discrete_fourier_transform_convolution[border: Border, new_dtype: DType](self, mut dest: Image[new_dtype, color_space], flipped_kernel: Matrix[dtype, color_space.channels()]):
         pass
 
     fn _bordered_load[border: Border](self, y: Int, x: Int, channel: Int) -> Scalar[dtype]:

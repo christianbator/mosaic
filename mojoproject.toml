@@ -22,4 +22,5 @@ channels = [
 max = "*"
 
 [tasks]
-build = "build/build.sh"
+build = { cmd = "build/build.sh" }
+test = { cmd = "mojo test", depends-on = ["build"], cwd = "test" }

@@ -9,7 +9,7 @@ from math import sqrt, Ceilable, CeilDivable, Floorable, Truncable
 from complex import ComplexSIMD
 
 #
-# ScalarNumber
+# Aliases
 #
 alias ScalarNumber = Number[width = 1]
 
@@ -511,6 +511,13 @@ struct Number[dtype: DType, complex: Bool, width: Int](
     #
     # TODO: Wrap other SIMD method implementations
     #
+
+    fn reduce_add(self) -> ScalarNumber[dtype, complex]:
+        @parameter
+        if complex:
+            return ScalarNumber[dtype, complex](real = self.real().reduce_add(), imaginary = self.imaginary().reduce_add())
+        else:
+            return self.value.reduce_add()
 
     @always_inline
     fn squared_norm(self: Self) -> SIMD[dtype, width]:
