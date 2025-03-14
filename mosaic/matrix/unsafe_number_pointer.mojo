@@ -43,8 +43,8 @@ struct UnsafeNumberPointer[dtype: DType, complex: Bool]:
     fn __getitem__(self, index: Int) -> ScalarNumber[dtype, complex]:
         return self.load[1](index)
     
-    fn __setitem__(mut self: UnsafeNumberPointer[dtype, complex], index: Int, number: ScalarNumber[dtype, complex]):
-        self.store(index = index, number = number)
+    fn __setitem__(mut self: UnsafeNumberPointer[dtype, complex], index: Int, value: ScalarNumber[dtype, complex]):
+        self.store(index = index, value = value)
     
     fn load[width: Int](self, index: Int) -> Number[dtype, complex, width]:
         @parameter
@@ -61,12 +61,12 @@ struct UnsafeNumberPointer[dtype: DType, complex: Bool]:
                 )
             )
     
-    fn store[width: Int, //](mut self, index: Int, number: Number[dtype, complex, width]):
+    fn store[width: Int, //](mut self, index: Int, value: Number[dtype, complex, width]):
         @parameter
         if complex:
-            self._data.offset(index * 2).store(number.value)
+            self._data.offset(index * 2).store(value.value)
         else:
-            self._data.offset(index).store(number.value)
+            self._data.offset(index).store(value.value)
 
     fn strided_load[width: Int](self, index: Int, stride: Int) -> Number[dtype, complex, width]:
         @parameter
@@ -82,13 +82,13 @@ struct UnsafeNumberPointer[dtype: DType, complex: Bool]:
                 )
             )
 
-    fn strided_store[width: Int, //](mut self, index: Int, stride: Int, number: Number[dtype, complex, width]):
+    fn strided_store[width: Int, //](mut self, index: Int, stride: Int, value: Number[dtype, complex, width]):
         @parameter
         if complex:
-            self._data.offset(index * 2).strided_store(val = number.real().value, stride = stride * 2)
-            self._data.offset(index * 2 + 1).strided_store(val = number.imaginary().value, stride = stride * 2)
+            self._data.offset(index * 2).strided_store(val = value.real().value, stride = stride * 2)
+            self._data.offset(index * 2 + 1).strided_store(val = value.imaginary().value, stride = stride * 2)
         else:
-            self._data.offset(index).strided_store(val = number.value, stride = stride)
+            self._data.offset(index).strided_store(val = value.value, stride = stride)
     
     fn gather[width: Int, //](
         self,
@@ -116,7 +116,7 @@ struct UnsafeNumberPointer[dtype: DType, complex: Bool]:
     fn scatter[width: Int, //](
         self, 
         index: Int,
-        number: Number[dtype, complex, width],
+        value: Number[dtype, complex, width],
         offset_vector: SIMD[DType.index, width],
         mask_vector: SIMD[DType.bool, width]
     ):
@@ -124,12 +124,12 @@ struct UnsafeNumberPointer[dtype: DType, complex: Bool]:
         if complex:
             self._data.offset(index * 2).scatter(
                 offset = (offset_vector * 2).interleave(offset_vector * 2 + 1),
-                val = rebind[SIMD[dtype, width * 2]](number.value),
+                val = rebind[SIMD[dtype, width * 2]](value.value),
                 mask = mask_vector.interleave(mask_vector)
             )
         else:
             self._data.offset(index).scatter(
                 offset = offset_vector,
-                val = rebind[SIMD[dtype, width]](number.value),
+                val = rebind[SIMD[dtype, width]](value.value),
                 mask = mask_vector
             )

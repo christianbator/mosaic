@@ -5,7 +5,7 @@
 # Created by Christian Bator on 03/14/2025
 #
 
-from mosaic.image import Image, ColorSpace, Border, ImageFileType
+from mosaic.image import Image, ColorSpace, Border
 from mosaic.visualizer import Visualizer
 
 fn main():
@@ -15,7 +15,6 @@ fn main():
 
         # Step 2: Blur the image with zero-padded border handling and a box filter of size 9
         image.box_blur[Border.zero](size = 9)
-        image.save[ImageFileType.png]("data/mandrill-blurred.png")
 
         # Step 3: Request the Visualizer to show the image in a window titled "Image"
         Visualizer.show(image = image, window_title = "Image")

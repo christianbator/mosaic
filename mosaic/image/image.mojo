@@ -100,7 +100,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
         return self._matrix.strided_load[width](row = y, col = x, component = channel).value
 
     fn strided_store[width: Int](mut self, y: Int, x: Int, channel: Int, value: SIMD[dtype, width]):
-        self._matrix.strided_store[width](row = y, col = x, component = channel, number = value)
+        self._matrix.strided_store[width](row = y, col = x, component = channel, value = value)
     
     fn unsafe_data_ptr(self) -> UnsafePointer[Scalar[dtype]]:
         return self._matrix.unsafe_data_ptr()
@@ -212,12 +212,12 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     #
     fn box_blur[border: Border](mut self, size: Int):
         self.filter[border](
-            Matrix[dtype, color_space.channels()](rows = size, cols = size, number = (1 / (size * size)).cast[dtype]())
+            Matrix[dtype, color_space.channels()](rows = size, cols = size, value = (1 / (size * size)).cast[dtype]())
         )
     
     fn box_blurred[border: Border](self, size: Int) -> Self:
         return self.filtered[border](
-            Matrix[dtype, color_space.channels()](rows = size, cols = size, number = (1 / (size * size)).cast[dtype]())
+            Matrix[dtype, color_space.channels()](rows = size, cols = size, value = (1 / (size * size)).cast[dtype]())
         )
 
     fn filter[border: Border](mut self, kernel: Matrix[dtype, color_space.channels()]):

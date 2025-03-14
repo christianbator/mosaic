@@ -60,8 +60,8 @@ struct Number[dtype: DType, complex: Bool, width: Int](
         self.value = value
 
     @always_inline
-    fn __init__[other_dtype: DType, //](out self, number: Number[other_dtype, complex, width]):
-        self.value = number.value.cast[dtype]()
+    fn __init__[other_dtype: DType, //](out self, value: Number[other_dtype, complex, width]):
+        self.value = value.value.cast[dtype]()
 
     @always_inline
     @implicit
@@ -122,14 +122,14 @@ struct Number[dtype: DType, complex: Bool, width: Int](
 
     @always_inline
     @implicit
-    fn __init__(out self, number: ScalarNumber[dtype, complex], /):
+    fn __init__(out self, value: ScalarNumber[dtype, complex], /):
         @parameter
         if complex:
             self.value = rebind[Self.Value](
-                SIMD[dtype, width](number.value[0]).interleave(SIMD[dtype, width](number.value[1]))
+                SIMD[dtype, width](value.value[0]).interleave(SIMD[dtype, width](value.value[1]))
             )
         else:
-            self.value = number.value[0]
+            self.value = value.value[0]
 
     @always_inline
     @implicit
@@ -208,25 +208,25 @@ struct Number[dtype: DType, complex: Bool, width: Int](
             return ScalarNumber[dtype, complex](self.value[index])
     
     @always_inline
-    fn __setitem__(mut self, index: Int, number: ScalarNumber[dtype, complex]):
+    fn __setitem__(mut self, index: Int, value: ScalarNumber[dtype, complex]):
         @parameter
         if complex:
-            self.value[index] = number.value[0]
-            self.value[index + 1] = number.value[1]
+            self.value[index] = value.value[0]
+            self.value[index + 1] = value.value[1]
         else:
-            self.value[index] = number.value[0]
+            self.value[index] = value.value[0]
 
-    fn __contains__(self, number: ScalarNumber[dtype, complex]) -> Bool:
+    fn __contains__(self, value: ScalarNumber[dtype, complex]) -> Bool:
         @parameter
         if complex:
             @parameter
             for i in range(width):
-                if self[i] == number:
+                if self[i] == value:
                     return True
             
             return False
         else:
-            return self.value.__contains__(number.value[0])
+            return self.value.__contains__(value.value[0])
 
     @always_inline
     fn real(self) -> SIMD[dtype, width]:
