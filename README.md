@@ -67,6 +67,7 @@ mosaic = "*"
 ```
 
 ## Examples
+#### Prerequisites
 Clone the repo and build Mosaic:
 ```bash
 git clone git@github.com:christianbator/mosaic.git
@@ -74,23 +75,23 @@ cd mosaic
 magic run build
 ```
 
-Then you can run the examples:
+#### Running an example
+Run an example file from the `examples/` directory like so:
 ```zsh
 cd examples
 magic run mojo show_image.mojo
 ```
 
-#### Descriptions
-- Show image
-  - Reads an image file into a UInt8, RGB representation and displays it in the visualizer
-  - Source: [examples/show_image.mojo](examples/show_image.mojo)
+#### Show image
+- Reads an image file into a UInt8 RGB representation and displays it in the visualizer
+- Source: [examples/show_image.mojo](examples/show_image.mojo)
 <div align="center">
   <img src="data/mandrill.png" alt="Mandrill" width="256" height="256">
 </div>
 
-- Blur image
-  - Reads an image file, converts the data type, and applies a box filter to blur the image
-  - Source: [examples/blur_image.mojo](examples/blur_image.mojo)
+#### Blur image
+- Reads an image file, converts the data type, and applies a box filter to blur the image
+- Source: [examples/blur_image.mojo](examples/blur_image.mojo)
 <div align="center">
   <img src="data/mandrill-blurred.png" alt="Mandrill blurred" width="256" height="256">
 </div>
