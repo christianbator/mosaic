@@ -17,7 +17,7 @@ alias ScalarNumber = Number[width = 1]
 # Number
 #
 @register_passable("trivial")
-struct Number[dtype: DType, complex: Bool, width: Int](
+struct Number[dtype: DType, width: Int, complex: Bool](
     Absable,
     Boolable,
     Ceilable,
@@ -60,7 +60,7 @@ struct Number[dtype: DType, complex: Bool, width: Int](
         self.value = value
 
     @always_inline
-    fn __init__[other_dtype: DType, //](out self, value: Number[other_dtype, complex, width]):
+    fn __init__[other_dtype: DType, //](out self, value: Number[other_dtype, width, complex]):
         self.value = value.value.cast[dtype]()
 
     @always_inline
@@ -117,7 +117,7 @@ struct Number[dtype: DType, complex: Bool, width: Int](
 
     @always_inline
     @implicit
-    fn __init__(out self: Number[DType.bool, False, width], value: Bool, /):
+    fn __init__(out self: Number[DType.bool, width, False], value: Bool, /):
         self.value = value
 
     @always_inline
@@ -162,7 +162,7 @@ struct Number[dtype: DType, complex: Bool, width: Int](
         )
 
     @staticmethod
-    fn from_bits[int_type: DType, //](value: SIMD[int_type, Self.Value.size]) -> Number[dtype, complex, width]:
+    fn from_bits[int_type: DType, //](value: SIMD[int_type, Self.Value.size]) -> Number[dtype, width, complex]:
         return Self(Self.Value.from_bits(value))
     
     @staticmethod
@@ -499,8 +499,8 @@ struct Number[dtype: DType, complex: Bool, width: Int](
     # Type Conversion
     #
     @always_inline
-    fn cast[new_dtype: DType](self) -> Number[new_dtype, complex, width]:
-        return Number[new_dtype, complex, width](
+    fn cast[new_dtype: DType](self) -> Number[new_dtype, width, complex]:
+        return Number[new_dtype, width, complex](
             self.value.cast[new_dtype]()
         )
 
@@ -519,10 +519,10 @@ struct Number[dtype: DType, complex: Bool, width: Int](
         else:
             return self.value.reduce_add()
     
-    fn reduce_min(self: Number[dtype, False, width]) -> ScalarNumber[dtype, False]:
+    fn reduce_min(self: Number[dtype, width, False]) -> ScalarNumber[dtype, False]:
         return self.value.reduce_min()
     
-    fn reduce_max(self: Number[dtype, False, width]) -> ScalarNumber[dtype, False]:
+    fn reduce_max(self: Number[dtype, width, False]) -> ScalarNumber[dtype, False]:
         return self.value.reduce_max()
 
     @always_inline
