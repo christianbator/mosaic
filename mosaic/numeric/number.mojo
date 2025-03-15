@@ -518,6 +518,12 @@ struct Number[dtype: DType, complex: Bool, width: Int](
             return ScalarNumber[dtype, complex](real = self.real().reduce_add(), imaginary = self.imaginary().reduce_add())
         else:
             return self.value.reduce_add()
+    
+    fn reduce_min(self: Number[dtype, False, width]) -> ScalarNumber[dtype, False]:
+        return self.value.reduce_min()
+    
+    fn reduce_max(self: Number[dtype, False, width]) -> ScalarNumber[dtype, False]:
+        return self.value.reduce_max()
 
     @always_inline
     fn squared_norm(self: Self) -> SIMD[dtype, width]:

@@ -378,7 +378,7 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
     #
     fn strided_sum(self, component: Int) -> ScalarNumber[dtype, complex]:
         var result = ScalarNumber[dtype, complex](0)
-
+    
         for row in range(self._rows):
             @parameter
             fn process_cols[width: Int](col: Int):
@@ -388,6 +388,51 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
         
         return result
     
+    fn sum(self: Matrix[dtype, 1, complex]) -> ScalarNumber[dtype, complex]:
+        return self.strided_sum(0)
+
+    fn strided_average(self, component: Int) -> ScalarNumber[DType.float64, complex]:
+        return self.strided_sum(component).cast[DType.float64]() / self.strided_count()
+
+    fn average(self: Matrix[dtype, 1, complex]) -> ScalarNumber[DType.float64, complex]:
+        return self.strided_average(0)
+
+    fn strided_min(self: Matrix[dtype, depth, False], component: Int) -> Scalar[dtype]:
+        var result = Scalar[dtype].MAX_FINITE
+
+        for row in range(self._rows):
+            @parameter
+            fn process_cols[width: Int](col: Int):
+                result = min(
+                    result,
+                    self.strided_load[width](row = row, col = col, component = component).reduce_min().value
+                )
+
+            vectorize[process_cols, Self.optimal_simd_width, unroll_factor = Self._unroll_factor](self._cols)
+        
+        return result
+
+    fn min(self: Matrix[dtype, 1, False]) -> Scalar[dtype]:
+        return self.strided_min(0)
+    
+    fn strided_max(self: Matrix[dtype, depth, False], component: Int) -> Scalar[dtype]:
+        var result = Scalar[dtype].MIN_FINITE
+
+        for row in range(self._rows):
+            @parameter
+            fn process_cols[width: Int](col: Int):
+                result = max(
+                    result,
+                    self.strided_load[width](row = row, col = col, component = component).reduce_max().value
+                )
+
+            vectorize[process_cols, Self.optimal_simd_width, unroll_factor = Self._unroll_factor](self._cols)
+        
+        return result
+
+    fn max(self: Matrix[dtype, 1, False]) -> Scalar[dtype]:
+        return self.strided_max(0)
+
     fn strided_normalize(mut self):
         @parameter
         for component in range(depth):

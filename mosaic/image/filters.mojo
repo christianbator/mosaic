@@ -13,11 +13,11 @@ from mosaic.numeric import Matrix, Number, ScalarNumber
 struct Filters:
 
     @staticmethod
-    fn box_kernel[dtype: DType, depth: Int, complex: Bool = False](size: Int) -> Matrix[dtype, depth, complex]:
+    fn box_kernel[dtype: DType, depth: Int = 1, complex: Bool = False](size: Int) -> Matrix[dtype, depth, complex]:
         return Matrix[dtype, depth, complex](rows = size, cols = size, value = (1 / (size * size)).cast[dtype]())
     
     @staticmethod
-    fn gaussian_kernel_1D[dtype: DType, depth: Int, complex: Bool = False](size: Int, std_dev: Optional[Float64] = None) -> Matrix[dtype, depth, complex]:
+    fn gaussian_kernel_1D[dtype: DType, depth: Int = 1, complex: Bool = False](size: Int, std_dev: Optional[Float64] = None) -> Matrix[dtype, depth, complex]:
         constrained[dtype.is_floating_point(), "gaussian_kernel_1D() is only available for floating point dtypes"]()
 
         if size == 1:
@@ -85,7 +85,7 @@ struct Filters:
                 return result.astype[dtype]()
 
     @staticmethod
-    fn gaussian_kernel_2D[dtype: DType, depth: Int, complex: Bool = False](size: Int, std_dev: Optional[Float64] = None) -> Matrix[dtype, depth, complex]:
+    fn gaussian_kernel_2D[dtype: DType, depth: Int = 1, complex: Bool = False](size: Int, std_dev: Optional[Float64] = None) -> Matrix[dtype, depth, complex]:
         var kernel = Self.gaussian_kernel_1D[dtype, depth, complex](size = size, std_dev = std_dev)
         
         return kernel @ kernel.transposed()
