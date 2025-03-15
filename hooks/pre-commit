@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+#
+# pre-commit
+# mosaic
+#
+# Created by Christian Bator on 03/15/2025
+#
+
+magic run mojo format mosaic
