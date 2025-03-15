@@ -7,33 +7,21 @@
 # Created by Christian Bator on 03/15/2025
 #
 
-# Colors
-cyan="\033[36m"
-reset="\033[0m"
-
 # Run the format command and capture its output
 output=$(magic run format 2>&1)
-echo "$output"
+echo -e "$output\n"
 
 # Look for files that were reformatted in the output: "reformatted <filepath>"
 reformatted_files=$(echo $output | grep -Eo "reformatted [^[:space:]]+\.mojo" | cut -d " " -f 2)
 
-# If no reformatted files are found, proceed with the commit
 if [ -z "$reformatted_files" ]; then
-  exit 0
+    # If no reformatted files are found, proceed with the commit
+    exit 0
+else
+    # Otherwise, re-add reformatted files    
+    for file in $reformatted_files; do
+        if git diff --name-only --staged | grep -q "$file"; then
+            git add "$file"
+        fi
+    done
 fi
-
-# Loop through the reformatted files
-for file in $reformatted_files; do
-  # Check if the file is staged
-  if git diff --name-only --staged | grep -q "$file"; then
-    echo "Adding reformatted file: $file ..."
-    git add "$file"
-  fi
-done
-
-# Perform the commit again, this time with the reformatted files
-# echo "Committing with reformatted files ..."
-# git commit --amend --no-edit
-
-exit 0
