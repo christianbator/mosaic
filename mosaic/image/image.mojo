@@ -214,22 +214,22 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     #
     fn box_blur[border: Border](mut self, size: Int):
         self.filter[border](
-            Filters.box_kernel[dtype, color_space.channels()](size)
+            Filters.box_kernel_2d[dtype, color_space.channels()](size)
         )
     
     fn box_blurred[border: Border](self, size: Int) -> Self:
         return self.filtered[border](
-            Filters.box_kernel[dtype, color_space.channels()](size)
+            Filters.box_kernel_2d[dtype, color_space.channels()](size)
         )
     
     fn gaussian_blur[border: Border](mut self, size: Int, std_dev: Optional[Float64] = None):
         self.filter[border](
-            Filters.gaussian_kernel_2D[dtype, color_space.channels()](size = size, std_dev = std_dev)
+            Filters.gaussian_kernel_2d[dtype, color_space.channels()](size = size, std_dev = std_dev)
         )
     
     fn gaussian_blurred[border: Border](mut self, size: Int, std_dev: Optional[Float64] = None) -> Self:
         return self.filtered[border](
-            Filters.gaussian_kernel_2D[dtype, color_space.channels()](size = size, std_dev = std_dev)
+            Filters.gaussian_kernel_2d[dtype, color_space.channels()](size = size, std_dev = std_dev)
         )
 
     #
