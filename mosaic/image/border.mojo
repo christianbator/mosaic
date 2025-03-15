@@ -32,7 +32,7 @@ struct Border(EqualityComparable, Stringable, Writable):
         return not(self == other)
 
     fn __str__(self) -> String:
-        return "[Border: " + String(self._raw_value) + "]"
+        return String.write(self)
 
     fn write_to[W: Writer](self, mut writer: W):
-        writer.write(String(self))
+        writer.write("[Border: ", self._raw_value, "]")

@@ -46,7 +46,7 @@ struct ImageFileType(EqualityComparable, Stringable, Writable):
         return not(self == other)
     
     fn __str__(self) -> String:
-        return "[ImageFileType: " + self._raw_value + "]"
-    
+        return String.write(self)
+
     fn write_to[W: Writer](self, mut writer: W):
-        writer.write(String(self))
+        writer.write("[ImageFileType: ", self._raw_value, "]")

@@ -49,7 +49,7 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
         self._data = UnsafeNumberPointer[dtype, complex](rows * cols * depth)
         
         for index in range(len(values)):
-            self.store(index = index, value = values[index])
+            self._store(index = index, value = values[index])
 
     fn __init__(out self, rows: Int, cols: Int, owned data: UnsafeNumberPointer[dtype, complex]):
         self._rows = rows
@@ -120,6 +120,10 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
     @always_inline
     fn cols(self) -> Int:
         return self._cols
+    
+    @always_inline
+    fn components(self) -> Int:
+        return depth
 
     @always_inline
     fn count(self) -> Int:
@@ -162,18 +166,12 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
             stride = depth
         )
 
-    fn strided_store[width: Int](mut self, row: Int, col: Int, component: Int, value: Number[dtype, complex, width]):
+    fn strided_store[width: Int, //](mut self, row: Int, col: Int, component: Int, value: Number[dtype, complex, width]):
         self._data.strided_store(
             index = self.index(row = row, col = col, component = component),
             stride = depth,
             value = value
         )
-
-    fn load[width: Int](self, index: Int) -> Number[dtype, complex, width]:
-        return self._data.load[width](index)
-    
-    fn store[width: Int](mut self, index: Int, value: Number[dtype, complex, width]):
-        self._data.store(index = index, value = value)
 
     fn gather[width: Int, //](self, row: Int, col: Int, component: Int, offset_vector: SIMD[DType.index, width], mask_vector: SIMD[DType.bool, width]) -> Number[dtype, complex, width]:
         return self._data.gather(
@@ -190,6 +188,18 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
             mask_vector = mask_vector
         )
 
+    #
+    # Private Access
+    #
+    fn _load[width: Int](self, index: Int) -> Number[dtype, complex, width]:
+        return self._data.load[width](index)
+    
+    fn _store[width: Int, //](mut self, index: Int, value: Number[dtype, complex, width]):
+        self._data.store(index = index, value = value)
+
+    #
+    # Unsafe Access
+    #
     fn unsafe_data_ptr(self) -> UnsafePointer[Scalar[dtype]]:
         return self._data.unsafe_ptr()
 
@@ -202,10 +212,6 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
     @always_inline
     fn index(self, row: Int, col: Int, component: Int) -> Int:
         return (row * self._cols + col) * depth + component
-
-    @always_inline
-    fn transposed_index(self, row: Int, col: Int, component: Int) -> Int:
-        return (col * self._rows + row) * depth + component
 
     @always_inline
     fn flattened_index(self, row: Int, offset: Int) -> Int:
@@ -450,10 +456,7 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
             @parameter
             fn iterate_over_row(row: Int):
                 for col in range(row + 1, self._cols):
-                    # var original_index = self.index(row = row, col = col, component = 0)
-                    # var transposed_index = self.transposed_index(row = row, col = col, component = 0)
                     var original_value = self.load_full_depth(row = row, col = col)
-                    
                     self.store_full_depth(row = row, col = col, value = self.load_full_depth(row = col, col = row))
                     self.store_full_depth(row = col, col = row, value = original_value)
 
@@ -472,10 +475,7 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
                     self.store_full_depth(
                         row = row,
                         col = col,
-                        value = copy.load_full_depth(
-                            row = col,
-                            col = row
-                        )
+                        value = copy.load_full_depth(row = col, col = row)
                     )
 
             parallelize[tranpose_row](self._rows)
@@ -497,10 +497,7 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
                     copy.store_full_depth(
                         row = row,
                         col = col,
-                        value = self.load_full_depth(
-                            row = col,
-                            col = row
-                        )
+                        value = self.load_full_depth(row = col, col = row)
                     )
 
             parallelize[tranpose_row](copy._rows)
@@ -592,9 +589,9 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
             fn transform_flattened_elements[width: Int](flattened_element: Int):
                 var index = self.flattened_index(row = row, offset = flattened_element)
 
-                self.store(
+                self._store(
                     index = index,
-                    value = transformer[width](self.load[width](index))
+                    value = transformer[width](self._load[width](index))
                 )
 
             vectorize[transform_flattened_elements, Self.optimal_simd_width, unroll_factor = Self._unroll_factor](self._cols * depth)
@@ -655,8 +652,8 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
                 @parameter
                 fn convert_flattened_elements[width: Int](flattened_element: Int):
                     var index = self.flattened_index(row = row, offset = flattened_element)
-                    var value = self.load[width](index).cast[new_dtype]()
-                    dest.store(index = index, value = value)
+                    var value = self._load[width](index).cast[new_dtype]()
+                    dest._store(index = index, value = value)
 
                 vectorize[convert_flattened_elements, Self.optimal_simd_width, unroll_factor = Self._unroll_factor](self._cols * depth)
             parallelize[convert_row](self._rows)
@@ -673,8 +670,8 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
                 @parameter
                 fn convert_flattened_elements[width: Int](flattened_element: Int):
                     var index = self.flattened_index(row = row, offset = flattened_element)
-                    var value = self.load[width](index).cast[new_dtype]()
-                    dest.store(index = index, value = value)
+                    var value = self._load[width](index).cast[new_dtype]()
+                    dest._store(index = index, value = value)
 
                 vectorize[convert_flattened_elements, Self.optimal_simd_width, unroll_factor = Self._unroll_factor](self._cols * depth)
             parallelize[convert_row](self._rows)
@@ -683,22 +680,17 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
     # Stringable & Writable
     #
     fn __str__(self) -> String:
-        var result = String("[Matrix:\n  [\n")
-
-        for row in range(self._rows):
-            var row_string = String("    [")
-            
-            for col in range(self._cols):
-                var index = self.index(row = row, col = col, component = 0)
-                var suffix = ", " if col < self._cols - 1 else ""
-                row_string += String(self.load[depth](index)) + suffix
-            
-            row_string += ("]," if row < self._rows - 1 else "]")
-            result += row_string + "\n"
-                    
-        result += "  ]\n]"
-
-        return result
+        return String.write(self)
 
     fn write_to[W: Writer](self, mut writer: W):
-        writer.write(String(self))
+        writer.write("[Matrix:\n  [\n")
+
+        for row in range(self._rows):
+            writer.write("    [")
+            for col in range(self._cols):
+                @parameter
+                for component in range(depth):
+                    writer.write(self[row, col, component])
+                writer.write(", " if col < self._cols - 1 else "")
+            writer.write("],\n" if row < self._rows - 1 else "]\n")
+        writer.write("  ]\n]")

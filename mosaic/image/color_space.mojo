@@ -49,7 +49,7 @@ struct ColorSpace(EqualityComparable, Stringable, Writable):
         return not(self == other)
     
     fn __str__(self) -> String:
-        return "[ColorSpace: " + self._raw_value + "]"
-    
+        return String.write(self)
+        
     fn write_to[W: Writer](self, mut writer: W):
-        writer.write(String(self))
+        writer.write("[ColorSpace: ", self._raw_value, "]")

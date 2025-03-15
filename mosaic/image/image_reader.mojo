@@ -26,10 +26,10 @@ struct ImageInfo(Stringable, Writable):
         self.bit_depth = 0
 
     fn __str__(self) -> String:
-        return "[ImageInfo: width = " + String(self.width) + ", height = " + String(self.height) + ", bit_depth = " + String(self.bit_depth) + "]"
+        return String.write(self)
 
     fn write_to[W: Writer](self, mut writer: W):
-        writer.write(String(self))
+        writer.write("[ImageInfo: width = ", self.width, ", height = ", self.height, ", bit_depth = ", self.bit_depth, "]")
 
 #
 # ImageReader

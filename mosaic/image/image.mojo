@@ -365,10 +365,10 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     # Stringable & Writable
     #
     fn __str__(self) -> String:
-        return "[Image: width = " + String(self.width()) + ", height = " + String(self.height()) + ", color_space = " + String(color_space) + ", bit_depth = " + String(dtype.bitwidth()) + "]"
+        return String.write(self)
 
     fn write_to[W: Writer](self, mut writer: W):
-        writer.write(String(self))
+        writer.write("[Image: width = ", self.width(), ", height = ", self.height(), ", color_space = ", color_space, ", bit_depth = ", dtype.bitwidth(), "]")
 
 #
 # ImagePointer

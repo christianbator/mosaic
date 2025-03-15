@@ -15,7 +15,7 @@ struct StereoDimensions(Stringable, Writable):
     var height: Int
 
     fn __str__(self) -> String:
-        return "[StereoDimensions: width = " + String(self.width) + ", height = " + String(self.height) + "]"
+        return String.write(self)
 
     fn write_to[W: Writer](self, mut writer: W):
-        writer.write(String(self))
+        writer.write("[StereoDimensions: width = ", self.width, ", height = ", self.height, "]")

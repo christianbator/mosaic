@@ -8,3 +8,4 @@
 from .number import Number, ScalarNumber
 from .unsafe_number_pointer import UnsafeNumberPointer
 from .matrix import Matrix
+from .matrix_slice import MatrixSlice
