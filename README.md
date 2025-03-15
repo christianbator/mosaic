@@ -95,3 +95,10 @@ magic run mojo show_image.mojo
 <div align="center">
   <img src="data/mandrill-blurred.png" alt="Mandrill blurred" width="256" height="256">
 </div>
+
+#### Slice image
+- Reads an image file, creates an image slice of the top half, and displays it in the visualizer
+- Source: [examples/slice_image.mojo](examples/slice_image.mojo)
+<div align="center">
+  <img src="data/mandrill-top-half.png" alt="Mandrill top half" width="256" height="128">
+</div>

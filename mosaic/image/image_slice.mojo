@@ -8,6 +8,7 @@
 from math import ceildiv
 from memory import Pointer
 from algorithm import parallelize, vectorize
+from pathlib import Path
 
 from mosaic.numeric import Matrix, MatrixSlice
 from mosaic.numeric import StridedRange
@@ -18,7 +19,7 @@ from mosaic.utility import unroll_factor
 # ImageSlice
 #
 @value
-struct ImageSlice[mut: Bool, //, dtype: DType, color_space: ColorSpace, origin: Origin[mut]]():
+struct ImageSlice[mut: Bool, //, dtype: DType, color_space: ColorSpace, origin: Origin[mut]](Stringable, Writable):
     #
     # Fields
     #
@@ -184,3 +185,35 @@ struct ImageSlice[mut: Bool, //, dtype: DType, color_space: ColorSpace, origin: 
             parallelize[process_row](self._height)
 
         return result^
+
+    #
+    # Saving to File
+    #
+    fn save[file_type: ImageFileType](self, path: String) raises:
+        self.copy().save[file_type](path)
+
+    fn save[file_type: ImageFileType](self, path: Path) raises:
+        self.copy().save[file_type](path)
+
+    #
+    # Stringable & Writable
+    #
+    fn __str__(self) -> String:
+        return String.write(self)
+
+    fn write_to[W: Writer](self, mut writer: W):
+        writer.write(
+            "[ImageSlice: y_range = ",
+            self._y_range,
+            ", x_range = ",
+            self._x_range,
+            ", width = ",
+            self.width(),
+            ", height = ",
+            self.height(),
+            ", color_space = ",
+            color_space,
+            ", bit_depth = ",
+            dtype.bitwidth(),
+            "]",
+        )

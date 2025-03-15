@@ -11,11 +11,17 @@
 #
 @value
 @register_passable("trivial")
-struct StridedRange:
+struct StridedRange(Stringable, Writable):
+    #
+    # Fields
+    #
     var start: Int
     var end: Int
     var step: Int
 
+    #
+    # Initialization
+    #
     @always_inline
     fn __init__(out self, end: Int):
         self.start = 0
@@ -59,3 +65,12 @@ struct StridedRange:
         self.start = slice.start.value() if slice.start else default_start
         self.end = slice.end.value() if slice.end else default_end
         self.step = slice.step.value() if slice.step else default_step
+
+    #
+    # Stringable & Writable
+    #
+    fn __str__(self) -> String:
+        return String.write(self)
+
+    fn write_to[W: Writer](self, mut writer: W):
+        writer.write("[StridedRange: (", self.start, ", ", self.end, ", ", self.step, ")]")

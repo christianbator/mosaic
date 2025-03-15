@@ -18,7 +18,7 @@ fn main():
         image.box_blur[Border.zero](size=9)
 
         # Step 3: Request the Visualizer to show the image in a window titled "Image"
-        Visualizer.show(image=image, window_title="Image")
+        Visualizer.show(image, window_title="Image")
 
         # Step 4: Wait for user interaction (CMD+W closes the window)
         Visualizer.wait()

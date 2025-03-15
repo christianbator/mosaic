@@ -504,17 +504,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
         return String.write(self)
 
     fn write_to[W: Writer](self, mut writer: W):
-        writer.write(
-            "[Image: width = ",
-            self.width(),
-            ", height = ",
-            self.height(),
-            ", color_space = ",
-            color_space,
-            ", bit_depth = ",
-            dtype.bitwidth(),
-            "]",
-        )
+        writer.write("[Image: width = ", self.width(), ", height = ", self.height(), ", color_space = ", color_space, ", bit_depth = ", dtype.bitwidth(), "]")
 
 
 #

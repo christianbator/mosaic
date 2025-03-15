@@ -15,7 +15,7 @@ fn main():
         var image = Image[DType.uint8, ColorSpace.rgb]("data/mandrill.png")
 
         # Step 2: Request the Visualizer to show the image in a window titled "Image"
-        Visualizer.show(image=image, window_title="Image")
+        Visualizer.show(image, window_title="Image")
 
         # Step 3: Wait for user interaction (CMD+W closes the window)
         Visualizer.wait()
