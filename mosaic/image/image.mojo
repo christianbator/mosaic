@@ -23,6 +23,9 @@ from .filters import Filters
 # Image
 #
 struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable, ExplicitlyCopyable, Stringable, Writable):
+    #
+    # Fields
+    #
     alias optimal_simd_width = optimal_simd_width[dtype]()
 
     var _matrix: Matrix[dtype, color_space.channels()]
@@ -100,31 +103,43 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     #
     # Public Access
     #
+    @always_inline
     fn __getitem__(self, y: Int, x: Int) -> Scalar[dtype]:
-        constrained[
-            color_space.channels() == 1,
-            "Must specify channel for image in color space with channels > 1",
-        ]()
+        constrained[color_space.channels() == 1, "Must specify channel for image in color space with channels > 1"]()
 
-        return self._matrix[y, x, 0].value
+        return self[y, x, 0]
 
+    @always_inline
     fn __getitem__(self, y: Int, x: Int, channel: Int) -> Scalar[dtype]:
         return self._matrix[y, x, channel].value
 
+    @always_inline
     fn __setitem__(mut self, y: Int, x: Int, value: Scalar[dtype]):
-        constrained[
-            color_space.channels() == 1,
-            "Must specify channel for image in color space with channels > 1",
-        ]()
+        constrained[color_space.channels() == 1, "Must specify channel for image in color space with channels > 1"]()
 
-        self._matrix[y, x, 0] = value
+        self[y, x, 0] = value
 
+    @always_inline
     fn __setitem__(mut self, y: Int, x: Int, channel: Int, value: Scalar[dtype]):
         self._matrix[y, x, channel] = value
 
+    @always_inline
+    fn load[width: Int](self, y: Int, x: Int) -> SIMD[dtype, width]:
+        constrained[color_space.channels() == 1, "Must specify channel for image in color space with channels > 1"]()
+
+        return self.strided_load[width](y=y, x=x, channel=0)
+
+    @always_inline
     fn strided_load[width: Int](self, y: Int, x: Int, channel: Int) -> SIMD[dtype, width]:
         return self._matrix.strided_load[width](row=y, col=x, component=channel).value
 
+    @always_inline
+    fn store[width: Int](mut self, y: Int, x: Int, value: SIMD[dtype, width]):
+        constrained[color_space.channels() == 1, "Must specify channel for image in color space with channels > 1"]()
+
+        self.strided_store(y=y, x=x, channel=0, value=value)
+
+    @always_inline
     fn strided_store[width: Int](mut self, y: Int, x: Int, channel: Int, value: SIMD[dtype, width]):
         self._matrix.strided_store[width](row=y, col=x, component=channel, value=value)
 
@@ -140,6 +155,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     #
     # Slicing
     #
+    @always_inline
     fn __getitem__[mut: Bool, origin: Origin[mut], //](ref [origin]self, y_slice: Slice, x_slice: Slice) -> ImageSlice[dtype, color_space, origin]:
         return self.slice(
             y_range=StridedRange(
@@ -156,28 +172,35 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
             ),
         )
 
+    @always_inline
     fn slice[mut: Bool, origin: Origin[mut], //](ref [origin]self, y_range: StridedRange) -> ImageSlice[dtype, color_space, origin]:
         return self.slice(y_range=y_range, x_range=StridedRange(self.width()))
 
+    @always_inline
     fn slice[mut: Bool, origin: Origin[mut], //](ref [origin]self, *, x_range: StridedRange) -> ImageSlice[dtype, color_space, origin]:
         return self.slice(y_range=StridedRange(self.height()), x_range=x_range)
 
+    @always_inline
     fn slice[mut: Bool, origin: Origin[mut], //](ref [origin]self, y_range: StridedRange, x_range: StridedRange) -> ImageSlice[dtype, color_space, origin]:
         return ImageSlice[dtype, color_space, origin](image=self, y_range=y_range, x_range=x_range)
 
+    @always_inline
     fn channel_slice[channel: Int](self) -> MatrixSlice[StridedRange(channel, channel + 1), dtype, color_space.channels(), False, __origin_of(self._matrix)]:
         return self._matrix.component_slice[channel]()
 
+    @always_inline
     fn channel_slice[
         channel: Int
     ](self, y_range: StridedRange) -> MatrixSlice[StridedRange(channel, channel + 1), dtype, color_space.channels(), False, __origin_of(self._matrix)]:
         return self._matrix.component_slice[channel](row_range=y_range)
 
+    @always_inline
     fn channel_slice[
         channel: Int
     ](self, *, x_range: StridedRange) -> MatrixSlice[StridedRange(channel, channel + 1), dtype, color_space.channels(), False, __origin_of(self._matrix)]:
         return self._matrix.component_slice[channel](col_range=x_range)
 
+    @always_inline
     fn channel_slice[
         channel: Int
     ](self, y_range: StridedRange, x_range: StridedRange) -> MatrixSlice[
@@ -185,24 +208,29 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     ]:
         return self._matrix.component_slice[channel](row_range=y_range, col_range=x_range)
 
+    @always_inline
     fn strided_slice[channel_range: StridedRange](self) -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
         return self._matrix.strided_slice[channel_range]()
 
+    @always_inline
     fn strided_slice[
         channel_range: StridedRange
     ](self, y_range: StridedRange) -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
         return self._matrix.strided_slice[channel_range](row_range=y_range)
 
+    @always_inline
     fn strided_slice[
         channel_range: StridedRange
     ](self, *, x_range: StridedRange) -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
         return self._matrix.strided_slice[channel_range](col_range=x_range)
 
+    @always_inline
     fn strided_slice[
         channel_range: StridedRange
     ](self, y_range: StridedRange, x_range: StridedRange) -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
         return self._matrix.strided_slice[channel_range](y_range, x_range)
 
+    @always_inline
     fn extract_channel[channel: Int](self) -> Matrix[dtype]:
         return self._matrix.extract_component[channel]()
 

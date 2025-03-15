@@ -19,6 +19,9 @@ from mosaic.utility import optimal_simd_width, unroll_factor
 # Matrix
 #
 struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, EqualityComparable, ExplicitlyCopyable, Stringable, Writable):
+    #
+    # Fields
+    #
     alias optimal_simd_width = optimal_simd_width[dtype]() // 2 if complex else optimal_simd_width[dtype]()
 
     var _rows: Int
@@ -172,52 +175,39 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
     #
     # Public Access
     #
-    fn __getitem__(self, row: Int, col: Int) -> ScalarNumber[dtype, complex=complex]:
-        constrained[depth == 1, "Must specify component for matrix with depth > 1"]()
+    @always_inline
+    fn __getitem__(self: Matrix[dtype, 1, complex=complex], row: Int, col: Int) -> ScalarNumber[dtype, complex=complex]:
+        return self[row, col, 0]
 
-        return self.strided_load[1](row=row, col=col, component=0)
-
+    @always_inline
     fn __getitem__(self, row: Int, col: Int, component: Int) -> ScalarNumber[dtype, complex=complex]:
         return self.strided_load[1](row=row, col=col, component=component)
 
-    fn __setitem__(
-        mut self,
-        row: Int,
-        col: Int,
-        value: ScalarNumber[dtype, complex=complex],
-    ):
-        constrained[depth == 1, "Must specify component for matrix with depth > 1"]()
+    @always_inline
+    fn __setitem__(mut self: Matrix[dtype, 1, complex=complex], row: Int, col: Int, value: ScalarNumber[dtype, complex=complex]):
+        self[row, col, 0] = value
 
-        self.strided_store(row=row, col=col, component=0, value=value)
-
-    fn __setitem__(
-        mut self,
-        row: Int,
-        col: Int,
-        component: Int,
-        value: ScalarNumber[dtype, complex=complex],
-    ):
+    @always_inline
+    fn __setitem__(mut self, row: Int, col: Int, component: Int, value: ScalarNumber[dtype, complex=complex]):
         self.strided_store(row=row, col=col, component=component, value=value)
 
-    fn strided_load[width: Int](self: Matrix[dtype, 1, complex=complex], row: Int, col: Int) -> Number[dtype, width, complex=complex]:
+    @always_inline
+    fn load[width: Int](self: Matrix[dtype, 1, complex=complex], row: Int, col: Int) -> Number[dtype, width, complex=complex]:
         return self.strided_load[width](row=row, col=col, component=0)
 
+    @always_inline
     fn strided_load[width: Int](self, row: Int, col: Int, component: Int) -> Number[dtype, width, complex=complex]:
-        return self._data.strided_load[width](
-            index=self.index(row=row, col=col, component=component),
-            stride=depth,
-        )
+        return self._data.strided_load[width](index=self.index(row=row, col=col, component=component), stride=depth)
 
-    fn strided_store[width: Int, //](mut self: Matrix[dtype, 1, complex=complex], row: Int, col: Int, value: Number[dtype, width, complex=complex]):
+    @always_inline
+    fn store[width: Int, //](mut self: Matrix[dtype, 1, complex=complex], row: Int, col: Int, value: Number[dtype, width, complex=complex]):
         self.strided_store(row=row, col=col, component=0, value=value)
 
+    @always_inline
     fn strided_store[width: Int, //](mut self, row: Int, col: Int, component: Int, value: Number[dtype, width, complex=complex]):
-        self._data.strided_store(
-            index=self.index(row=row, col=col, component=component),
-            stride=depth,
-            value=value,
-        )
+        self._data.strided_store(index=self.index(row=row, col=col, component=component), stride=depth, value=value)
 
+    @always_inline
     fn gather[
         width: Int, //
     ](
@@ -236,6 +226,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
             mask_vector=mask_vector,
         )
 
+    @always_inline
     fn scatter[
         width: Int, //
     ](
@@ -255,88 +246,13 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
         )
 
     #
-    # Slicing
-    #
-    fn __getitem__[
-        mut: Bool, origin: Origin[mut], //
-    ](ref [origin]self, row_slice: Slice, col_slice: Slice) -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
-        return self.slice(
-            row_range=StridedRange(
-                slice=row_slice,
-                default_start=0,
-                default_end=self._rows,
-                default_step=1,
-            ),
-            col_range=StridedRange(
-                slice=col_slice,
-                default_start=0,
-                default_end=self._cols,
-                default_step=1,
-            ),
-        )
-
-    fn slice[mut: Bool, //, origin: Origin[mut]](ref [origin]self, row_range: StridedRange) -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
-        return self.slice(row_range=row_range, col_range=StridedRange(self._cols))
-
-    fn slice[
-        mut: Bool, //, origin: Origin[mut]
-    ](ref [origin]self, *, col_range: StridedRange) -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
-        return self.slice(row_range=StridedRange(self._rows), col_range=col_range)
-
-    fn slice[
-        mut: Bool, //, origin: Origin[mut]
-    ](ref [origin]self, row_range: StridedRange, col_range: StridedRange) -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
-        return MatrixSlice[StridedRange(depth), dtype, depth, complex, origin](matrix=self, row_range=row_range, col_range=col_range)
-
-    fn component_slice[
-        component: Int, mut: Bool, origin: Origin[mut]
-    ](ref [origin]self) -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
-        return self.strided_slice[StridedRange(component, component + 1)]()
-
-    fn component_slice[
-        component: Int, mut: Bool, origin: Origin[mut]
-    ](ref [origin]self, row_range: StridedRange) -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
-        return self.strided_slice[StridedRange(component, component + 1)](row_range)
-
-    fn component_slice[
-        component: Int, mut: Bool, origin: Origin[mut]
-    ](ref [origin]self, *, col_range: StridedRange) -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
-        return self.strided_slice[StridedRange(component, component + 1)](col_range=col_range)
-
-    fn component_slice[
-        component: Int, mut: Bool, origin: Origin[mut]
-    ](ref [origin]self, row_range: StridedRange, col_range: StridedRange) -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
-        return self.strided_slice[StridedRange(component, component + 1)](row_range=row_range, col_range=col_range)
-
-    fn strided_slice[
-        component_range: StridedRange, mut: Bool, origin: Origin[mut]
-    ](ref [origin]self) -> MatrixSlice[component_range, dtype, depth, complex, origin]:
-        return self.strided_slice[component_range](row_range=StridedRange(self._rows), col_range=StridedRange(self._cols))
-
-    fn strided_slice[
-        component_range: StridedRange, mut: Bool, origin: Origin[mut]
-    ](ref [origin]self, row_range: StridedRange) -> MatrixSlice[component_range, dtype, depth, complex, origin]:
-        return self.strided_slice[component_range](row_range=row_range, col_range=StridedRange(self._cols))
-
-    fn strided_slice[
-        component_range: StridedRange, mut: Bool, origin: Origin[mut]
-    ](ref [origin]self, *, col_range: StridedRange) -> MatrixSlice[component_range, dtype, depth, complex, origin]:
-        return self.strided_slice[component_range](row_range=StridedRange(self._rows), col_range=col_range)
-
-    fn strided_slice[
-        component_range: StridedRange, mut: Bool, origin: Origin[mut]
-    ](ref [origin]self, row_range: StridedRange, col_range: StridedRange) -> MatrixSlice[component_range, dtype, depth, complex, origin]:
-        return MatrixSlice[component_range, dtype, depth, complex, origin](matrix=self, row_range=row_range, col_range=col_range)
-
-    fn extract_component[component: Int](self) -> Matrix[dtype, complex=complex]:
-        return self.component_slice[component]().rebound_copy[depth=1]()
-
-    #
     # Private Access
     #
+    @always_inline
     fn _load[width: Int](self, index: Int) -> Number[dtype, width, complex=complex]:
         return self._data.load[width](index)
 
+    @always_inline
     fn _store[width: Int, //](mut self, index: Int, value: Number[dtype, width, complex=complex]):
         self._data.store(index=index, value=value)
 
@@ -375,6 +291,96 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
     @always_inline
     fn end_index(self) -> Int:
         return self.count() - 1
+
+    #
+    # Slicing
+    #
+    @always_inline
+    fn __getitem__[
+        mut: Bool, origin: Origin[mut], //
+    ](ref [origin]self, row_slice: Slice, col_slice: Slice) -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
+        return self.slice(
+            row_range=StridedRange(
+                slice=row_slice,
+                default_start=0,
+                default_end=self._rows,
+                default_step=1,
+            ),
+            col_range=StridedRange(
+                slice=col_slice,
+                default_start=0,
+                default_end=self._cols,
+                default_step=1,
+            ),
+        )
+
+    @always_inline
+    fn slice[mut: Bool, //, origin: Origin[mut]](ref [origin]self, row_range: StridedRange) -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
+        return self.slice(row_range=row_range, col_range=StridedRange(self._cols))
+
+    @always_inline
+    fn slice[
+        mut: Bool, //, origin: Origin[mut]
+    ](ref [origin]self, *, col_range: StridedRange) -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
+        return self.slice(row_range=StridedRange(self._rows), col_range=col_range)
+
+    @always_inline
+    fn slice[
+        mut: Bool, //, origin: Origin[mut]
+    ](ref [origin]self, row_range: StridedRange, col_range: StridedRange) -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
+        return MatrixSlice[StridedRange(depth), dtype, depth, complex, origin](matrix=self, row_range=row_range, col_range=col_range)
+
+    @always_inline
+    fn component_slice[
+        component: Int, mut: Bool, origin: Origin[mut]
+    ](ref [origin]self) -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
+        return self.strided_slice[StridedRange(component, component + 1)]()
+
+    @always_inline
+    fn component_slice[
+        component: Int, mut: Bool, origin: Origin[mut]
+    ](ref [origin]self, row_range: StridedRange) -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
+        return self.strided_slice[StridedRange(component, component + 1)](row_range)
+
+    @always_inline
+    fn component_slice[
+        component: Int, mut: Bool, origin: Origin[mut]
+    ](ref [origin]self, *, col_range: StridedRange) -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
+        return self.strided_slice[StridedRange(component, component + 1)](col_range=col_range)
+
+    @always_inline
+    fn component_slice[
+        component: Int, mut: Bool, origin: Origin[mut]
+    ](ref [origin]self, row_range: StridedRange, col_range: StridedRange) -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
+        return self.strided_slice[StridedRange(component, component + 1)](row_range=row_range, col_range=col_range)
+
+    @always_inline
+    fn strided_slice[
+        component_range: StridedRange, mut: Bool, origin: Origin[mut]
+    ](ref [origin]self) -> MatrixSlice[component_range, dtype, depth, complex, origin]:
+        return self.strided_slice[component_range](row_range=StridedRange(self._rows), col_range=StridedRange(self._cols))
+
+    @always_inline
+    fn strided_slice[
+        component_range: StridedRange, mut: Bool, origin: Origin[mut]
+    ](ref [origin]self, row_range: StridedRange) -> MatrixSlice[component_range, dtype, depth, complex, origin]:
+        return self.strided_slice[component_range](row_range=row_range, col_range=StridedRange(self._cols))
+
+    @always_inline
+    fn strided_slice[
+        component_range: StridedRange, mut: Bool, origin: Origin[mut]
+    ](ref [origin]self, *, col_range: StridedRange) -> MatrixSlice[component_range, dtype, depth, complex, origin]:
+        return self.strided_slice[component_range](row_range=StridedRange(self._rows), col_range=col_range)
+
+    @always_inline
+    fn strided_slice[
+        component_range: StridedRange, mut: Bool, origin: Origin[mut]
+    ](ref [origin]self, row_range: StridedRange, col_range: StridedRange) -> MatrixSlice[component_range, dtype, depth, complex, origin]:
+        return MatrixSlice[component_range, dtype, depth, complex, origin](matrix=self, row_range=row_range, col_range=col_range)
+
+    @always_inline
+    fn extract_component[component: Int](self) -> Matrix[dtype, complex=complex]:
+        return self.component_slice[component]().rebound_copy[depth=1]()
 
     #
     # ExplicitlyCopyable
@@ -677,30 +683,6 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
                     ](dest._cols)
 
             parallelize[calculate_row](dest._rows)
-
-    fn _naive_matmul_into(self, mut dest: Self, rhs: Self):
-        if self._cols != rhs._rows or dest._rows != self._rows or dest._cols != rhs._cols:
-            abort(
-                "Dimension mismatch for matrix multiplication: ",
-                self._rows,
-                "x",
-                self._cols,
-                "@",
-                rhs._rows,
-                "x",
-                rhs._cols,
-                "->",
-                dest._rows,
-                "x",
-                dest._cols,
-            )
-
-        var shared_dim = self._cols
-
-        for i in range(dest._rows):
-            for j in range(dest._cols):
-                for k in range(shared_dim):
-                    dest[i, j] += self[i, k] * rhs[k, j]
 
     fn reshape(mut self, rows: Int, cols: Int):
         self._rows = rows
