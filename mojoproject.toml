@@ -24,4 +24,4 @@ max = "*"
 [tasks]
 build = { cmd = "build/build.sh" }
 test = { cmd = "mojo test", depends-on = ["build"], cwd = "test" }
-format = { cmd = "mojo format --line-length=160 mosaic test examples" }
+format = { cmd = "mojo format --line-length 160 mosaic test examples" }

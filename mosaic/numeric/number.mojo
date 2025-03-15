@@ -60,7 +60,9 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
         self.value = value
 
     @always_inline
-    fn __init__[other_dtype: DType, //](out self, value: Number[other_dtype, width, complex=complex]):
+    fn __init__[
+        other_dtype: DType, //
+    ](out self, value: Number[other_dtype, width, complex=complex]):
         self.value = value.value.cast[dtype]()
 
     @always_inline
@@ -82,18 +84,26 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
             self.value = value
 
     @always_inline
-    fn __init__[T: Floatable](out self: ScalarNumber[DType.float64, complex=complex], value: T):
+    fn __init__[
+        T: Floatable
+    ](out self: ScalarNumber[DType.float64, complex=complex], value: T):
         @parameter
         if complex:
-            self.value = ScalarNumber[DType.float64, complex=complex].Value(value.__float__(), 0.0)
+            self.value = ScalarNumber[DType.float64, complex=complex].Value(
+                value.__float__(), 0.0
+            )
         else:
             self.value = value.__float__()
 
     @always_inline
-    fn __init__[T: FloatableRaising](out self: ScalarNumber[DType.float64, complex=complex], value: T) raises:
+    fn __init__[
+        T: FloatableRaising
+    ](out self: ScalarNumber[DType.float64, complex=complex], value: T) raises:
         @parameter
         if complex:
-            self.value = ScalarNumber[DType.float64, complex=complex].Value(value.__float__(), 0.0)
+            self.value = ScalarNumber[DType.float64, complex=complex].Value(
+                value.__float__(), 0.0
+            )
         else:
             self.value = value.__float__()
 
@@ -117,7 +127,9 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
 
     @always_inline
     @implicit
-    fn __init__(out self: Number[DType.bool, width, complex=False], value: Bool, /):
+    fn __init__(
+        out self: Number[DType.bool, width, complex=False], value: Bool, /
+    ):
         self.value = value
 
     @always_inline
@@ -125,7 +137,11 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
     fn __init__(out self, value: ScalarNumber[dtype, complex=complex], /):
         @parameter
         if complex:
-            self.value = rebind[Self.Value](SIMD[dtype, width](value.value[0]).interleave(SIMD[dtype, width](value.value[1])))
+            self.value = rebind[Self.Value](
+                SIMD[dtype, width](value.value[0]).interleave(
+                    SIMD[dtype, width](value.value[1])
+                )
+            )
         else:
             self.value = value.value[0]
 
@@ -135,7 +151,10 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
         # TODO: Make this a compile-time check when possible
         debug_assert(
             width == len(elems),
-            "mismatch in the number of elements in the Number variadic constructor",
+            (
+                "mismatch in the number of elements in the Number variadic"
+                " constructor"
+            ),
         )
 
         self.value = Self.Value(0)
@@ -157,7 +176,9 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
     #
 
     @always_inline
-    fn __init__(out self, real: SIMD[dtype, width], imaginary: SIMD[dtype, width]):
+    fn __init__(
+        out self, real: SIMD[dtype, width], imaginary: SIMD[dtype, width]
+    ):
         constrained[
             complex,
             "__init__(real, imaginary) is only available for complex numbers",
@@ -166,30 +187,42 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
         self.value = rebind[Self.Value](real.interleave(imaginary))
 
     @staticmethod
-    fn from_bits[int_type: DType, //](value: SIMD[int_type, Self.Value.size]) -> Number[dtype, width, complex=complex]:
+    fn from_bits[
+        int_type: DType, //
+    ](value: SIMD[int_type, Self.Value.size]) -> Number[
+        dtype, width, complex=complex
+    ]:
         return Self(Self.Value.from_bits(value))
 
     @staticmethod
     fn _max() -> Self:
-        constrained[not complex, "MAX is only available for non-complex numbers"]()
+        constrained[
+            not complex, "MAX is only available for non-complex numbers"
+        ]()
 
         return Self(Self.Value.MAX)
 
     @staticmethod
     fn _min() -> Self:
-        constrained[not complex, "MIN is only available for non-complex numbers"]()
+        constrained[
+            not complex, "MIN is only available for non-complex numbers"
+        ]()
 
         return Self(Self.Value.MIN)
 
     @staticmethod
     fn _max_finite() -> Self:
-        constrained[not complex, "MAX_FINITE is only available for non-complex numbers"]()
+        constrained[
+            not complex, "MAX_FINITE is only available for non-complex numbers"
+        ]()
 
         return Self(Self.Value.MAX_FINITE)
 
     @staticmethod
     fn _min_finite() -> Self:
-        constrained[not complex, "MIN_FINITE is only available for non-complex numbers"]()
+        constrained[
+            not complex, "MIN_FINITE is only available for non-complex numbers"
+        ]()
 
         return Self(Self.Value.MIN_FINITE)
 
@@ -207,12 +240,16 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
     fn __getitem__(self, index: Int) -> ScalarNumber[dtype, complex=complex]:
         @parameter
         if complex:
-            return ScalarNumber[dtype, complex=complex](self.value[index], self.value[index + 1])
+            return ScalarNumber[dtype, complex=complex](
+                self.value[index], self.value[index + 1]
+            )
         else:
             return ScalarNumber[dtype, complex=complex](self.value[index])
 
     @always_inline
-    fn __setitem__(mut self, index: Int, value: ScalarNumber[dtype, complex=complex]):
+    fn __setitem__(
+        mut self, index: Int, value: ScalarNumber[dtype, complex=complex]
+    ):
         @parameter
         if complex:
             self.value[index] = value.value[0]
@@ -241,7 +278,9 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
 
     @always_inline
     fn imaginary(self) -> SIMD[dtype, width]:
-        constrained[complex, "imaginary() is only available for complex numbers"]()
+        constrained[
+            complex, "imaginary() is only available for complex numbers"
+        ]()
 
         return rebind[SIMD[dtype, width]](self.value.deinterleave()[1])
 
@@ -269,8 +308,10 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
         @parameter
         if complex:
             return Self(
-                real=self.real() * rhs.real() - self.imaginary() * rhs.imaginary(),
-                imaginary=self.real() * rhs.imaginary() + self.imaginary() * rhs.real(),
+                real=self.real() * rhs.real()
+                - self.imaginary() * rhs.imaginary(),
+                imaginary=self.real() * rhs.imaginary()
+                + self.imaginary() * rhs.real(),
             )
         else:
             return Self(self.value * rhs.value)
@@ -282,8 +323,16 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
             var denominator = rhs.squared_norm()
 
             return Self(
-                real=(self.real() * rhs.real() + self.imaginary() * rhs.imaginary()) / denominator,
-                imaginary=(self.imaginary() * rhs.real() - self.real() * rhs.imaginary()) / denominator,
+                real=(
+                    self.real() * rhs.real()
+                    + self.imaginary() * rhs.imaginary()
+                )
+                / denominator,
+                imaginary=(
+                    self.imaginary() * rhs.real()
+                    - self.real() * rhs.imaginary()
+                )
+                / denominator,
             )
         else:
             return Self(self.value / rhs.value)
@@ -299,31 +348,41 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
 
     @always_inline
     fn __mod__(self: Self, rhs: Self) -> Self:
-        constrained[not complex, "__mod__() is only available for non-complex numbers"]()
+        constrained[
+            not complex, "__mod__() is only available for non-complex numbers"
+        ]()
 
         return Self(self.value % rhs.value)
 
     @always_inline
     fn __pow__(self: Self, rhs: Self) -> Self:
-        constrained[not complex, "__pow__() is only available for non-complex numbers"]()
+        constrained[
+            not complex, "__pow__() is only available for non-complex numbers"
+        ]()
 
         return Self(self.value**rhs.value)
 
     @always_inline
     fn __and__(self, rhs: Self) -> Self:
-        constrained[not complex, "__and__() is only available for non-complex numbers"]()
+        constrained[
+            not complex, "__and__() is only available for non-complex numbers"
+        ]()
 
         return Self(self.value & rhs.value)
 
     @always_inline
     fn __or__(self, rhs: Self) -> Self:
-        constrained[not complex, "__or__() is only available for non-complex numbers"]()
+        constrained[
+            not complex, "__or__() is only available for non-complex numbers"
+        ]()
 
         return Self(self.value | rhs.value)
 
     @always_inline
     fn __xor__(self, rhs: Self) -> Self:
-        constrained[not complex, "__xor__() is only available for non-complex numbers"]()
+        constrained[
+            not complex, "__xor__() is only available for non-complex numbers"
+        ]()
 
         return Self(self.value ^ rhs.value)
 
@@ -347,13 +406,17 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
 
     @always_inline
     fn __lt__(self, rhs: Self) -> SIMD[DType.bool, width]:
-        constrained[not complex, "__lt__() is only available for non-complex numbers"]()
+        constrained[
+            not complex, "__lt__() is only available for non-complex numbers"
+        ]()
 
         return rebind[SIMD[DType.bool, width]](self.value < rhs.value)
 
     @always_inline
     fn __le__(self, rhs: Self) -> SIMD[DType.bool, width]:
-        constrained[not complex, "__le__() is only available for non-complex numbers"]()
+        constrained[
+            not complex, "__le__() is only available for non-complex numbers"
+        ]()
 
         return rebind[SIMD[DType.bool, width]](self.value <= rhs.value)
 
@@ -365,7 +428,10 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
 
             @parameter
             for i in range(0, 2 * width, 2):
-                result[i // 2] = self.value[i] == rhs.value[i] and self.value[i + 1] == rhs.value[i + 1]
+                result[i // 2] = (
+                    self.value[i] == rhs.value[i]
+                    and self.value[i + 1] == rhs.value[i + 1]
+                )
 
             return result
         else:
@@ -377,13 +443,17 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
 
     @always_inline
     fn __gt__(self, rhs: Self) -> SIMD[DType.bool, width]:
-        constrained[not complex, "__gt__() is only available for non-complex numbers"]()
+        constrained[
+            not complex, "__gt__() is only available for non-complex numbers"
+        ]()
 
         return rebind[SIMD[DType.bool, width]](self.value > rhs.value)
 
     @always_inline
     fn __ge__(self, rhs: Self) -> SIMD[DType.bool, width]:
-        constrained[not complex, "__ge__() is only available for non-complex numbers"]()
+        constrained[
+            not complex, "__ge__() is only available for non-complex numbers"
+        ]()
 
         return rebind[SIMD[DType.bool, width]](self.value >= rhs.value)
 
@@ -502,8 +572,12 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
     # Type Conversion
     #
     @always_inline
-    fn cast[new_dtype: DType](self) -> Number[new_dtype, width, complex=complex]:
-        return Number[new_dtype, width, complex=complex](self.value.cast[new_dtype]())
+    fn cast[
+        new_dtype: DType
+    ](self) -> Number[new_dtype, width, complex=complex]:
+        return Number[new_dtype, width, complex=complex](
+            self.value.cast[new_dtype]()
+        )
 
     #
     # Methods
@@ -523,15 +597,21 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
         else:
             return self.value.reduce_add()
 
-    fn reduce_min(self: Number[dtype, width, complex=False]) -> ScalarNumber[dtype, complex=False]:
+    fn reduce_min(
+        self: Number[dtype, width, complex=False]
+    ) -> ScalarNumber[dtype, complex=False]:
         return self.value.reduce_min()
 
-    fn reduce_max(self: Number[dtype, width, complex=False]) -> ScalarNumber[dtype, complex=False]:
+    fn reduce_max(
+        self: Number[dtype, width, complex=False]
+    ) -> ScalarNumber[dtype, complex=False]:
         return self.value.reduce_max()
 
     @always_inline
     fn squared_norm(self: Self) -> SIMD[dtype, width]:
-        constrained[complex, "squared_norm() is only available for complex numbers"]()
+        constrained[
+            complex, "squared_norm() is only available for complex numbers"
+        ]()
 
         return self.real() * self.real() + self.imaginary() * self.imaginary()
 
@@ -547,12 +627,18 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
         if complex:
             var result = ComplexSIMD(re=self.real(), im=self.imaginary()).fma(
                 b=ComplexSIMD(re=multiplier.real(), im=multiplier.imaginary()),
-                c=ComplexSIMD(re=accumulator.real(), im=accumulator.imaginary()),
+                c=ComplexSIMD(
+                    re=accumulator.real(), im=accumulator.imaginary()
+                ),
             )
 
             return Self(real=result.re, imaginary=result.im)
         else:
-            return Self(self.value.fma(multiplier=multiplier.value, accumulator=accumulator.value))
+            return Self(
+                self.value.fma(
+                    multiplier=multiplier.value, accumulator=accumulator.value
+                )
+            )
 
     #
     # Trait Implementations
@@ -561,20 +647,27 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
     fn __abs__(self) -> Self:
         constrained[
             not complex,
-            "__abs__() is only available for non-complex numbers, see norm() instead",
+            (
+                "__abs__() is only available for non-complex numbers, see"
+                " norm() instead"
+            ),
         ]()
 
         return Self(self.value.__abs__())
 
     @always_inline
     fn __bool__(self) -> Bool:
-        constrained[not complex, "__bool__() is only available for non-complex numbers"]()
+        constrained[
+            not complex, "__bool__() is only available for non-complex numbers"
+        ]()
 
         return self.value.__bool__()
 
     @always_inline
     fn __ceil__(self) -> Self:
-        constrained[not complex, "__ceil__() is only available for non-complex numbers"]()
+        constrained[
+            not complex, "__ceil__() is only available for non-complex numbers"
+        ]()
 
         return Self(self.value.__ceil__())
 
@@ -589,13 +682,17 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
 
     @always_inline
     fn __float__(self) -> Float64:
-        constrained[not complex, "__float__() is only available for non-complex numbers"]()
+        constrained[
+            not complex, "__float__() is only available for non-complex numbers"
+        ]()
 
         return self.value.__float__()
 
     @always_inline
     fn __floor__(self) -> Self:
-        constrained[not complex, "__floor__() is only available for non-complex numbers"]()
+        constrained[
+            not complex, "__floor__() is only available for non-complex numbers"
+        ]()
 
         return Self(self.value.__floor__())
 
@@ -604,19 +701,25 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
 
     @always_inline
     fn __int__(self) -> Int:
-        constrained[not complex, "__int__() is only available for non-complex numbers"]()
+        constrained[
+            not complex, "__int__() is only available for non-complex numbers"
+        ]()
 
         return self.value.__int__()
 
     @always_inline
     fn __index__(self) -> __mlir_type.index:
-        constrained[not complex, "__index__() is only available for non-complex numbers"]()
+        constrained[
+            not complex, "__index__() is only available for non-complex numbers"
+        ]()
 
         return self.value.__index__()
 
     @always_inline
     fn __round__(self) -> Self:
-        constrained[not complex, "__round__() is only available for non-complex numbers"]()
+        constrained[
+            not complex, "__round__() is only available for non-complex numbers"
+        ]()
 
         return Self(self.value.__round__())
 
@@ -635,7 +738,9 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
 
     @always_inline
     fn __trunc__(self) -> Self:
-        constrained[not complex, "__trunc__() is only available for non-complex numbers"]()
+        constrained[
+            not complex, "__trunc__() is only available for non-complex numbers"
+        ]()
 
         return Self(self.value.__trunc__())
 

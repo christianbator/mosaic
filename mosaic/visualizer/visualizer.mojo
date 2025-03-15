@@ -31,7 +31,9 @@ struct Visualizer:
     # Image
     #
     @staticmethod
-    fn show[color_space: ColorSpace, dtype: DType, //](image: Image[dtype, color_space], window_title: String):
+    fn show[
+        color_space: ColorSpace, dtype: DType, //
+    ](image: Image[dtype, color_space], window_title: String):
         @parameter
         if color_space.is_display_color_space() and dtype == Self.display_dtype:
             Self._show(image=image, window_title=window_title)
@@ -42,12 +44,16 @@ struct Visualizer:
             )
         else:
             Self._show(
-                image=image.converted_astype[ColorSpace.rgb, Self.display_dtype](),
+                image=image.converted_astype[
+                    ColorSpace.rgb, Self.display_dtype
+                ](),
                 window_title=window_title,
             )
 
     @staticmethod
-    fn _show[color_space: ColorSpace, dtype: DType, //](image: Image[dtype, color_space], window_title: String):
+    fn _show[
+        color_space: ColorSpace, dtype: DType, //
+    ](image: Image[dtype, color_space], window_title: String):
         var show = Self._libvisualizer().get_function[
             fn (
                 data: UnsafePointer[UInt8],
@@ -72,7 +78,9 @@ struct Visualizer:
     # Video
     #
     @staticmethod
-    fn stream[VideoCaptureType: VideoCapture, //](mut video_capture: VideoCaptureType, window_title: String):
+    fn stream[
+        VideoCaptureType: VideoCapture, //
+    ](mut video_capture: VideoCaptureType, window_title: String):
         while True:
             if video_capture.is_next_frame_available():
                 var frame = video_capture.next_frame()
@@ -90,7 +98,9 @@ struct Visualizer:
         VideoCaptureType: VideoCapture,
         out_color_space: ColorSpace,
         out_dtype: DType, //,
-        frame_processor: fn[V: VideoCapture] (ImagePointer[V.dtype, V.color_space]) capturing [_] -> ImagePointer[out_dtype, out_color_space],
+        frame_processor: fn[V: VideoCapture] (
+            ImagePointer[V.dtype, V.color_space]
+        ) capturing [_] -> ImagePointer[out_dtype, out_color_space],
     ](mut video_capture: VideoCaptureType, window_title: String):
         while True:
             if video_capture.is_next_frame_available():
@@ -111,7 +121,9 @@ struct Visualizer:
 
     @staticmethod
     fn wait(timeout: Float32) -> Bool:
-        var wait = Self._libvisualizer().get_function[fn (timeout: c_float) -> Bool]("wait")
+        var wait = Self._libvisualizer().get_function[
+            fn (timeout: c_float) -> Bool
+        ]("wait")
 
         var result = wait(c_float(timeout))
         Self._close()

@@ -23,7 +23,9 @@ struct MatrixSlice[
     origin: Origin[mut],
 ](Stringable, Writable):
     alias _MatrixType = Matrix[dtype, depth, complex]
-    alias _depth = ceildiv(component_range.end - component_range.start, component_range.step)
+    alias _depth = ceildiv(
+        component_range.end - component_range.start, component_range.step
+    )
 
     var _matrix: Pointer[Self._MatrixType, origin]
 
@@ -54,7 +56,14 @@ struct MatrixSlice[
 
     fn __init__[
         other_component_range: StridedRange
-    ](out self, other: MatrixSlice[other_component_range, dtype, depth, complex, origin], row_range: StridedRange, col_range: StridedRange,):
+    ](
+        out self,
+        other: MatrixSlice[
+            other_component_range, dtype, depth, complex, origin
+        ],
+        row_range: StridedRange,
+        col_range: StridedRange,
+    ):
         self._matrix = other._matrix
         self._row_range = StridedRange(
             other._row_range.start + row_range.start,
@@ -84,7 +93,9 @@ struct MatrixSlice[
     #
     # Access
     #
-    fn __getitem__(self, row: Int, col: Int) -> ScalarNumber[dtype, complex=complex]:
+    fn __getitem__(
+        self, row: Int, col: Int
+    ) -> ScalarNumber[dtype, complex=complex]:
         constrained[
             Self._depth == 1,
             "Must specify component for matrix slice with depth > 1",
@@ -92,12 +103,19 @@ struct MatrixSlice[
 
         return self.strided_load[1](row=row, col=col, component=0)
 
-    fn __getitem__(self, row: Int, col: Int, component: Int) -> ScalarNumber[dtype, complex=complex]:
+    fn __getitem__(
+        self, row: Int, col: Int, component: Int
+    ) -> ScalarNumber[dtype, complex=complex]:
         return self.strided_load[1](row=row, col=col, component=component)
 
     fn __setitem__[
         origin: MutableOrigin, //
-    ](mut self: MatrixSlice[_, dtype, _, complex, origin], row: Int, col: Int, value: ScalarNumber[dtype, complex=complex],):
+    ](
+        mut self: MatrixSlice[_, dtype, _, complex, origin],
+        row: Int,
+        col: Int,
+        value: ScalarNumber[dtype, complex=complex],
+    ):
         constrained[
             Self._depth == 1,
             "Must specify component for matrix slice with depth > 1",
@@ -107,10 +125,20 @@ struct MatrixSlice[
 
     fn __setitem__[
         origin: MutableOrigin, //
-    ](mut self: MatrixSlice[_, dtype, _, complex, origin], row: Int, col: Int, component: Int, value: ScalarNumber[dtype, complex=complex],):
+    ](
+        mut self: MatrixSlice[_, dtype, _, complex, origin],
+        row: Int,
+        col: Int,
+        component: Int,
+        value: ScalarNumber[dtype, complex=complex],
+    ):
         self.strided_store(row=row, col=col, component=component, value=value)
 
-    fn strided_load[width: Int](self, row: Int, col: Int, component: Int) -> Number[dtype, width, complex=complex]:
+    fn strided_load[
+        width: Int
+    ](self, row: Int, col: Int, component: Int) -> Number[
+        dtype, width, complex=complex
+    ]:
         return self._matrix[].strided_load[width](
             row=self._row_range.start + row * self._row_range.step,
             col=self._col_range.start + col * self._col_range.step,
@@ -119,7 +147,13 @@ struct MatrixSlice[
 
     fn strided_store[
         origin: MutableOrigin, width: Int, //
-    ](mut self: MatrixSlice[_, dtype, _, complex, origin], row: Int, col: Int, component: Int, value: Number[dtype, width, complex=complex],):
+    ](
+        mut self: MatrixSlice[_, dtype, _, complex, origin],
+        row: Int,
+        col: Int,
+        component: Int,
+        value: Number[dtype, width, complex=complex],
+    ):
         self._matrix[].strided_store(
             row=self._row_range.start + row * self._row_range.step,
             col=self._col_range.start + col * self._col_range.step,
@@ -151,7 +185,8 @@ struct MatrixSlice[
         component: Int
     ](self) -> MatrixSlice[
         StridedRange(
-            component_range.start + StridedRange(component, component + 1).start,
+            component_range.start
+            + StridedRange(component, component + 1).start,
             component_range.start + StridedRange(component, component + 1).end,
             component_range.step * StridedRange(component, component + 1).step,
         ),
@@ -166,7 +201,8 @@ struct MatrixSlice[
         component: Int
     ](self, row_range: StridedRange) -> MatrixSlice[
         StridedRange(
-            component_range.start + StridedRange(component, component + 1).start,
+            component_range.start
+            + StridedRange(component, component + 1).start,
             component_range.start + StridedRange(component, component + 1).end,
             component_range.step * StridedRange(component, component + 1).step,
         ),
@@ -175,13 +211,16 @@ struct MatrixSlice[
         complex,
         origin,
     ]:
-        return self.strided_slice[StridedRange(component, component + 1)](row_range)
+        return self.strided_slice[StridedRange(component, component + 1)](
+            row_range
+        )
 
     fn component_slice[
         component: Int
     ](self, *, col_range: StridedRange) -> MatrixSlice[
         StridedRange(
-            component_range.start + StridedRange(component, component + 1).start,
+            component_range.start
+            + StridedRange(component, component + 1).start,
             component_range.start + StridedRange(component, component + 1).end,
             component_range.step * StridedRange(component, component + 1).step,
         ),
@@ -190,13 +229,16 @@ struct MatrixSlice[
         complex,
         origin,
     ]:
-        return self.strided_slice[StridedRange(component, component + 1)](col_range=col_range)
+        return self.strided_slice[StridedRange(component, component + 1)](
+            col_range=col_range
+        )
 
     fn component_slice[
         component: Int
     ](self, row_range: StridedRange, col_range: StridedRange) -> MatrixSlice[
         StridedRange(
-            component_range.start + StridedRange(component, component + 1).start,
+            component_range.start
+            + StridedRange(component, component + 1).start,
             component_range.start + StridedRange(component, component + 1).end,
             component_range.step * StridedRange(component, component + 1).step,
         ),
@@ -205,7 +247,9 @@ struct MatrixSlice[
         complex,
         origin,
     ]:
-        return self.strided_slice[StridedRange(component, component + 1)](row_range=row_range, col_range=col_range)
+        return self.strided_slice[StridedRange(component, component + 1)](
+            row_range=row_range, col_range=col_range
+        )
 
     fn strided_slice[
         new_component_range: StridedRange,
@@ -220,7 +264,9 @@ struct MatrixSlice[
         complex,
         origin,
     ]:
-        return self.strided_slice[new_component_range](row_range=(0, self._rows), col_range=(0, self._cols))
+        return self.strided_slice[new_component_range](
+            row_range=(0, self._rows), col_range=(0, self._cols)
+        )
 
     fn strided_slice[
         new_component_range: StridedRange,
@@ -235,7 +281,9 @@ struct MatrixSlice[
         complex,
         origin,
     ]:
-        return self.strided_slice[new_component_range](row_range=row_range, col_range=(0, self._cols))
+        return self.strided_slice[new_component_range](
+            row_range=row_range, col_range=(0, self._cols)
+        )
 
     fn strided_slice[
         new_component_range: StridedRange,
@@ -250,7 +298,9 @@ struct MatrixSlice[
         complex,
         origin,
     ]:
-        return self.strided_slice[new_component_range](row_range=(0, self._rows), col_range=col_range)
+        return self.strided_slice[new_component_range](
+            row_range=(0, self._rows), col_range=col_range
+        )
 
     fn strided_slice[
         new_component_range: StridedRange,
@@ -281,7 +331,9 @@ struct MatrixSlice[
     # Copy
     #
     fn copy(self) -> Matrix[dtype, Self._depth, complex]:
-        var result = Matrix[dtype, Self._depth, complex](rows=self.rows(), cols=self.cols())
+        var result = Matrix[dtype, Self._depth, complex](
+            rows=self.rows(), cols=self.cols()
+        )
 
         @parameter
         for slice_component in range(Self._depth):
@@ -299,10 +351,14 @@ struct MatrixSlice[
                         row=range_row,
                         col=range_col,
                         component=slice_component,
-                        value=self._matrix[].strided_load[width](row=row, col=col, component=component),
+                        value=self._matrix[].strided_load[width](
+                            row=row, col=col, component=component
+                        ),
                     )
 
-                vectorize[process_col, Self._MatrixType.optimal_simd_width](self._cols)
+                vectorize[process_col, Self._MatrixType.optimal_simd_width](
+                    self._cols
+                )
 
             parallelize[process_row](self._rows)
 
@@ -335,7 +391,9 @@ struct MatrixSlice[
 
                     @parameter
                     if Self._depth > 1:
-                        writer.write(", " if component < Self._depth - 1 else "]")
+                        writer.write(
+                            ", " if component < Self._depth - 1 else "]"
+                        )
 
                 writer.write(", " if col < self._cols - 1 else "")
             writer.write("],\n" if row < self._rows - 1 else "]\n")

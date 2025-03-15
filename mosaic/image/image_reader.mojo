@@ -74,7 +74,9 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
 
         if not is_valid_info:
             libcodec.close()
-            raise Error("Failed to read image from file (invalid info): ", self._path)
+            raise Error(
+                "Failed to read image from file (invalid info): ", self._path
+            )
 
         # Decode image data
         var width = Int(image_info.width)
@@ -114,7 +116,9 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
                     data=image_data.bitcast[Scalar[dtype]](),
                 )
             else:
-                image = Image[DType.uint8, color_space](width=width, height=height, data=image_data).astype[dtype]()
+                image = Image[DType.uint8, color_space](
+                    width=width, height=height, data=image_data
+                ).astype[dtype]()
 
         #
         # 16-bit images
@@ -146,7 +150,9 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
                     data=image_data.bitcast[Scalar[dtype]](),
                 )
             else:
-                image = Image[DType.uint16, color_space](width=width, height=height, data=image_data).astype[dtype]()
+                image = Image[DType.uint16, color_space](
+                    width=width, height=height, data=image_data
+                ).astype[dtype]()
 
         #
         # HDR (32-bit float) images
@@ -178,7 +184,9 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
                     data=image_data.bitcast[Scalar[dtype]](),
                 )
             else:
-                image = Image[DType.float32, color_space](width=width, height=height, data=image_data).astype[dtype]()
+                image = Image[DType.float32, color_space](
+                    width=width, height=height, data=image_data
+                ).astype[dtype]()
 
         #
         # Unsupported bit-depth
@@ -194,7 +202,9 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
 
         if not is_valid_data:
             libcodec.close()
-            raise Error("Failed to read image from file (invalid data): ", self._path)
+            raise Error(
+                "Failed to read image from file (invalid data): ", self._path
+            )
 
         libcodec.close()
 
