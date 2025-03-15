@@ -171,19 +171,19 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     fn channel_slice[
         channel: Int
     ](self, y_range: StridedRange) -> MatrixSlice[StridedRange(channel, channel + 1), dtype, color_space.channels(), False, __origin_of(self._matrix)]:
-        return self._matrix.component_slice[channel](row_range = y_range)
+        return self._matrix.component_slice[channel](row_range=y_range)
 
     fn channel_slice[
         channel: Int
     ](self, *, x_range: StridedRange) -> MatrixSlice[StridedRange(channel, channel + 1), dtype, color_space.channels(), False, __origin_of(self._matrix)]:
-        return self._matrix.component_slice[channel](col_range = x_range)
+        return self._matrix.component_slice[channel](col_range=x_range)
 
     fn channel_slice[
         channel: Int
     ](self, y_range: StridedRange, x_range: StridedRange) -> MatrixSlice[
         StridedRange(channel, channel + 1), dtype, color_space.channels(), False, __origin_of(self._matrix)
     ]:
-        return self._matrix.component_slice[channel](row_range = y_range, col_range = x_range)
+        return self._matrix.component_slice[channel](row_range=y_range, col_range=x_range)
 
     fn strided_slice[channel_range: StridedRange](self) -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
         return self._matrix.strided_slice[channel_range]()
@@ -191,12 +191,12 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     fn strided_slice[
         channel_range: StridedRange
     ](self, y_range: StridedRange) -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
-        return self._matrix.strided_slice[channel_range](row_range = y_range)
+        return self._matrix.strided_slice[channel_range](row_range=y_range)
 
     fn strided_slice[
         channel_range: StridedRange
     ](self, *, x_range: StridedRange) -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
-        return self._matrix.strided_slice[channel_range](col_range = x_range)
+        return self._matrix.strided_slice[channel_range](col_range=x_range)
 
     fn strided_slice[
         channel_range: StridedRange

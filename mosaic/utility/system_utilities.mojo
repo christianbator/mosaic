@@ -16,4 +16,5 @@ fn optimal_simd_width[dtype: DType]() -> Int:
     else:
         return 2 * simdwidthof[dtype]()
 
+
 alias unroll_factor = 4

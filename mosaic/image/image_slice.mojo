@@ -13,12 +13,12 @@ from mosaic.numeric import Matrix, MatrixSlice
 from mosaic.numeric import StridedRange
 from mosaic.utility import unroll_factor
 
+
 #
 # ImageSlice
 #
 @value
 struct ImageSlice[mut: Bool, //, dtype: DType, color_space: ColorSpace, origin: Origin[mut]]():
-
     var _image: Pointer[Image[dtype, color_space], origin]
     var _y_range: StridedRange
     var _x_range: StridedRange
@@ -73,7 +73,7 @@ struct ImageSlice[mut: Bool, //, dtype: DType, color_space: ColorSpace, origin: 
                         value=self._image[].strided_load[width](y=y, x=x, channel=channel),
                     )
 
-                vectorize[process_col, Image[dtype, color_space].optimal_simd_width, unroll_factor = unroll_factor](self._width)
+                vectorize[process_col, Image[dtype, color_space].optimal_simd_width, unroll_factor=unroll_factor](self._width)
 
             parallelize[process_row](self._height)
 

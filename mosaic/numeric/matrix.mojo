@@ -199,7 +199,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
     ):
         self.strided_store(row=row, col=col, component=component, value=value)
 
-    fn strided_load[width: Int](self: Matrix[dtype, 1, complex = complex], row: Int, col: Int) -> Number[dtype, width, complex=complex]:
+    fn strided_load[width: Int](self: Matrix[dtype, 1, complex=complex], row: Int, col: Int) -> Number[dtype, width, complex=complex]:
         return self.strided_load[width](row=row, col=col, component=0)
 
     fn strided_load[width: Int](self, row: Int, col: Int, component: Int) -> Number[dtype, width, complex=complex]:
@@ -208,7 +208,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
             stride=depth,
         )
 
-    fn strided_store[width: Int, //](mut self: Matrix[dtype, 1, complex = complex], row: Int, col: Int, value: Number[dtype, width, complex=complex]):
+    fn strided_store[width: Int, //](mut self: Matrix[dtype, 1, complex=complex], row: Int, col: Int, value: Number[dtype, width, complex=complex]):
         self.strided_store(row=row, col=col, component=0, value=value)
 
     fn strided_store[width: Int, //](mut self, row: Int, col: Int, component: Int, value: Number[dtype, width, complex=complex]):
@@ -328,8 +328,8 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
     ](ref [origin]self, row_range: StridedRange, col_range: StridedRange) -> MatrixSlice[component_range, dtype, depth, complex, origin]:
         return MatrixSlice[component_range, dtype, depth, complex, origin](matrix=self, row_range=row_range, col_range=col_range)
 
-    fn extract_component[component: Int](self) -> Matrix[dtype, complex = complex]:
-        return self.component_slice[component]().rebound_copy[depth = 1]()
+    fn extract_component[component: Int](self) -> Matrix[dtype, complex=complex]:
+        return self.component_slice[component]().rebound_copy[depth=1]()
 
     #
     # Private Access
@@ -572,7 +572,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
     fn average(self: Matrix[dtype, 1, complex=complex]) -> ScalarNumber[DType.float64, complex=complex]:
         return self.strided_average(0)
 
-    fn strided_min(self: Matrix[dtype, depth, complex = False], component: Int) -> Scalar[dtype]:
+    fn strided_min(self: Matrix[dtype, depth, complex=False], component: Int) -> Scalar[dtype]:
         var result = Scalar[dtype].MAX_FINITE
 
         for row in range(self._rows):
@@ -592,10 +592,10 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
 
         return result
 
-    fn min(self: Matrix[dtype, 1, complex = False]) -> Scalar[dtype]:
+    fn min(self: Matrix[dtype, 1, complex=False]) -> Scalar[dtype]:
         return self.strided_min(0)
 
-    fn strided_max(self: Matrix[dtype, depth, complex = False], component: Int) -> Scalar[dtype]:
+    fn strided_max(self: Matrix[dtype, depth, complex=False], component: Int) -> Scalar[dtype]:
         var result = Scalar[dtype].MIN_FINITE
 
         for row in range(self._rows):
@@ -615,7 +615,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
 
         return result
 
-    fn max(self: Matrix[dtype, 1, complex = False]) -> Scalar[dtype]:
+    fn max(self: Matrix[dtype, 1, complex=False]) -> Scalar[dtype]:
         return self.strided_max(0)
 
     fn strided_normalize(mut self):
