@@ -36,8 +36,6 @@ mkdir -p $lib_dir
 #
 echo -e "> Building ${cyan}libcodec${reset} ..."
 
-cp external/stb/{stb_image.h,stb_image_write.h} libcodec
-
 if [[ "$os" == "Darwin" ]]; then
     clang -fPIC -shared -Wall -Werror -DSTBI_NEON -o $lib_dir/libcodec.dylib libcodec/libcodec.c
 else

@@ -40,9 +40,7 @@ jobs:
     - if: matrix.language == 'c-cpp'
       name: Compile (c-cpp)
       shell: bash
-      run: |
-        cp external/stb/{stb_image.h,stb_image_write.h} libcodec
-        clang -fPIC -shared -Wall -Werror libcodec/libcodec.c
+      run: clang -fPIC -shared -Wall -Werror libcodec/libcodec.c
     - if: matrix.language == 'swift'
       name: Compile (swift)
       shell: bash
