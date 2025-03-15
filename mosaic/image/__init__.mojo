@@ -10,3 +10,4 @@ from .image_file_type import ImageFileType
 from .color_space import ColorSpace
 from .border import Border
 from .filters import Filters
+from .image_slice import ImageSlice

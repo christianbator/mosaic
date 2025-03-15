@@ -12,15 +12,14 @@ from random import rand
 from math import ceildiv, isclose
 from collections import InlineArray
 
-from mosaic.utility import optimal_simd_width
+from mosaic.utility import optimal_simd_width, unroll_factor
 
 
 #
 # Matrix
 #
-struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, EqualityComparable, ExplicitlyCopyable, Stringable, Writable):
+struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, EqualityComparable, ExplicitlyCopyable, Stringable, Writable):
     alias optimal_simd_width = optimal_simd_width[dtype]() // 2 if complex else optimal_simd_width[dtype]()
-    alias _unroll_factor = 4
 
     var _rows: Int
     var _cols: Int
@@ -200,15 +199,19 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
     ):
         self.strided_store(row=row, col=col, component=component, value=value)
 
+    fn strided_load[width: Int](self: Matrix[dtype, 1, complex = complex], row: Int, col: Int) -> Number[dtype, width, complex=complex]:
+        return self.strided_load[width](row=row, col=col, component=0)
+
     fn strided_load[width: Int](self, row: Int, col: Int, component: Int) -> Number[dtype, width, complex=complex]:
         return self._data.strided_load[width](
             index=self.index(row=row, col=col, component=component),
             stride=depth,
         )
 
-    fn strided_store[
-        width: Int, //
-    ](mut self, row: Int, col: Int, component: Int, value: Number[dtype, width, complex=complex],):
+    fn strided_store[width: Int, //](mut self: Matrix[dtype, 1, complex = complex], row: Int, col: Int, value: Number[dtype, width, complex=complex]):
+        self.strided_store(row=row, col=col, component=0, value=value)
+
+    fn strided_store[width: Int, //](mut self, row: Int, col: Int, component: Int, value: Number[dtype, width, complex=complex]):
         self._data.strided_store(
             index=self.index(row=row, col=col, component=component),
             stride=depth,
@@ -257,8 +260,7 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
     fn __getitem__[
         mut: Bool, origin: Origin[mut], //
     ](ref [origin]self, row_slice: Slice, col_slice: Slice) -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
-        return MatrixSlice[StridedRange(depth), dtype, depth, complex, origin](
-            matrix=self,
+        return self.slice(
             row_range=StridedRange(
                 slice=row_slice,
                 default_start=0,
@@ -273,45 +275,61 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
             ),
         )
 
+    fn slice[mut: Bool, //, origin: Origin[mut]](ref [origin]self, row_range: StridedRange) -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
+        return self.slice(row_range=row_range, col_range=StridedRange(self._cols))
+
+    fn slice[
+        mut: Bool, //, origin: Origin[mut]
+    ](ref [origin]self, *, col_range: StridedRange) -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
+        return self.slice(row_range=StridedRange(self._rows), col_range=col_range)
+
+    fn slice[
+        mut: Bool, //, origin: Origin[mut]
+    ](ref [origin]self, row_range: StridedRange, col_range: StridedRange) -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
+        return MatrixSlice[StridedRange(depth), dtype, depth, complex, origin](matrix=self, row_range=row_range, col_range=col_range)
+
     fn component_slice[
-        component: Int, /, mut: Bool, origin: Origin[mut]
+        component: Int, mut: Bool, origin: Origin[mut]
     ](ref [origin]self) -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
         return self.strided_slice[StridedRange(component, component + 1)]()
 
     fn component_slice[
-        component: Int, /, mut: Bool, origin: Origin[mut]
+        component: Int, mut: Bool, origin: Origin[mut]
     ](ref [origin]self, row_range: StridedRange) -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
         return self.strided_slice[StridedRange(component, component + 1)](row_range)
 
     fn component_slice[
-        component: Int, /, mut: Bool, origin: Origin[mut]
+        component: Int, mut: Bool, origin: Origin[mut]
     ](ref [origin]self, *, col_range: StridedRange) -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
         return self.strided_slice[StridedRange(component, component + 1)](col_range=col_range)
 
     fn component_slice[
-        component: Int, /, mut: Bool, origin: Origin[mut]
+        component: Int, mut: Bool, origin: Origin[mut]
     ](ref [origin]self, row_range: StridedRange, col_range: StridedRange) -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
         return self.strided_slice[StridedRange(component, component + 1)](row_range=row_range, col_range=col_range)
 
     fn strided_slice[
-        component_range: StridedRange, /, mut: Bool, origin: Origin[mut]
+        component_range: StridedRange, mut: Bool, origin: Origin[mut]
     ](ref [origin]self) -> MatrixSlice[component_range, dtype, depth, complex, origin]:
-        return self.strided_slice[component_range](row_range=(0, self._rows), col_range=(0, self._cols))
+        return self.strided_slice[component_range](row_range=StridedRange(self._rows), col_range=StridedRange(self._cols))
 
     fn strided_slice[
-        component_range: StridedRange, /, mut: Bool, origin: Origin[mut]
+        component_range: StridedRange, mut: Bool, origin: Origin[mut]
     ](ref [origin]self, row_range: StridedRange) -> MatrixSlice[component_range, dtype, depth, complex, origin]:
-        return self.strided_slice[component_range](row_range=row_range, col_range=(0, self._cols))
+        return self.strided_slice[component_range](row_range=row_range, col_range=StridedRange(self._cols))
 
     fn strided_slice[
-        component_range: StridedRange, /, mut: Bool, origin: Origin[mut]
+        component_range: StridedRange, mut: Bool, origin: Origin[mut]
     ](ref [origin]self, *, col_range: StridedRange) -> MatrixSlice[component_range, dtype, depth, complex, origin]:
-        return self.strided_slice[component_range](row_range=(0, self._rows), col_range=col_range)
+        return self.strided_slice[component_range](row_range=StridedRange(self._rows), col_range=col_range)
 
     fn strided_slice[
-        component_range: StridedRange, /, mut: Bool, origin: Origin[mut]
+        component_range: StridedRange, mut: Bool, origin: Origin[mut]
     ](ref [origin]self, row_range: StridedRange, col_range: StridedRange) -> MatrixSlice[component_range, dtype, depth, complex, origin]:
         return MatrixSlice[component_range, dtype, depth, complex, origin](matrix=self, row_range=row_range, col_range=col_range)
+
+    fn extract_component[component: Int](self) -> Matrix[dtype, complex = complex]:
+        return self.component_slice[component]().rebound_copy[depth = 1]()
 
     #
     # Private Access
@@ -540,7 +558,7 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
             vectorize[
                 process_cols,
                 Self.optimal_simd_width,
-                unroll_factor = Self._unroll_factor,
+                unroll_factor=unroll_factor,
             ](self._cols)
 
         return result
@@ -554,7 +572,7 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
     fn average(self: Matrix[dtype, 1, complex=complex]) -> ScalarNumber[DType.float64, complex=complex]:
         return self.strided_average(0)
 
-    fn strided_min(self: Matrix[dtype, depth, False], component: Int) -> Scalar[dtype]:
+    fn strided_min(self: Matrix[dtype, depth, complex = False], component: Int) -> Scalar[dtype]:
         var result = Scalar[dtype].MAX_FINITE
 
         for row in range(self._rows):
@@ -569,15 +587,15 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
             vectorize[
                 process_cols,
                 Self.optimal_simd_width,
-                unroll_factor = Self._unroll_factor,
+                unroll_factor=unroll_factor,
             ](self._cols)
 
         return result
 
-    fn min(self: Matrix[dtype, 1, False]) -> Scalar[dtype]:
+    fn min(self: Matrix[dtype, 1, complex = False]) -> Scalar[dtype]:
         return self.strided_min(0)
 
-    fn strided_max(self: Matrix[dtype, depth, False], component: Int) -> Scalar[dtype]:
+    fn strided_max(self: Matrix[dtype, depth, complex = False], component: Int) -> Scalar[dtype]:
         var result = Scalar[dtype].MIN_FINITE
 
         for row in range(self._rows):
@@ -592,12 +610,12 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
             vectorize[
                 process_cols,
                 Self.optimal_simd_width,
-                unroll_factor = Self._unroll_factor,
+                unroll_factor=unroll_factor,
             ](self._cols)
 
         return result
 
-    fn max(self: Matrix[dtype, 1, False]) -> Scalar[dtype]:
+    fn max(self: Matrix[dtype, 1, complex = False]) -> Scalar[dtype]:
         return self.strided_max(0)
 
     fn strided_normalize(mut self):
@@ -655,7 +673,7 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
                     vectorize[
                         dot_product,
                         Self.optimal_simd_width,
-                        unroll_factor = Self._unroll_factor,
+                        unroll_factor=unroll_factor,
                     ](dest._cols)
 
             parallelize[calculate_row](dest._rows)
@@ -859,7 +877,7 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
             vectorize[
                 transform_col,
                 Self.optimal_simd_width,
-                unroll_factor = Self._unroll_factor,
+                unroll_factor=unroll_factor,
             ](self._cols)
 
         parallelize[transform_row](self._rows)
@@ -879,7 +897,7 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
             vectorize[
                 transform_flattened_elements,
                 Self.optimal_simd_width,
-                unroll_factor = Self._unroll_factor,
+                unroll_factor=unroll_factor,
             ](self._cols * depth)
 
         parallelize[transform_row](self._rows)
@@ -957,7 +975,7 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
                 vectorize[
                     convert_flattened_elements,
                     Self.optimal_simd_width,
-                    unroll_factor = Self._unroll_factor,
+                    unroll_factor=unroll_factor,
                 ](self._cols * depth)
 
             parallelize[convert_row](self._rows)
@@ -985,7 +1003,7 @@ struct Matrix[dtype: DType, depth: Int = 1, complex: Bool = False](Movable, Equa
                 vectorize[
                     convert_flattened_elements,
                     Self.optimal_simd_width,
-                    unroll_factor = Self._unroll_factor,
+                    unroll_factor=unroll_factor,
                 ](self._cols * depth)
 
             parallelize[convert_row](self._rows)

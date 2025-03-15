@@ -21,7 +21,7 @@ struct ImageWriter:
     fn __init__(out self, path: Path):
         self._path = path
 
-    fn write[dtype: DType, //, file_type: ImageFileType](self, image: Image[dtype, _]) raises:
+    fn write[dtype: DType, //, file_type: ImageFileType](self, image: Image[dtype]) raises:
         var libcodec = DLHandle("mosaic/libcodec.dylib")
 
         var path_string = self._path.__fspath__()

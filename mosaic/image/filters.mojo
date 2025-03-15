@@ -13,34 +13,34 @@ from mosaic.numeric import Matrix, Number, ScalarNumber
 
 struct Filters:
     @staticmethod
-    fn box_kernel_1d[dtype: DType, depth: Int = 1, complex: Bool = False](size: Int) -> Matrix[dtype, depth, complex]:
+    fn box_kernel_1d[dtype: DType, depth: Int = 1, complex: Bool = False](size: Int) -> Matrix[dtype, depth, complex = complex]:
         constrained[
             dtype.is_floating_point(),
             "box_kernel_1d() is only available for floating point dtypes",
         ]()
 
-        return Matrix[dtype, depth, complex](rows=size, cols=1, value=(1 / size).cast[dtype]())
+        return Matrix[dtype, depth, complex = complex](rows=size, cols=1, value=(1 / size).cast[dtype]())
 
     @staticmethod
-    fn box_kernel_2d[dtype: DType, depth: Int = 1, complex: Bool = False](size: Int) -> Matrix[dtype, depth, complex]:
+    fn box_kernel_2d[dtype: DType, depth: Int = 1, complex: Bool = False](size: Int) -> Matrix[dtype, depth, complex = complex]:
         constrained[
             dtype.is_floating_point(),
             "box_kernel_2d() is only available for floating point dtypes",
         ]()
 
-        return Matrix[dtype, depth, complex](rows=size, cols=size, value=(1 / (size * size)).cast[dtype]())
+        return Matrix[dtype, depth, complex = complex](rows=size, cols=size, value=(1 / (size * size)).cast[dtype]())
 
     @staticmethod
-    fn gaussian_kernel_1d[dtype: DType, depth: Int = 1, complex: Bool = False](size: Int, std_dev: Optional[Float64] = None) -> Matrix[dtype, depth, complex]:
+    fn gaussian_kernel_1d[dtype: DType, depth: Int = 1, complex: Bool = False](size: Int, std_dev: Optional[Float64] = None) -> Matrix[dtype, depth, complex = complex]:
         constrained[
             dtype.is_floating_point(),
             "gaussian_kernel_1d() is only available for floating point dtypes",
         ]()
 
         if size == 1:
-            return Matrix[dtype, depth, complex].strided_replication(size, 1, 1.0)
+            return Matrix[dtype, depth, complex = complex].strided_replication(size, 1, 1.0)
         elif std_dev:
-            var result = Matrix[DType.float64, depth, complex](rows=size, cols=1)
+            var result = Matrix[DType.float64, depth, complex = complex](rows=size, cols=1)
             var variance = std_dev.value() ** 2
 
             for i in range(size):
@@ -55,11 +55,11 @@ struct Filters:
             return result.astype[dtype]()
         else:
             if size == 3:
-                return Matrix[dtype, depth, complex].strided_replication(size, 1, 0.250, 0.500, 0.250)
+                return Matrix[dtype, depth, complex = complex].strided_replication(size, 1, 0.250, 0.500, 0.250)
             elif size == 5:
-                return Matrix[dtype, depth, complex].strided_replication(size, 1, 0.062500, 0.250000, 0.375000, 0.250000, 0.062500)
+                return Matrix[dtype, depth, complex = complex].strided_replication(size, 1, 0.062500, 0.250000, 0.375000, 0.250000, 0.062500)
             elif size == 7:
-                return Matrix[dtype, depth, complex].strided_replication(
+                return Matrix[dtype, depth, complex = complex].strided_replication(
                     size,
                     1,
                     0.031250,
@@ -71,7 +71,7 @@ struct Filters:
                     0.031250,
                 )
             elif size == 9:
-                return Matrix[dtype, depth, complex].strided_replication(
+                return Matrix[dtype, depth, complex = complex].strided_replication(
                     size,
                     1,
                     0.015625000,
@@ -85,7 +85,7 @@ struct Filters:
                     0.015625000,
                 )
             else:
-                var result = Matrix[DType.float64, depth, complex](rows=size, cols=1)
+                var result = Matrix[DType.float64, depth, complex = complex](rows=size, cols=1)
                 var variance = (0.3 * ((size - 1) * 0.5 - 1.0) + 0.8) ** 2
 
                 for i in range(size):
@@ -100,7 +100,7 @@ struct Filters:
                 return result.astype[dtype]()
 
     @staticmethod
-    fn gaussian_kernel_2d[dtype: DType, depth: Int = 1, complex: Bool = False](size: Int, std_dev: Optional[Float64] = None) -> Matrix[dtype, depth, complex]:
+    fn gaussian_kernel_2d[dtype: DType, depth: Int = 1, complex: Bool = False](size: Int, std_dev: Optional[Float64] = None) -> Matrix[dtype, depth, complex = complex]:
         constrained[
             dtype.is_floating_point(),
             "gaussian_kernel_2d() is only available for floating point dtypes",

@@ -9,6 +9,8 @@ from math import ceildiv
 from memory import Pointer
 from algorithm import parallelize, vectorize
 
+from mosaic.utility import unroll_factor
+
 
 #
 # MatrixSlice
@@ -22,20 +24,17 @@ struct MatrixSlice[
     complex: Bool,
     origin: Origin[mut],
 ](Stringable, Writable):
-    alias _MatrixType = Matrix[dtype, depth, complex]
     alias _depth = ceildiv(component_range.end - component_range.start, component_range.step)
 
-    var _matrix: Pointer[Self._MatrixType, origin]
-
+    var _matrix: Pointer[Matrix[dtype, depth, complex=complex], origin]
     var _row_range: StridedRange
     var _col_range: StridedRange
-
     var _rows: Int
     var _cols: Int
 
     fn __init__(
         out self,
-        ref [origin]matrix: Self._MatrixType,
+        ref [origin]matrix: Matrix[dtype, depth, complex=complex],
         row_range: StridedRange,
         col_range: StridedRange,
     ):
@@ -44,13 +43,6 @@ struct MatrixSlice[
         self._col_range = col_range
         self._rows = ceildiv(row_range.end - row_range.start, row_range.step)
         self._cols = ceildiv(col_range.end - col_range.start, col_range.step)
-
-    # fn __init__(out self, other: Self, row_range: StridedRange, col_range: StridedRange):
-    #     self._matrix = other._matrix
-    #     self._row_range = StridedRange(other._row_range.start + row_range.start, other._row_range.start + row_range.end, other._row_range.step * row_range.step)
-    #     self._col_range = StridedRange(other._col_range.start + col_range.start, other._col_range.start + col_range.end, other._col_range.step * col_range.step)
-    #     self._rows = ceildiv(row_range.end - row_range.start, row_range.step)
-    #     self._cols = ceildiv(col_range.end - col_range.start, col_range.step)
 
     fn __init__[
         other_component_range: StridedRange
@@ -131,8 +123,7 @@ struct MatrixSlice[
     # Slicing
     #
     fn __getitem__(self, row_slice: Slice, col_slice: Slice) -> Self:
-        return Self(
-            other=self,
+        return self.slice(
             row_range=StridedRange(
                 slice=row_slice,
                 default_start=0,
@@ -146,6 +137,15 @@ struct MatrixSlice[
                 default_step=1,
             ),
         )
+
+    fn slice(self, row_range: StridedRange) -> Self:
+        return self.slice(row_range=row_range, col_range=StridedRange(self._cols))
+
+    fn slice(self, *, col_range: StridedRange) -> Self:
+        return self.slice(row_range=StridedRange(self._rows), col_range=col_range)
+
+    fn slice(self, row_range: StridedRange, col_range: StridedRange) -> Self:
+        return Self(other=self, row_range=row_range, col_range=col_range)
 
     fn component_slice[
         component: Int
@@ -220,7 +220,7 @@ struct MatrixSlice[
         complex,
         origin,
     ]:
-        return self.strided_slice[new_component_range](row_range=(0, self._rows), col_range=(0, self._cols))
+        return self.strided_slice[new_component_range](row_range=StridedRange(self._rows), col_range=StridedRange(self._cols))
 
     fn strided_slice[
         new_component_range: StridedRange,
@@ -235,7 +235,7 @@ struct MatrixSlice[
         complex,
         origin,
     ]:
-        return self.strided_slice[new_component_range](row_range=row_range, col_range=(0, self._cols))
+        return self.strided_slice[new_component_range](row_range=row_range, col_range=StridedRange(self._cols))
 
     fn strided_slice[
         new_component_range: StridedRange,
@@ -250,7 +250,7 @@ struct MatrixSlice[
         complex,
         origin,
     ]:
-        return self.strided_slice[new_component_range](row_range=(0, self._rows), col_range=col_range)
+        return self.strided_slice[new_component_range](row_range=StridedRange(self._rows), col_range=col_range)
 
     fn strided_slice[
         new_component_range: StridedRange,
@@ -280,8 +280,8 @@ struct MatrixSlice[
     #
     # Copy
     #
-    fn copy(self) -> Matrix[dtype, Self._depth, complex]:
-        var result = Matrix[dtype, Self._depth, complex](rows=self.rows(), cols=self.cols())
+    fn copy(self) -> Matrix[dtype, Self._depth, complex=complex]:
+        var result = Matrix[dtype, Self._depth, complex=complex](rows=self._rows, cols=self._cols)
 
         @parameter
         for slice_component in range(Self._depth):
@@ -302,7 +302,37 @@ struct MatrixSlice[
                         value=self._matrix[].strided_load[width](row=row, col=col, component=component),
                     )
 
-                vectorize[process_col, Self._MatrixType.optimal_simd_width](self._cols)
+                vectorize[process_col, Matrix[dtype, depth, complex=complex].optimal_simd_width, unroll_factor=unroll_factor](self._cols)
+
+            parallelize[process_row](self._rows)
+
+        return result^
+
+    fn rebound_copy[*, depth: Int](self) -> Matrix[dtype, depth, complex=complex]:
+        constrained[depth == Self._depth]()
+
+        var result = Matrix[dtype, depth, complex=complex](rows=self._rows, cols=self._cols)
+
+        @parameter
+        for slice_component in range(depth):
+            var component = component_range.start + slice_component * component_range.step
+
+            @parameter
+            fn process_row(range_row: Int):
+                var row = self._row_range.start + range_row * self._row_range.step
+
+                @parameter
+                fn process_col[width: Int](range_col: Int):
+                    var col = self._col_range.start + range_col * self._col_range.step
+
+                    result.strided_store(
+                        row=range_row,
+                        col=range_col,
+                        component=slice_component,
+                        value=self._matrix[].strided_load[width](row=row, col=col, component=component),
+                    )
+
+                vectorize[process_col, Matrix[dtype, depth, complex=complex].optimal_simd_width, unroll_factor=unroll_factor](self._cols)
 
             parallelize[process_row](self._rows)
 

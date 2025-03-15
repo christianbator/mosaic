@@ -8,7 +8,7 @@
 from sys.ffi import DLHandle, c_int, c_char, c_float
 from memory import UnsafePointer
 
-from mosaic.image import Image, ImagePointer, ColorSpace
+from mosaic.image import Image, ImageSlice, ImagePointer, ColorSpace
 from mosaic.video import VideoCapture
 
 
@@ -22,16 +22,18 @@ struct Visualizer:
     fn _libvisualizer() -> DLHandle:
         return DLHandle("mosaic/libvisualizer.dylib")
 
+    #
+    # ImageSlice
+    #
     @staticmethod
-    fn _close():
-        var libvisualizer = Self._libvisualizer()
-        libvisualizer.close()
+    fn show[dtype: DType, color_space: ColorSpace, //](image_slice: ImageSlice[dtype, color_space], window_title: String):
+        Self.show(image=image_slice.copy(), window_title=window_title)
 
     #
     # Image
     #
     @staticmethod
-    fn show[color_space: ColorSpace, dtype: DType, //](image: Image[dtype, color_space], window_title: String):
+    fn show[dtype: DType, color_space: ColorSpace, //](image: Image[dtype, color_space], window_title: String):
         @parameter
         if color_space.is_display_color_space() and dtype == Self.display_dtype:
             Self._show(image=image, window_title=window_title)
@@ -47,7 +49,7 @@ struct Visualizer:
             )
 
     @staticmethod
-    fn _show[color_space: ColorSpace, dtype: DType, //](image: Image[dtype, color_space], window_title: String):
+    fn _show[dtype: DType, color_space: ColorSpace, //](image: Image[dtype, color_space], window_title: String):
         var show = Self._libvisualizer().get_function[
             fn (
                 data: UnsafePointer[UInt8],
@@ -65,8 +67,6 @@ struct Visualizer:
             channels=c_int(image.channels()),
             window_title=window_title.unsafe_cstr_ptr(),
         )
-
-        Self._close()
 
     #
     # Video
@@ -88,8 +88,8 @@ struct Visualizer:
     @staticmethod
     fn stream[
         VideoCaptureType: VideoCapture,
-        out_color_space: ColorSpace,
-        out_dtype: DType, //,
+        out_dtype: DType,
+        out_color_space: ColorSpace, //,
         frame_processor: fn[V: VideoCapture] (ImagePointer[V.dtype, V.color_space]) capturing [_] -> ImagePointer[out_dtype, out_color_space],
     ](mut video_capture: VideoCaptureType, window_title: String):
         while True:
@@ -113,7 +113,4 @@ struct Visualizer:
     fn wait(timeout: Float32) -> Bool:
         var wait = Self._libvisualizer().get_function[fn (timeout: c_float) -> Bool]("wait")
 
-        var result = wait(c_float(timeout))
-        Self._close()
-
-        return result
+        return wait(c_float(timeout))

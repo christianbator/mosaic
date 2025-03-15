@@ -11,8 +11,8 @@ from memory import UnsafePointer
 from algorithm import vectorize, parallelize
 from collections import Optional
 
-from mosaic.numeric import Matrix, Number, ScalarNumber
-from mosaic.utility import optimal_simd_width
+from mosaic.numeric import Matrix, MatrixSlice, Number, ScalarNumber, StridedRange
+from mosaic.utility import optimal_simd_width, unroll_factor
 
 from .image_reader import ImageReader
 from .image_writer import ImageWriter
@@ -50,6 +50,19 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     fn __init__(out self, owned matrix: Matrix[dtype, color_space.channels()]):
         self._matrix = matrix^
 
+    fn __init__(out self, single_channel_matrix: Matrix[dtype], channel: Int):
+        self._matrix = Matrix[dtype, color_space.channels()](rows=single_channel_matrix.rows(), cols=single_channel_matrix.cols())
+
+        @parameter
+        fn process_row(row: Int):
+            @parameter
+            fn process_col[width: Int](col: Int):
+                self.strided_store(y=row, x=col, channel=channel, value=single_channel_matrix.strided_load[width](row=row, col=col, component=0).value)
+
+            vectorize[process_col, Self.optimal_simd_width, unroll_factor=unroll_factor](single_channel_matrix.cols())
+
+        parallelize[process_row](single_channel_matrix.rows())
+
     fn __moveinit__(out self, owned existing: Self):
         self._matrix = existing._matrix^
 
@@ -68,7 +81,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     fn pixels(self) -> Int:
         return self._matrix.strided_count()
 
-    @always_inline
+    @parameter
     fn channels(self) -> Int:
         return color_space.channels()
 
@@ -76,7 +89,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     fn samples(self) -> Int:
         return self._matrix.count()
 
-    @always_inline
+    @parameter
     fn bit_depth(self) -> Int:
         return dtype.bitwidth()
 
@@ -115,11 +128,83 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     fn strided_store[width: Int](mut self, y: Int, x: Int, channel: Int, value: SIMD[dtype, width]):
         self._matrix.strided_store[width](row=y, col=x, component=channel, value=value)
 
+    #
+    # Unsafe Access
+    #
     fn unsafe_data_ptr(self) -> UnsafePointer[Scalar[dtype]]:
         return self._matrix.unsafe_data_ptr()
 
     fn unsafe_uint8_ptr(self) -> UnsafePointer[UInt8]:
         return self._matrix.unsafe_uint8_ptr()
+
+    #
+    # Slicing
+    #
+    fn __getitem__[mut: Bool, origin: Origin[mut], //](ref [origin]self, y_slice: Slice, x_slice: Slice) -> ImageSlice[dtype, color_space, origin]:
+        return self.slice(
+            y_range=StridedRange(
+                slice=y_slice,
+                default_start=0,
+                default_end=self.height(),
+                default_step=1,
+            ),
+            x_range=StridedRange(
+                slice=x_slice,
+                default_start=0,
+                default_end=self.width(),
+                default_step=1,
+            ),
+        )
+
+    fn slice[mut: Bool, origin: Origin[mut], //](ref [origin]self, y_range: StridedRange) -> ImageSlice[dtype, color_space, origin]:
+        return self.slice(y_range=y_range, x_range=StridedRange(self.width()))
+
+    fn slice[mut: Bool, origin: Origin[mut], //](ref [origin]self, *, x_range: StridedRange) -> ImageSlice[dtype, color_space, origin]:
+        return self.slice(y_range=StridedRange(self.height()), x_range=x_range)
+
+    fn slice[mut: Bool, origin: Origin[mut], //](ref [origin]self, y_range: StridedRange, x_range: StridedRange) -> ImageSlice[dtype, color_space, origin]:
+        return ImageSlice[dtype, color_space, origin](image=self, y_range=y_range, x_range=x_range)
+
+    fn channel_slice[channel: Int](self) -> MatrixSlice[StridedRange(channel, channel + 1), dtype, color_space.channels(), False, __origin_of(self._matrix)]:
+        return self._matrix.component_slice[channel]()
+
+    fn channel_slice[
+        channel: Int
+    ](self, y_range: StridedRange) -> MatrixSlice[StridedRange(channel, channel + 1), dtype, color_space.channels(), False, __origin_of(self._matrix)]:
+        return self._matrix.component_slice[channel](row_range = y_range)
+
+    fn channel_slice[
+        channel: Int
+    ](self, *, x_range: StridedRange) -> MatrixSlice[StridedRange(channel, channel + 1), dtype, color_space.channels(), False, __origin_of(self._matrix)]:
+        return self._matrix.component_slice[channel](col_range = x_range)
+
+    fn channel_slice[
+        channel: Int
+    ](self, y_range: StridedRange, x_range: StridedRange) -> MatrixSlice[
+        StridedRange(channel, channel + 1), dtype, color_space.channels(), False, __origin_of(self._matrix)
+    ]:
+        return self._matrix.component_slice[channel](row_range = y_range, col_range = x_range)
+
+    fn strided_slice[channel_range: StridedRange](self) -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
+        return self._matrix.strided_slice[channel_range]()
+
+    fn strided_slice[
+        channel_range: StridedRange
+    ](self, y_range: StridedRange) -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
+        return self._matrix.strided_slice[channel_range](row_range = y_range)
+
+    fn strided_slice[
+        channel_range: StridedRange
+    ](self, *, x_range: StridedRange) -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
+        return self._matrix.strided_slice[channel_range](col_range = x_range)
+
+    fn strided_slice[
+        channel_range: StridedRange
+    ](self, y_range: StridedRange, x_range: StridedRange) -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
+        return self._matrix.strided_slice[channel_range](y_range, x_range)
+
+    fn extract_channel[channel: Int](self) -> Matrix[dtype]:
+        return self._matrix.extract_component[channel]()
 
     #
     # ExplicitlyCopyable
@@ -202,7 +287,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
                                 value=grey.cast[new_dtype](),
                             )
 
-                vectorize[convert_row_pixels, Self.optimal_simd_width](self.width())
+                vectorize[convert_row_pixels, Self.optimal_simd_width, unroll_factor=unroll_factor](self.width())
 
             parallelize[convert_row](num_work_items=self.height())
 
