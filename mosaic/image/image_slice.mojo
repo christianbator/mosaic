@@ -43,6 +43,24 @@ struct ImageSlice[mut: Bool, //, dtype: DType, color_space: ColorSpace, origin: 
         self._height = ceildiv(y_range.end - y_range.start, y_range.step)
         self._width = ceildiv(x_range.end - x_range.start, x_range.step)
 
+    fn __init__(out self, other: Self, y_range: StridedRange, x_range: StridedRange):
+        self._image = other._image
+
+        self._y_range = StridedRange(
+            other._y_range.start + y_range.start,
+            other._y_range.start + y_range.end,
+            other._y_range.step * y_range.step,
+        )
+
+        self._x_range = StridedRange(
+            other._x_range.start + x_range.start,
+            other._x_range.start + x_range.end,
+            other._x_range.step * x_range.step,
+        )
+
+        self._height = ceildiv(y_range.end - y_range.start, y_range.step)
+        self._width = ceildiv(x_range.end - x_range.start, x_range.step)
+
     #
     # Properties
     #
@@ -108,6 +126,34 @@ struct ImageSlice[mut: Bool, //, dtype: DType, color_space: ColorSpace, origin: 
     #
     # Slicing
     #
+    @always_inline
+    fn __getitem__(self, y_slice: Slice, x_slice: Slice) -> Self:
+        return self.slice(
+            y_range=StridedRange(
+                slice=y_slice,
+                default_start=0,
+                default_end=self.height(),
+                default_step=1,
+            ),
+            x_range=StridedRange(
+                slice=x_slice,
+                default_start=0,
+                default_end=self.width(),
+                default_step=1,
+            ),
+        )
+
+    @always_inline
+    fn slice(self, y_range: StridedRange) -> Self:
+        return self.slice(y_range=y_range, x_range=StridedRange(self.width()))
+
+    @always_inline
+    fn slice(self, *, x_range: StridedRange) -> Self:
+        return self.slice(y_range=StridedRange(self.height()), x_range=x_range)
+
+    @always_inline
+    fn slice(self, y_range: StridedRange, x_range: StridedRange) -> Self:
+        return Self(other=self, y_range=y_range, x_range=x_range)
 
     #
     # Copy

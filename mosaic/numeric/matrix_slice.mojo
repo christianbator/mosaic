@@ -54,16 +54,19 @@ struct MatrixSlice[
         other_component_range: StridedRange
     ](out self, other: MatrixSlice[other_component_range, dtype, depth, complex, origin], row_range: StridedRange, col_range: StridedRange,):
         self._matrix = other._matrix
+
         self._row_range = StridedRange(
             other._row_range.start + row_range.start,
             other._row_range.start + row_range.end,
             other._row_range.step * row_range.step,
         )
+
         self._col_range = StridedRange(
             other._col_range.start + col_range.start,
             other._col_range.start + col_range.end,
             other._col_range.step * col_range.step,
         )
+
         self._rows = ceildiv(row_range.end - row_range.start, row_range.step)
         self._cols = ceildiv(col_range.end - col_range.start, col_range.step)
 
