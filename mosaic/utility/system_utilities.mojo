@@ -7,6 +7,7 @@
 
 from sys import info, simdwidthof
 
+
 @parameter
 fn optimal_simd_width[dtype: DType]() -> Int:
     @parameter

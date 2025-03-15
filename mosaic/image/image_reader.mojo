@@ -10,12 +10,12 @@ from pathlib import Path
 from sys.ffi import DLHandle, c_int
 from memory import UnsafePointer
 
+
 #
 # ImageInfo
 #
 @value
 struct ImageInfo(Stringable, Writable):
-
     var width: c_int
     var height: c_int
     var bit_depth: c_int
@@ -29,13 +29,21 @@ struct ImageInfo(Stringable, Writable):
         return String.write(self)
 
     fn write_to[W: Writer](self, mut writer: W):
-        writer.write("[ImageInfo: width = ", self.width, ", height = ", self.height, ", bit_depth = ", self.bit_depth, "]")
+        writer.write(
+            "[ImageInfo: width = ",
+            self.width,
+            ", height = ",
+            self.height,
+            ", bit_depth = ",
+            self.bit_depth,
+            "]",
+        )
+
 
 #
 # ImageReader
 #
 struct ImageReader[dtype: DType, color_space: ColorSpace]:
-    
     var _path: Path
 
     fn __init__(out self, path: Path):
@@ -51,13 +59,17 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
         var image_info = ImageInfo()
 
         var decode_image_info = libcodec.get_function[
-            fn (raw_data: UnsafePointer[UInt8], raw_data_length: c_int, image_info: UnsafePointer[ImageInfo]) -> c_int
+            fn (
+                raw_data: UnsafePointer[UInt8],
+                raw_data_length: c_int,
+                image_info: UnsafePointer[ImageInfo],
+            ) -> c_int
         ]("decode_image_info")
 
         var is_valid_info = decode_image_info(
-            raw_data = raw_data.unsafe_ptr(),
-            raw_data_length = len(raw_data),
-            image_info = UnsafePointer.address_of(image_info)
+            raw_data=raw_data.unsafe_ptr(),
+            raw_data_length=len(raw_data),
+            image_info=UnsafePointer.address_of(image_info),
         )
 
         if not is_valid_info:
@@ -83,22 +95,26 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
                     raw_data: UnsafePointer[UInt8],
                     raw_data_length: c_int,
                     desired_channels: c_int,
-                    image_data: UnsafePointer[UInt8]
+                    image_data: UnsafePointer[UInt8],
                 ) -> c_int
             ]("decode_image_data_uint8")
 
             is_valid_data = decode_image_data_uint8(
-                raw_data = raw_data.unsafe_ptr(),
-                raw_data_length = len(raw_data),
-                desired_channels = color_space.channels(),
-                image_data = image_data
+                raw_data=raw_data.unsafe_ptr(),
+                raw_data_length=len(raw_data),
+                desired_channels=color_space.channels(),
+                image_data=image_data,
             )
 
             @parameter
             if dtype == DType.uint8:
-                image = Image[dtype, color_space](width = width, height = height, data = image_data.bitcast[Scalar[dtype]]())
+                image = Image[dtype, color_space](
+                    width=width,
+                    height=height,
+                    data=image_data.bitcast[Scalar[dtype]](),
+                )
             else:
-                image = Image[DType.uint8, color_space](width = width, height = height, data = image_data).astype[dtype]()
+                image = Image[DType.uint8, color_space](width=width, height=height, data=image_data).astype[dtype]()
 
         #
         # 16-bit images
@@ -111,22 +127,26 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
                     raw_data: UnsafePointer[UInt8],
                     raw_data_length: c_int,
                     desired_channels: c_int,
-                    image_data: UnsafePointer[UInt16]
+                    image_data: UnsafePointer[UInt16],
                 ) -> c_int
             ]("decode_image_data_uint16")
 
             is_valid_data = decode_image_data_uint16(
-                raw_data = raw_data.unsafe_ptr(),
-                raw_data_length = len(raw_data),
-                desired_channels = color_space.channels(),
-                image_data = image_data
+                raw_data=raw_data.unsafe_ptr(),
+                raw_data_length=len(raw_data),
+                desired_channels=color_space.channels(),
+                image_data=image_data,
             )
 
             @parameter
             if dtype == DType.uint16:
-                image = Image[dtype, color_space](width = width, height = height, data = image_data.bitcast[Scalar[dtype]]())
+                image = Image[dtype, color_space](
+                    width=width,
+                    height=height,
+                    data=image_data.bitcast[Scalar[dtype]](),
+                )
             else:
-                image = Image[DType.uint16, color_space](width = width, height = height, data = image_data).astype[dtype]()
+                image = Image[DType.uint16, color_space](width=width, height=height, data=image_data).astype[dtype]()
 
         #
         # HDR (32-bit float) images
@@ -139,33 +159,37 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
                     raw_data: UnsafePointer[UInt8],
                     raw_data_length: c_int,
                     desired_channels: c_int,
-                    image_data: UnsafePointer[Float32]
+                    image_data: UnsafePointer[Float32],
                 ) -> c_int
             ]("decode_image_data_float32")
 
             is_valid_data = decode_image_data_float32(
-                raw_data = raw_data.unsafe_ptr(),
-                raw_data_length = len(raw_data),
-                desired_channels = color_space.channels(),
-                image_data = image_data
+                raw_data=raw_data.unsafe_ptr(),
+                raw_data_length=len(raw_data),
+                desired_channels=color_space.channels(),
+                image_data=image_data,
             )
 
             @parameter
             if dtype == DType.float32:
-                image = Image[dtype, color_space](width = width, height = height, data = image_data.bitcast[Scalar[dtype]]())
+                image = Image[dtype, color_space](
+                    width=width,
+                    height=height,
+                    data=image_data.bitcast[Scalar[dtype]](),
+                )
             else:
-                image = Image[DType.float32, color_space](width = width, height = height, data = image_data).astype[dtype]()
-        
+                image = Image[DType.float32, color_space](width=width, height=height, data=image_data).astype[dtype]()
+
         #
         # Unsupported bit-depth
         #
         else:
             libcodec.close()
             abort()
-            
+
             # Bypass the pass manager
             is_valid_data = 0
-            image = Image[dtype, color_space](width = width, height = height)
+            image = Image[dtype, color_space](width=width, height=height)
             ##
 
         if not is_valid_data:

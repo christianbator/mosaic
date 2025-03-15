@@ -7,11 +7,11 @@
 
 from mosaic.image import Image, ImagePointer, ColorSpace
 
+
 #
 # VideoCapture
 #
 trait VideoCapture:
-
     alias dtype: DType
     alias color_space: ColorSpace
 
@@ -20,6 +20,6 @@ trait VideoCapture:
 
     fn next_frame(self) -> ImagePointer[Self.dtype, Self.color_space]:
         ...
-    
+
     fn did_read_next_frame(mut self):
         ...

@@ -7,12 +7,12 @@
 
 from os import abort
 
+
 #
 # Border
 #
 @value
 struct Border(EqualityComparable, Stringable, Writable):
-
     alias zero = Self(0)
     alias wrap = Self(1)
     alias reflect = Self(2)
@@ -24,12 +24,12 @@ struct Border(EqualityComparable, Stringable, Writable):
 
         if raw_value not in [0, 1, 2]:
             abort("Unsupported border: ", raw_value)
-    
+
     fn __eq__(self, other: Self) -> Bool:
         return self._raw_value == other._raw_value
-    
+
     fn __ne__(self, other: Self) -> Bool:
-        return not(self == other)
+        return not (self == other)
 
     fn __str__(self) -> String:
         return String.write(self)

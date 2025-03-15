@@ -7,12 +7,12 @@
 
 from os import abort
 
+
 #
 # ColorSpace
 #
 @value
 struct ColorSpace(EqualityComparable, Stringable, Writable):
-
     alias greyscale = Self(ColorSpace._greyscale)
     alias rgb = Self(ColorSpace._rgb)
 
@@ -38,7 +38,7 @@ struct ColorSpace(EqualityComparable, Stringable, Writable):
             abort("Unimplemented channels() for color space: ", self._raw_value)
             while True:
                 pass
-    
+
     fn is_display_color_space(self) -> Bool:
         return self in [Self.greyscale, Self.rgb]
 
@@ -46,10 +46,10 @@ struct ColorSpace(EqualityComparable, Stringable, Writable):
         return self._raw_value == other._raw_value
 
     fn __ne__(self, other: Self) -> Bool:
-        return not(self == other)
-    
+        return not (self == other)
+
     fn __str__(self) -> String:
         return String.write(self)
-        
+
     fn write_to[W: Writer](self, mut writer: W):
         writer.write("[ColorSpace: ", self._raw_value, "]")

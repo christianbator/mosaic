@@ -7,12 +7,12 @@
 
 from os import abort
 
+
 #
 # ImageFileType
 #
 @value
 struct ImageFileType(EqualityComparable, Stringable, Writable):
-
     alias png = Self(ImageFileType._png)
     alias jpeg = Self(ImageFileType._jpeg)
 
@@ -35,7 +35,10 @@ struct ImageFileType(EqualityComparable, Stringable, Writable):
         elif self == Self.jpeg:
             return ".jpeg"
         else:
-            abort("Unimplemented extension() for image file type: ", self._raw_value)
+            abort(
+                "Unimplemented extension() for image file type: ",
+                self._raw_value,
+            )
             while True:
                 pass
 
@@ -43,8 +46,8 @@ struct ImageFileType(EqualityComparable, Stringable, Writable):
         return self._raw_value == other._raw_value
 
     fn __ne__(self, other: Self) -> Bool:
-        return not(self == other)
-    
+        return not (self == other)
+
     fn __str__(self) -> String:
         return String.write(self)
 

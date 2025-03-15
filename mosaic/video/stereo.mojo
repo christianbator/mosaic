@@ -5,12 +5,12 @@
 # Created by Christian Bator on 02/20/2025
 #
 
+
 #
 # StereoDimensions
 #
 @value
 struct StereoDimensions(Stringable, Writable):
-
     var width: Int
     var height: Int
 
@@ -18,4 +18,10 @@ struct StereoDimensions(Stringable, Writable):
         return String.write(self)
 
     fn write_to[W: Writer](self, mut writer: W):
-        writer.write("[StereoDimensions: width = ", self.width, ", height = ", self.height, "]")
+        writer.write(
+            "[StereoDimensions: width = ",
+            self.width,
+            ", height = ",
+            self.height,
+            "]",
+        )
