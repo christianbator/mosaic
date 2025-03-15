@@ -17,7 +17,7 @@ alias ScalarNumber = Number[width = 1]
 # Number
 #
 @register_passable("trivial")
-struct Number[dtype: DType, width: Int, complex: Bool](
+struct Number[dtype: DType, width: Int, *, complex: Bool](
     Absable,
     Boolable,
     Ceilable,
@@ -60,7 +60,7 @@ struct Number[dtype: DType, width: Int, complex: Bool](
         self.value = value
 
     @always_inline
-    fn __init__[other_dtype: DType, //](out self, value: Number[other_dtype, width, complex]):
+    fn __init__[other_dtype: DType, //](out self, value: Number[other_dtype, width, complex = complex]):
         self.value = value.value.cast[dtype]()
 
     @always_inline
@@ -82,18 +82,18 @@ struct Number[dtype: DType, width: Int, complex: Bool](
             self.value = value
 
     @always_inline
-    fn __init__[T: Floatable](out self: ScalarNumber[DType.float64, complex], value: T):
+    fn __init__[T: Floatable](out self: ScalarNumber[DType.float64, complex = complex], value: T):
         @parameter
         if complex:
-            self.value = ScalarNumber[DType.float64, complex].Value(value.__float__(), 0.0)
+            self.value = ScalarNumber[DType.float64, complex = complex].Value(value.__float__(), 0.0)
         else:
             self.value = value.__float__()
 
     @always_inline
-    fn __init__[T: FloatableRaising](out self: ScalarNumber[DType.float64, complex], value: T) raises:
+    fn __init__[T: FloatableRaising](out self: ScalarNumber[DType.float64, complex = complex], value: T) raises:
         @parameter
         if complex:
-            self.value = ScalarNumber[DType.float64, complex].Value(value.__float__(), 0.0)
+            self.value = ScalarNumber[DType.float64, complex = complex].Value(value.__float__(), 0.0)
         else:
             self.value = value.__float__()
 
@@ -117,12 +117,12 @@ struct Number[dtype: DType, width: Int, complex: Bool](
 
     @always_inline
     @implicit
-    fn __init__(out self: Number[DType.bool, width, False], value: Bool, /):
+    fn __init__(out self: Number[DType.bool, width, complex = False], value: Bool, /):
         self.value = value
 
     @always_inline
     @implicit
-    fn __init__(out self, value: ScalarNumber[dtype, complex], /):
+    fn __init__(out self, value: ScalarNumber[dtype, complex = complex], /):
         @parameter
         if complex:
             self.value = rebind[Self.Value](
@@ -162,7 +162,7 @@ struct Number[dtype: DType, width: Int, complex: Bool](
         )
 
     @staticmethod
-    fn from_bits[int_type: DType, //](value: SIMD[int_type, Self.Value.size]) -> Number[dtype, width, complex]:
+    fn from_bits[int_type: DType, //](value: SIMD[int_type, Self.Value.size]) -> Number[dtype, width, complex =  complex]:
         return Self(Self.Value.from_bits(value))
     
     @staticmethod
@@ -200,15 +200,15 @@ struct Number[dtype: DType, width: Int, complex: Bool](
     # Access
     #
     @always_inline
-    fn __getitem__(self, index: Int) -> ScalarNumber[dtype, complex]:
+    fn __getitem__(self, index: Int) -> ScalarNumber[dtype, complex = complex]:
         @parameter 
         if complex:
-            return ScalarNumber[dtype, complex](self.value[index], self.value[index + 1])
+            return ScalarNumber[dtype, complex = complex](self.value[index], self.value[index + 1])
         else:
-            return ScalarNumber[dtype, complex](self.value[index])
+            return ScalarNumber[dtype, complex = complex](self.value[index])
     
     @always_inline
-    fn __setitem__(mut self, index: Int, value: ScalarNumber[dtype, complex]):
+    fn __setitem__(mut self, index: Int, value: ScalarNumber[dtype, complex = complex]):
         @parameter
         if complex:
             self.value[index] = value.value[0]
@@ -216,7 +216,7 @@ struct Number[dtype: DType, width: Int, complex: Bool](
         else:
             self.value[index] = value.value[0]
 
-    fn __contains__(self, value: ScalarNumber[dtype, complex]) -> Bool:
+    fn __contains__(self, value: ScalarNumber[dtype, complex = complex]) -> Bool:
         @parameter
         if complex:
             @parameter
@@ -499,8 +499,8 @@ struct Number[dtype: DType, width: Int, complex: Bool](
     # Type Conversion
     #
     @always_inline
-    fn cast[new_dtype: DType](self) -> Number[new_dtype, width, complex]:
-        return Number[new_dtype, width, complex](
+    fn cast[new_dtype: DType](self) -> Number[new_dtype, width, complex = complex]:
+        return Number[new_dtype, width, complex = complex](
             self.value.cast[new_dtype]()
         )
 
@@ -512,17 +512,17 @@ struct Number[dtype: DType, width: Int, complex: Bool](
     # TODO: Wrap other SIMD method implementations
     #
 
-    fn reduce_add(self) -> ScalarNumber[dtype, complex]:
+    fn reduce_add(self) -> ScalarNumber[dtype, complex = complex]:
         @parameter
         if complex:
-            return ScalarNumber[dtype, complex](real = self.real().reduce_add(), imaginary = self.imaginary().reduce_add())
+            return ScalarNumber[dtype, complex = complex](real = self.real().reduce_add(), imaginary = self.imaginary().reduce_add())
         else:
             return self.value.reduce_add()
     
-    fn reduce_min(self: Number[dtype, width, False]) -> ScalarNumber[dtype, False]:
+    fn reduce_min(self: Number[dtype, width, complex = False]) -> ScalarNumber[dtype, complex = False]:
         return self.value.reduce_min()
     
-    fn reduce_max(self: Number[dtype, width, False]) -> ScalarNumber[dtype, False]:
+    fn reduce_max(self: Number[dtype, width, complex = False]) -> ScalarNumber[dtype, complex = False]:
         return self.value.reduce_max()
 
     @always_inline

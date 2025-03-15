@@ -11,7 +11,7 @@ from memory import UnsafePointer, memset_zero
 # UnsafeNumberPointer
 #
 @value
-struct UnsafeNumberPointer[dtype: DType, complex: Bool]:
+struct UnsafeNumberPointer[dtype: DType, *, complex: Bool]:
 
     var _data: UnsafePointer[Scalar[dtype]]
 
@@ -40,49 +40,49 @@ struct UnsafeNumberPointer[dtype: DType, complex: Bool]:
     #
     # Access
     #
-    fn __getitem__(self, index: Int) -> ScalarNumber[dtype, complex]:
+    fn __getitem__(self, index: Int) -> ScalarNumber[dtype, complex = complex]:
         return self.load[1](index)
     
-    fn __setitem__(mut self: UnsafeNumberPointer[dtype, complex], index: Int, value: ScalarNumber[dtype, complex]):
+    fn __setitem__(mut self: UnsafeNumberPointer[dtype, complex = complex], index: Int, value: ScalarNumber[dtype, complex = complex]):
         self.store(index = index, value = value)
     
-    fn load[width: Int](self, index: Int) -> Number[dtype, width, complex]:
+    fn load[width: Int](self, index: Int) -> Number[dtype, width, complex = complex]:
         @parameter
         if complex:
-            return Number[dtype, width, complex](
-                rebind[Number[dtype, width, complex].Value](
+            return Number[dtype, width, complex = complex](
+                rebind[Number[dtype, width, complex = complex].Value](
                     self._data.offset(index * 2).load[width = 2 * width]()
                 )
             )
         else:
-            return Number[dtype, width, complex](
-                rebind[Number[dtype, width, complex].Value](
+            return Number[dtype, width, complex = complex](
+                rebind[Number[dtype, width, complex = complex].Value](
                     self._data.offset(index).load[width = width]()
                 )
             )
     
-    fn store[width: Int, //](mut self, index: Int, value: Number[dtype, width, complex]):
+    fn store[width: Int, //](mut self, index: Int, value: Number[dtype, width, complex = complex]):
         @parameter
         if complex:
             self._data.offset(index * 2).store(value.value)
         else:
             self._data.offset(index).store(value.value)
 
-    fn strided_load[width: Int](self, index: Int, stride: Int) -> Number[dtype, width, complex]:
+    fn strided_load[width: Int](self, index: Int, stride: Int) -> Number[dtype, width, complex = complex]:
         @parameter
         if complex:
-            return Number[dtype, width, complex](
+            return Number[dtype, width, complex = complex](
                 real = self._data.offset(index * 2).strided_load[width = width](stride * 2),
                 imaginary = self._data.offset(index * 2 + 1).strided_load[width = width](stride * 2)
             )
         else:
-            return Number[dtype, width, complex](
-                rebind[Number[dtype, width, complex].Value](
+            return Number[dtype, width, complex = complex](
+                rebind[Number[dtype, width, complex = complex].Value](
                     self._data.offset(index).strided_load[width = width](stride)
                 )
             )
 
-    fn strided_store[width: Int, //](mut self, index: Int, stride: Int, value: Number[dtype, width, complex]):
+    fn strided_store[width: Int, //](mut self, index: Int, stride: Int, value: Number[dtype, width, complex = complex]):
         @parameter
         if complex:
             self._data.offset(index * 2).strided_store(val = value.real().value, stride = stride * 2)
@@ -95,11 +95,11 @@ struct UnsafeNumberPointer[dtype: DType, complex: Bool]:
         index: Int,
         offset_vector: SIMD[DType.index, width],
         mask_vector: SIMD[DType.bool, width]
-    ) -> Number[dtype, width, complex]:
+    ) -> Number[dtype, width, complex = complex]:
         @parameter
         if complex:
-             return Number[dtype, width, complex](
-                rebind[Number[dtype, width, complex].Value](
+             return Number[dtype, width, complex = complex](
+                rebind[Number[dtype, width, complex = complex].Value](
                     self._data.offset(index * 2).gather(
                         offset = (offset_vector * 2).interleave(offset_vector * 2 + 1),
                         mask = mask_vector.interleave(mask_vector)
@@ -107,8 +107,8 @@ struct UnsafeNumberPointer[dtype: DType, complex: Bool]:
                 )
             )
         else:
-            return Number[dtype, width, complex](
-                rebind[Number[dtype, width, complex].Value](
+            return Number[dtype, width, complex = complex](
+                rebind[Number[dtype, width, complex = complex].Value](
                     self._data.offset(index).gather(offset = offset_vector, mask = mask_vector)
                 )
             )
@@ -116,7 +116,7 @@ struct UnsafeNumberPointer[dtype: DType, complex: Bool]:
     fn scatter[width: Int, //](
         self, 
         index: Int,
-        value: Number[dtype, width, complex],
+        value: Number[dtype, width, complex = complex],
         offset_vector: SIMD[DType.index, width],
         mask_vector: SIMD[DType.bool, width]
     ):
