@@ -9,7 +9,7 @@
 pixi.lock merge=binary linguist-language=YAML linguist-generated=true
 
 # Exclude build scripts from language statistics
-**/*.sh -linguist-detectable
+*.sh -linguist-detectable
 
 # Exclude third-party files from language statistics
 libcodec/*.h linguist-vendored
