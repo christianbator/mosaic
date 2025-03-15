@@ -21,29 +21,19 @@ struct ImageWriter:
     fn __init__(out self, path: Path):
         self._path = path
 
-    fn write[
-        dtype: DType, //, file_type: ImageFileType
-    ](self, image: Image[dtype, _]) raises:
+    fn write[dtype: DType, //, file_type: ImageFileType](self, image: Image[dtype, _]) raises:
         var libcodec = DLHandle("mosaic/libcodec.dylib")
 
         var path_string = self._path.__fspath__()
         if not path_string.endswith(file_type.extension()):
             libcodec.close()
-            raise Error(
-                "Mismatched file type and extension "
-                + String(file_type)
-                + ": "
-                + path_string
-            )
+            raise Error("Mismatched file type and extension " + String(file_type) + ": " + path_string)
 
         try:
             makedirs(path=dirname(self._path), exist_ok=True)
         except:
             libcodec.close()
-            raise (
-                "Failed to create directory for image writing: "
-                + String(self._path)
-            )
+            raise ("Failed to create directory for image writing: " + String(self._path))
 
         var data: UnsafePointer[UInt8]
 

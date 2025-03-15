@@ -22,9 +22,7 @@ from .filters import Filters
 #
 # Image
 #
-struct Image[dtype: DType, color_space: ColorSpace](
-    Movable, EqualityComparable, ExplicitlyCopyable, Stringable, Writable
-):
+struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable, ExplicitlyCopyable, Stringable, Writable):
     alias optimal_simd_width = optimal_simd_width[dtype]()
 
     var _matrix: Matrix[dtype, color_space.channels()]
@@ -39,9 +37,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
         self = ImageReader[dtype, color_space](path).read()
 
     fn __init__(out self, width: Int, height: Int):
-        self._matrix = Matrix[dtype, color_space.channels()](
-            rows=height, cols=width
-        )
+        self._matrix = Matrix[dtype, color_space.channels()](rows=height, cols=width)
 
     fn __init__(
         out self,
@@ -49,9 +45,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
         height: Int,
         owned data: UnsafePointer[Scalar[dtype]],
     ):
-        self._matrix = Matrix[dtype, color_space.channels()](
-            rows=height, cols=width, data=data
-        )
+        self._matrix = Matrix[dtype, color_space.channels()](rows=height, cols=width, data=data)
 
     fn __init__(out self, owned matrix: Matrix[dtype, color_space.channels()]):
         self._matrix = matrix^
@@ -112,24 +106,14 @@ struct Image[dtype: DType, color_space: ColorSpace](
 
         self._matrix[y, x, 0] = value
 
-    fn __setitem__(
-        mut self, y: Int, x: Int, channel: Int, value: Scalar[dtype]
-    ):
+    fn __setitem__(mut self, y: Int, x: Int, channel: Int, value: Scalar[dtype]):
         self._matrix[y, x, channel] = value
 
-    fn strided_load[
-        width: Int
-    ](self, y: Int, x: Int, channel: Int) -> SIMD[dtype, width]:
-        return self._matrix.strided_load[width](
-            row=y, col=x, component=channel
-        ).value
+    fn strided_load[width: Int](self, y: Int, x: Int, channel: Int) -> SIMD[dtype, width]:
+        return self._matrix.strided_load[width](row=y, col=x, component=channel).value
 
-    fn strided_store[
-        width: Int
-    ](mut self, y: Int, x: Int, channel: Int, value: SIMD[dtype, width]):
-        self._matrix.strided_store[width](
-            row=y, col=x, component=channel, value=value
-        )
+    fn strided_store[width: Int](mut self, y: Int, x: Int, channel: Int, value: SIMD[dtype, width]):
+        self._matrix.strided_store[width](row=y, col=x, component=channel, value=value)
 
     fn unsafe_data_ptr(self) -> UnsafePointer[Scalar[dtype]]:
         return self._matrix.unsafe_data_ptr()
@@ -156,49 +140,33 @@ struct Image[dtype: DType, color_space: ColorSpace](
     # Type Conversion
     #
     fn astype[new_dtype: DType](self) -> Image[new_dtype, color_space]:
-        var result = Image[new_dtype, color_space](
-            width=self.width(), height=self.height()
-        )
+        var result = Image[new_dtype, color_space](width=self.width(), height=self.height())
         self.astype_into(result)
 
         return result^
 
-    fn astype_into[
-        new_dtype: DType
-    ](self, mut dest: Image[new_dtype, color_space]):
+    fn astype_into[new_dtype: DType](self, mut dest: Image[new_dtype, color_space]):
         self._matrix.astype_into[new_dtype](dest._matrix)
 
     #
     # Color Space Conversion
     #
-    fn converted[
-        new_color_space: ColorSpace
-    ](self) -> Image[dtype, new_color_space]:
+    fn converted[new_color_space: ColorSpace](self) -> Image[dtype, new_color_space]:
         return self.converted_astype[new_color_space, dtype]()
 
-    fn converted_into[
-        new_color_space: ColorSpace
-    ](self, mut dest: Image[dtype, new_color_space]):
+    fn converted_into[new_color_space: ColorSpace](self, mut dest: Image[dtype, new_color_space]):
         self.converted_astype_into(dest)
 
-    fn converted_astype[
-        new_color_space: ColorSpace, new_dtype: DType
-    ](self) -> Image[new_dtype, new_color_space]:
-        var result = Image[new_dtype, new_color_space](
-            width=self.width(), height=self.height()
-        )
+    fn converted_astype[new_color_space: ColorSpace, new_dtype: DType](self) -> Image[new_dtype, new_color_space]:
+        var result = Image[new_dtype, new_color_space](width=self.width(), height=self.height())
         self.converted_astype_into(result)
 
         return result^
 
-    fn converted_astype_into[
-        new_color_space: ColorSpace, new_dtype: DType
-    ](self, mut dest: Image[new_dtype, new_color_space]):
+    fn converted_astype_into[new_color_space: ColorSpace, new_dtype: DType](self, mut dest: Image[new_dtype, new_color_space]):
         @parameter
         if new_color_space == color_space:
-            self._matrix._unsafe_astype_into[
-                new_dtype, new_color_space.channels()
-            ](dest._matrix)
+            self._matrix._unsafe_astype_into[new_dtype, new_color_space.channels()](dest._matrix)
         else:
 
             @parameter
@@ -208,9 +176,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
                     # Greyscale ->
                     @parameter
                     if color_space == ColorSpace.greyscale:
-                        var grey = self.strided_load[width](
-                            y=y, x=x, channel=0
-                        ).cast[new_dtype]()
+                        var grey = self.strided_load[width](y=y, x=x, channel=0).cast[new_dtype]()
 
                         # RGB
                         @parameter
@@ -222,21 +188,13 @@ struct Image[dtype: DType, color_space: ColorSpace](
                     # RGB ->
                     elif color_space == ColorSpace.rgb:
                         var red = self.strided_load[width](y=y, x=x, channel=0)
-                        var green = self.strided_load[width](
-                            y=y, x=x, channel=1
-                        )
+                        var green = self.strided_load[width](y=y, x=x, channel=1)
                         var blue = self.strided_load[width](y=y, x=x, channel=2)
 
                         # Greyscale
                         @parameter
                         if new_color_space == ColorSpace.greyscale:
-                            var grey = 0.299 * red.cast[
-                                DType.float64
-                            ]() + 0.587 * green.cast[
-                                DType.float64
-                            ]() + 0.114 * blue.cast[
-                                DType.float64
-                            ]()
+                            var grey = 0.299 * red.cast[DType.float64]() + 0.587 * green.cast[DType.float64]() + 0.114 * blue.cast[DType.float64]()
                             dest.strided_store(
                                 y=y,
                                 x=x,
@@ -244,9 +202,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
                                 value=grey.cast[new_dtype](),
                             )
 
-                vectorize[convert_row_pixels, Self.optimal_simd_width](
-                    self.width()
-                )
+                vectorize[convert_row_pixels, Self.optimal_simd_width](self.width())
 
             parallelize[convert_row](num_work_items=self.height())
 
@@ -275,95 +231,52 @@ struct Image[dtype: DType, color_space: ColorSpace](
     # Common Filters
     #
     fn box_blur[border: Border](mut self, size: Int):
-        self.filter[border](
-            Filters.box_kernel_2d[dtype, color_space.channels()](size)
-        )
+        self.filter[border](Filters.box_kernel_2d[dtype, color_space.channels()](size))
 
     fn box_blurred[border: Border](self, size: Int) -> Self:
-        return self.filtered[border](
-            Filters.box_kernel_2d[dtype, color_space.channels()](size)
-        )
+        return self.filtered[border](Filters.box_kernel_2d[dtype, color_space.channels()](size))
 
-    fn gaussian_blur[
-        border: Border
-    ](mut self, size: Int, std_dev: Optional[Float64] = None):
-        self.filter[border](
-            Filters.gaussian_kernel_2d[dtype, color_space.channels()](
-                size=size, std_dev=std_dev
-            )
-        )
+    fn gaussian_blur[border: Border](mut self, size: Int, std_dev: Optional[Float64] = None):
+        self.filter[border](Filters.gaussian_kernel_2d[dtype, color_space.channels()](size=size, std_dev=std_dev))
 
-    fn gaussian_blurred[
-        border: Border
-    ](mut self, size: Int, std_dev: Optional[Float64] = None) -> Self:
-        return self.filtered[border](
-            Filters.gaussian_kernel_2d[dtype, color_space.channels()](
-                size=size, std_dev=std_dev
-            )
-        )
+    fn gaussian_blurred[border: Border](mut self, size: Int, std_dev: Optional[Float64] = None) -> Self:
+        return self.filtered[border](Filters.gaussian_kernel_2d[dtype, color_space.channels()](size=size, std_dev=std_dev))
 
     #
     # Filtering
     #
-    fn filter[
-        border: Border
-    ](mut self, kernel: Matrix[dtype, color_space.channels()]):
+    fn filter[border: Border](mut self, kernel: Matrix[dtype, color_space.channels()]):
         self.filtered[border](kernel)._matrix.copy_into(self._matrix)
 
-    fn filtered[
-        border: Border
-    ](self, kernel: Matrix[dtype, color_space.channels()]) -> Self:
+    fn filtered[border: Border](self, kernel: Matrix[dtype, color_space.channels()]) -> Self:
         var result = Self(width=self.width(), height=self.height())
         self.filtered_into[border](dest=result, kernel=kernel)
 
         return result^
 
-    fn filtered_into[
-        border: Border
-    ](self, mut dest: Self, kernel: Matrix[dtype, color_space.channels()]):
+    fn filtered_into[border: Border](self, mut dest: Self, kernel: Matrix[dtype, color_space.channels()]):
         var count = kernel.strided_count()
 
         if count == 1:
-            self._direct_convolution[border, 1](
-                dest=dest, kernel=kernel.rotated_180()
-            )
+            self._direct_convolution[border, 1](dest=dest, kernel=kernel.rotated_180())
         elif count == 2:
-            self._direct_convolution[border, 2](
-                dest=dest, kernel=kernel.rotated_180()
-            )
+            self._direct_convolution[border, 2](dest=dest, kernel=kernel.rotated_180())
         elif count <= 4:
-            self._direct_convolution[border, 4](
-                dest=dest, kernel=kernel.rotated_180()
-            )
+            self._direct_convolution[border, 4](dest=dest, kernel=kernel.rotated_180())
         elif count <= 8:
-            self._direct_convolution[border, 8](
-                dest=dest, kernel=kernel.rotated_180()
-            )
+            self._direct_convolution[border, 8](dest=dest, kernel=kernel.rotated_180())
         elif count <= 16:
-            self._direct_convolution[border, 16](
-                dest=dest, kernel=kernel.rotated_180()
-            )
+            self._direct_convolution[border, 16](dest=dest, kernel=kernel.rotated_180())
         elif count <= 32:
-            self._direct_convolution[border, 32](
-                dest=dest, kernel=kernel.rotated_180()
-            )
+            self._direct_convolution[border, 32](dest=dest, kernel=kernel.rotated_180())
         elif count <= 64:
-            self._direct_convolution[border, 64](
-                dest=dest, kernel=kernel.rotated_180()
-            )
+            self._direct_convolution[border, 64](dest=dest, kernel=kernel.rotated_180())
         elif count <= 128:
-            self._direct_convolution[border, 128](
-                dest=dest, kernel=kernel.rotated_180()
-            )
+            self._direct_convolution[border, 128](dest=dest, kernel=kernel.rotated_180())
         else:
-            abort(
-                "Direct convolution for kernels with strided counts greater"
-                " than 128 is not supported yet"
-            )
+            abort("Direct convolution for kernels with strided counts greater than 128 is not supported yet")
 
-    fn _direct_convolution[
-        border: Border, width: Int
-    ](self, mut dest: Self, kernel: Matrix[dtype, color_space.channels()]):
+    fn _direct_convolution[border: Border, width: Int](self, mut dest: Self, kernel: Matrix[dtype, color_space.channels()]):
         var half_kernel_width = kernel.cols() // 2
         var half_kernel_height = kernel.rows() // 2
 
@@ -378,10 +291,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
                 var index = kernel_y * kernel.cols() + kernel_x
                 y_offset_vector[index] = kernel_y - half_kernel_height
                 x_offset_vector[index] = kernel_x - half_kernel_width
-                offset_vector[index] = (
-                    y_offset_vector[index] * self.width()
-                    + x_offset_vector[index]
-                ) * color_space.channels()
+                offset_vector[index] = (y_offset_vector[index] * self.width() + x_offset_vector[index]) * color_space.channels()
                 mask_vector[index] = True
 
         @parameter
@@ -389,11 +299,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
             # TODO: Create strided slice of kernel data and fill the kernel vector from that, or create an as_simd() method on Matrix?
             for row in range(kernel.rows()):
                 for col in range(kernel.cols()):
-                    kernel_vector[
-                        row * kernel.cols() + col
-                    ] = kernel.strided_load[1](
-                        row=row, col=col, component=channel
-                    ).value
+                    kernel_vector[row * kernel.cols() + col] = kernel.strided_load[1](row=row, col=col, component=channel).value
 
             @parameter
             fn process_row(y: Int):
@@ -401,12 +307,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
                 var max_patch_y = y + half_kernel_height
 
                 for x in range(dest.width()):
-                    if (
-                        max_patch_y < self.height()
-                        and min_patch_y >= 0
-                        and (x + half_kernel_width) < self.width()
-                        and (x - half_kernel_width) >= 0
-                    ):
+                    if max_patch_y < self.height() and min_patch_y >= 0 and (x + half_kernel_width) < self.width() and (x - half_kernel_width) >= 0:
                         dest[y, x, channel] = (
                             self._matrix.gather(
                                 row=y,
@@ -438,16 +339,10 @@ struct Image[dtype: DType, color_space: ColorSpace](
 
     fn _discrete_fourier_transform_convolution[
         border: Border, new_dtype: DType
-    ](
-        self,
-        mut dest: Image[new_dtype, color_space],
-        flipped_kernel: Matrix[dtype, color_space.channels()],
-    ):
+    ](self, mut dest: Image[new_dtype, color_space], flipped_kernel: Matrix[dtype, color_space.channels()],):
         pass
 
-    fn _bordered_load[
-        border: Border
-    ](self, y: Int, x: Int, channel: Int) -> Scalar[dtype]:
+    fn _bordered_load[border: Border](self, y: Int, x: Int, channel: Int) -> Scalar[dtype]:
         @parameter
         if border == Border.zero:
             if y >= 0 and y < self.height() and x >= 0 and x < self.width():
@@ -517,9 +412,7 @@ struct ImagePointer[dtype: DType, color_space: ColorSpace](EqualityComparable):
     var _pointer: Pointer[Image[dtype, color_space], ImmutableAnyOrigin]
 
     fn __init__(out self, image: Image[dtype, color_space]):
-        self._pointer = rebind[
-            Pointer[Image[dtype, color_space], ImmutableAnyOrigin]
-        ](Pointer.address_of(image))
+        self._pointer = rebind[Pointer[Image[dtype, color_space], ImmutableAnyOrigin]](Pointer.address_of(image))
 
     fn __getitem__(self) -> ref [self._pointer[]] Image[dtype, color_space]:
         return self._pointer[]
