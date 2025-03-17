@@ -37,27 +37,27 @@ struct ImageSlice[mut: Bool, //, dtype: DType, color_space: ColorSpace, origin: 
         ref [origin]image: Image[dtype, color_space],
         y_range: StridedRange,
         x_range: StridedRange,
-    ):
+    ) raises:
         self._image = Pointer.address_of(image)
-        self._y_range = y_range
-        self._x_range = x_range
+        self._y_range = y_range.normalized_in_positive_range(image.height())
+        self._x_range = x_range.normalized_in_positive_range(image.width())
         self._height = ceildiv(y_range.end - y_range.start, y_range.step)
         self._width = ceildiv(x_range.end - x_range.start, x_range.step)
 
-    fn __init__(out self, other: Self, y_range: StridedRange, x_range: StridedRange):
+    fn __init__(out self, other: Self, y_range: StridedRange, x_range: StridedRange) raises:
         self._image = other._image
 
         self._y_range = StridedRange(
             other._y_range.start + y_range.start,
             other._y_range.start + y_range.end,
             other._y_range.step * y_range.step,
-        )
+        ).normalized_in_positive_range(other._height)
 
         self._x_range = StridedRange(
             other._x_range.start + x_range.start,
             other._x_range.start + x_range.end,
             other._x_range.step * x_range.step,
-        )
+        ).normalized_in_positive_range(other._width)
 
         self._height = ceildiv(y_range.end - y_range.start, y_range.step)
         self._width = ceildiv(x_range.end - x_range.start, x_range.step)
@@ -128,7 +128,7 @@ struct ImageSlice[mut: Bool, //, dtype: DType, color_space: ColorSpace, origin: 
     # Slicing
     #
     @always_inline
-    fn __getitem__(self, y_slice: Slice, x_slice: Slice) -> Self:
+    fn __getitem__(self, y_slice: Slice, x_slice: Slice) raises -> Self:
         return self.slice(
             y_range=StridedRange(
                 slice=y_slice,
@@ -145,15 +145,15 @@ struct ImageSlice[mut: Bool, //, dtype: DType, color_space: ColorSpace, origin: 
         )
 
     @always_inline
-    fn slice(self, y_range: StridedRange) -> Self:
+    fn slice(self, y_range: StridedRange) raises -> Self:
         return self.slice(y_range=y_range, x_range=StridedRange(self.width()))
 
     @always_inline
-    fn slice(self, *, x_range: StridedRange) -> Self:
+    fn slice(self, *, x_range: StridedRange) raises -> Self:
         return self.slice(y_range=StridedRange(self.height()), x_range=x_range)
 
     @always_inline
-    fn slice(self, y_range: StridedRange, x_range: StridedRange) -> Self:
+    fn slice(self, y_range: StridedRange, x_range: StridedRange) raises -> Self:
         return Self(other=self, y_range=y_range, x_range=x_range)
 
     #

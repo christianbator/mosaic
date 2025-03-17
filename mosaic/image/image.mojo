@@ -144,7 +144,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     # Slicing
     #
     @always_inline
-    fn __getitem__[mut: Bool, origin: Origin[mut], //](ref [origin]self, y_slice: Slice, x_slice: Slice) -> ImageSlice[dtype, color_space, origin]:
+    fn __getitem__[mut: Bool, origin: Origin[mut], //](ref [origin]self, y_slice: Slice, x_slice: Slice) raises -> ImageSlice[dtype, color_space, origin]:
         return self.slice(
             y_range=StridedRange(
                 slice=y_slice,
@@ -161,15 +161,17 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
         )
 
     @always_inline
-    fn slice[mut: Bool, origin: Origin[mut], //](ref [origin]self, y_range: StridedRange) -> ImageSlice[dtype, color_space, origin]:
+    fn slice[mut: Bool, origin: Origin[mut], //](ref [origin]self, y_range: StridedRange) raises -> ImageSlice[dtype, color_space, origin]:
         return self.slice(y_range=y_range, x_range=StridedRange(self.width()))
 
     @always_inline
-    fn slice[mut: Bool, origin: Origin[mut], //](ref [origin]self, *, x_range: StridedRange) -> ImageSlice[dtype, color_space, origin]:
+    fn slice[mut: Bool, origin: Origin[mut], //](ref [origin]self, *, x_range: StridedRange) raises -> ImageSlice[dtype, color_space, origin]:
         return self.slice(y_range=StridedRange(self.height()), x_range=x_range)
 
     @always_inline
-    fn slice[mut: Bool, origin: Origin[mut], //](ref [origin]self, y_range: StridedRange, x_range: StridedRange) -> ImageSlice[dtype, color_space, origin]:
+    fn slice[
+        mut: Bool, origin: Origin[mut], //
+    ](ref [origin]self, y_range: StridedRange, x_range: StridedRange) raises -> ImageSlice[dtype, color_space, origin]:
         return ImageSlice[dtype, color_space, origin](image=self, y_range=y_range, x_range=x_range)
 
     @always_inline

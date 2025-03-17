@@ -67,6 +67,18 @@ struct StridedRange(Stringable, Writable):
         self.step = slice.step.value() if slice.step else default_step
 
     #
+    # Normalization
+    #
+    fn normalized_in_positive_range(self, end_of_range: Int) raises -> Self:
+        var start = self.start + end_of_range if self.start < 0 else self.start
+        var end = self.end + end_of_range if self.end < 0 else self.end
+
+        if (0 <= start < end <= end_of_range) and (self.step > 0):
+            return Self(start, end, self.step)
+        else:
+            raise Error("Unable to normalize ", self, " in positive range: [0, ", end_of_range, ")")
+
+    #
     # Stringable & Writable
     #
     fn __str__(self) -> String:
