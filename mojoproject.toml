@@ -7,9 +7,15 @@
 
 [project]
 name = "mosaic"
-version = "0.0.1"
-description = "Vision of the future"
+description = "An open source computer vision library in Mojo"
 authors = ["Christian Bator <christian@bator.co>"]
+readme = "README.md"
+license = "Apache-2.0"
+license-file = "LICENSE"
+homepage = "https://mosaiclib.org"
+repository = "https://github.com/christianbator/mosaic"
+documentation = "https://mosaiclib.org/docs"
+version = "0.0.1"
 platforms = ["osx-arm64", "linux-aarch64", "linux-64"]
 channels = [
     "https://conda.modular.com/max-nightly",
