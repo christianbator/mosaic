@@ -27,10 +27,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Build package
-        working-directory: rattler-build
         uses: prefix-dev/rattler-build-action@v0.2.33
         with:
-          recipe-path: recipe.yaml
+          recipe-path: rattler-build/recipe.yaml
           build-args: -c https://conda.modular.com/max -c conda-forge --target-platform ${{ matrix.target-platform }}${{ matrix.target-platform == 'linux-aarch64' && ' --no-test' || '' }}
           artifact-name: mosaic-${{ matrix.target-platform }}
       
