@@ -10,6 +10,8 @@ from pathlib import Path
 from sys.ffi import DLHandle, c_int
 from memory import UnsafePointer
 
+from mosaic.utility import dynamic_library_filepath
+
 
 #
 # ImageInfo
@@ -44,13 +46,31 @@ struct ImageInfo(Stringable, Writable):
 # ImageReader
 #
 struct ImageReader[dtype: DType, color_space: ColorSpace]:
+    #
+    # Fields
+    #
     var _path: Path
 
+    @staticmethod
+    fn _libcodec() -> DLHandle:
+        var libcodec = DLHandle(dynamic_library_filepath("libcodec"))
+
+        if not libcodec:
+            abort("Failed to load libcodec")
+
+        return libcodec
+
+    #
+    # Initialization
+    #
     fn __init__(out self, path: Path):
         self._path = path
 
+    #
+    # Reading
+    #
     fn read(self) raises -> Image[dtype, color_space]:
-        var libcodec = DLHandle("mosaic/libcodec.dylib")
+        var libcodec = Self._libcodec()
 
         # Read raw file data
         var raw_data = self._path.read_bytes()
@@ -73,7 +93,6 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
         )
 
         if not is_valid_info:
-            libcodec.close()
             raise Error("Failed to read image from file (invalid info): ", self._path)
 
         # Decode image data
@@ -184,18 +203,15 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
         # Unsupported bit-depth
         #
         else:
-            libcodec.close()
-            abort()
-
-            # Bypass the pass manager
-            is_valid_data = 0
-            image = Image[dtype, color_space](width=width, height=height)
-            ##
+            raise Error("Unsupported bit depth in ImageReader.read()")
+            # abort("Unsupported bit depth")
+            # while True: pass
+            # # Bypass the pass manager
+            # is_valid_data = 0
+            # image = Image[dtype, color_space](width=width, height=height)
+            # ##
 
         if not is_valid_data:
-            libcodec.close()
             raise Error("Failed to read image from file (invalid data): ", self._path)
-
-        libcodec.close()
 
         return image^

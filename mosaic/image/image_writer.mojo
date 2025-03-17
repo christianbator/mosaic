@@ -11,22 +11,41 @@ from pathlib import Path
 from sys.ffi import DLHandle, c_int, c_char
 from memory import UnsafePointer
 
+from mosaic.utility import dynamic_library_filepath
+
 
 #
 # ImageWriter
 #
 struct ImageWriter:
+    #
+    # Fields
+    #
     var _path: Path
 
+    @staticmethod
+    fn _libcodec() raises -> DLHandle:
+        var libcodec = DLHandle(dynamic_library_filepath("libcodec"))
+
+        if not libcodec:
+            abort("Failed to load libcodec")
+
+        return libcodec
+
+    #
+    # Initialization
+    #
     fn __init__(out self, path: Path):
         self._path = path
 
+    #
+    # Writing
+    #
     fn write[dtype: DType, //, file_type: ImageFileType](self, image: Image[dtype]) raises:
-        var libcodec = DLHandle("mosaic/libcodec.dylib")
+        var libcodec = Self._libcodec()
 
         var path_string = self._path.__fspath__()
         if not path_string.endswith(file_type.extension()):
-            libcodec.close()
             raise Error("Mismatched file type and extension " + String(file_type) + ": " + path_string)
 
         try:

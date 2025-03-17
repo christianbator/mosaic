@@ -11,14 +11,14 @@ from complex import ComplexSIMD
 #
 # Aliases
 #
-alias ScalarNumber = Number[width=1]
+alias ScalarNumber = Number[width=1, complex=_]
 
 
 #
 # Number
 #
 @register_passable("trivial")
-struct Number[dtype: DType, width: Int, *, complex: Bool](
+struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     Absable,
     Boolable,
     Ceilable,
@@ -555,7 +555,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
             return Self(self.value.fma(multiplier=multiplier.value, accumulator=accumulator.value))
 
     #
-    # Trait Implementations
+    # Numeric Trait Implementations
     #
     @always_inline
     fn __abs__(self) -> Self:
@@ -629,15 +629,18 @@ struct Number[dtype: DType, width: Int, *, complex: Bool](
 
         return Self(self.value.__round__(ndigits))
 
-    @no_inline
-    fn __str__(self) -> String:
-        return String.write(self)
-
     @always_inline
     fn __trunc__(self) -> Self:
         constrained[not complex, "__trunc__() is only available for non-complex numbers"]()
 
         return Self(self.value.__trunc__())
+
+    #
+    # Stringable & Writable
+    #
+    @no_inline
+    fn __str__(self) -> String:
+        return String.write(self)
 
     @no_inline
     fn write_to[W: Writer](self, mut writer: W):

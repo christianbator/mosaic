@@ -36,28 +36,14 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
         self._cols = cols
         self._data = UnsafeNumberPointer[dtype, complex=complex](rows * cols * depth)
 
-    fn __init__(
-        out self,
-        rows: Int,
-        cols: Int,
-        value: ScalarNumber[dtype, complex=complex],
-    ):
+    fn __init__(out self, rows: Int, cols: Int, value: ScalarNumber[dtype, complex=complex]):
         self._rows = rows
         self._cols = cols
         self._data = UnsafeNumberPointer[dtype, complex=complex](rows * cols * depth)
         self.fill(value)
 
-    fn __init__(
-        out self,
-        rows: Int,
-        cols: Int,
-        *values: ScalarNumber[dtype, complex=complex],
-    ):
-        # TODO: Make this a compile-time check when possible
-        debug_assert(
-            rows * cols * depth == len(values),
-            "mismatch in the number of values in the Matrix variadic constructor",
-        )
+    fn __init__(out self, rows: Int, cols: Int, *values: ScalarNumber[dtype, complex=complex]):
+        debug_assert[assert_mode="safe"](rows * cols * depth == len(values), "Mismatch in variadic argument length for Matrix constructor")
 
         self._rows = rows
         self._cols = cols
@@ -66,12 +52,17 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
         for index in range(len(values)):
             self._store(index=index, value=values[index])
 
-    fn __init__(
-        out self,
-        rows: Int,
-        cols: Int,
-        owned data: UnsafeNumberPointer[dtype, complex=complex],
-    ):
+    fn __init__(out self, rows: Int, cols: Int, values: List[ScalarNumber[dtype, complex=complex]]):
+        debug_assert[assert_mode="safe"](rows * cols * depth == len(values), "Mismatch in list length for Matrix constructor")
+
+        self._rows = rows
+        self._cols = cols
+        self._data = UnsafeNumberPointer[dtype, complex=complex](rows * cols * depth)
+
+        for index in range(len(values)):
+            self._store(index=index, value=values[index])
+
+    fn __init__(out self, rows: Int, cols: Int, owned data: UnsafeNumberPointer[dtype, complex=complex]):
         self._rows = rows
         self._cols = cols
         self._data = data
@@ -102,12 +93,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
         return Self(rows=rows, cols=cols, data=data)
 
     @staticmethod
-    fn random(
-        rows: Int,
-        cols: Int,
-        min: Scalar[dtype] = Scalar[dtype].MIN_FINITE,
-        max: Scalar[dtype] = Scalar[dtype].MAX_FINITE,
-    ) -> Self:
+    fn random(rows: Int, cols: Int, min: Scalar[dtype] = Scalar[dtype].MIN_FINITE, max: Scalar[dtype] = Scalar[dtype].MAX_FINITE) -> Self:
         var data = UnsafeNumberPointer[dtype, complex=complex](rows * cols * depth)
 
         var scalar_count: Int
@@ -118,12 +104,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
         else:
             scalar_count = rows * cols * depth
 
-        rand(
-            data.unsafe_ptr(),
-            scalar_count,
-            min=min.cast[DType.float64](),
-            max=max.cast[DType.float64](),
-        )
+        rand(data.unsafe_ptr(), scalar_count, min=min.cast[DType.float64](), max=max.cast[DType.float64]())
 
         return Self(rows=rows, cols=cols, data=data)
 
@@ -671,9 +652,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
                             value=Number[dtype, width, complex=complex](self[row, k, component]).fma(
                                 rhs.strided_load[width](row=k, col=col, component=component),
                                 dest.strided_load[width](row=row, col=col, component=component),
-                            )
-                            # TODO: Can I use fma()?
-                            # value = dest.strided_load[width](row = row, col = col, component = component) + self[row, k, component] * rhs.strided_load[width](row = k, col = col, component = component)
+                            ),
                         )
 
                     vectorize[

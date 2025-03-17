@@ -484,7 +484,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
 
             return self[reflected_y, reflected_x, channel]
         else:
-            abort()
+            abort("Unimplemented border type in Image._bordered_load()")
             while True:
                 pass
 

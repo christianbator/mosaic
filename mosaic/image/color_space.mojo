@@ -13,9 +13,15 @@ from os import abort
 #
 @value
 struct ColorSpace(EqualityComparable, Stringable, Writable):
+    #
+    # Supported Color Spaces
+    #
     alias greyscale = Self(ColorSpace._greyscale)
     alias rgb = Self(ColorSpace._rgb)
 
+    #
+    # Fields
+    #
     alias _greyscale = String("greyscale")
     alias _rgb = String("rgb")
 
@@ -23,12 +29,18 @@ struct ColorSpace(EqualityComparable, Stringable, Writable):
 
     var _raw_value: String
 
+    #
+    # Initialization
+    #
     fn __init__(out self, raw_value: String):
         self._raw_value = raw_value
 
         if raw_value not in Self._supported_color_spaces:
             abort("Unsupported color space: ", raw_value)
 
+    #
+    # Properties
+    #
     fn channels(self) -> Int:
         if self == Self.greyscale:
             return 1
@@ -48,6 +60,9 @@ struct ColorSpace(EqualityComparable, Stringable, Writable):
     fn __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
+    #
+    # Stringable & Writable
+    #
     fn __str__(self) -> String:
         return String.write(self)
 

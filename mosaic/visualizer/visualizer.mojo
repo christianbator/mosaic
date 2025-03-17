@@ -5,9 +5,11 @@
 # Created by Christian Bator on 12/14/2024
 #
 
+from os import abort
 from sys.ffi import DLHandle, c_int, c_char, c_float
 from memory import UnsafePointer
 
+from mosaic.utility import dynamic_library_filepath
 from mosaic.image import Image, ImageSlice, ImagePointer, ColorSpace
 from mosaic.video import VideoCapture
 
@@ -16,11 +18,19 @@ from mosaic.video import VideoCapture
 # Visualizer
 #
 struct Visualizer:
+    #
+    # Fields
+    #
     alias display_dtype = DType.uint8
 
     @staticmethod
     fn _libvisualizer() -> DLHandle:
-        return DLHandle("mosaic/libvisualizer.dylib")
+        var libvisualizer = DLHandle(dynamic_library_filepath("libvisualizer"))
+
+        if not libvisualizer:
+            abort("Failed to load libvisualizer")
+
+        return libvisualizer
 
     #
     # ImageSlice
