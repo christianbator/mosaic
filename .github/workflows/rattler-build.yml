@@ -30,7 +30,7 @@ jobs:
         uses: prefix-dev/rattler-build-action@v0.2.33
         with:
           recipe-path: rattler-build/recipe.yaml
-          build-args: -c https://conda.modular.com/max -c https://conda.modular.com/max-nightly -c conda-forge --target-platform ${{ matrix.target-platform }}${{ matrix.target-platform == 'linux-aarch64' && ' --no-test' || '' }}
+          build-args: -c https://conda.modular.com/max-nightly -c https://conda.modular.com/max -c https://repo.prefix.dev/modular-community -c conda-forge --target-platform ${{ matrix.target-platform }}${{ matrix.target-platform == 'linux-aarch64' && ' --no-test' || '' }}
           artifact-name: mosaic-${{ matrix.target-platform }}
       
     
