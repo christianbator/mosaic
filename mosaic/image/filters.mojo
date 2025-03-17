@@ -9,6 +9,7 @@ from math import pi, exp
 from collections import Optional
 
 from mosaic.numeric import Matrix, Number, ScalarNumber
+from mosaic.utility import fatal_error
 
 
 struct Filters:
@@ -40,62 +41,50 @@ struct Filters:
         ]()
 
         if size == 1:
-            return Matrix[dtype, depth, complex=complex].strided_replication(size, 1, 1.0)
+            return Matrix[dtype, depth, complex=complex].strided_replication(rows=size, cols=1, values=List[ScalarNumber[dtype, complex=complex]](1.0))
         elif std_dev:
             var result = Matrix[DType.float64, depth, complex=complex](rows=size, cols=1)
             var variance = std_dev.value() ** 2
 
-            for i in range(size):
-                result.store_full_depth(
-                    row=i,
-                    col=0,
-                    value=result.create_full_depth_value(exp(-((i - (size - 1) / 2) ** 2) / (2 * variance))),
-                )
+            try:
+                for i in range(size):
+                    result.store_full_depth(result.create_full_depth_value(exp(-((i - (size - 1) / 2) ** 2) / (2 * variance))), row=i, col=0)
+            except error:
+                fatal_error(error)
 
             result.strided_normalize()
 
             return result.astype[dtype]()
         else:
             if size == 3:
-                return Matrix[dtype, depth, complex=complex].strided_replication(size, 1, 0.250, 0.500, 0.250)
+                return Matrix[dtype, depth, complex=complex].strided_replication(
+                    rows=size, cols=1, values=List[ScalarNumber[dtype, complex=complex]](0.250, 0.500, 0.250)
+                )
             elif size == 5:
-                return Matrix[dtype, depth, complex=complex].strided_replication(size, 1, 0.062500, 0.250000, 0.375000, 0.250000, 0.062500)
+                return Matrix[dtype, depth, complex=complex].strided_replication(
+                    rows=size, cols=1, values=List[ScalarNumber[dtype, complex=complex]](0.062500, 0.250000, 0.375000, 0.250000, 0.062500)
+                )
             elif size == 7:
                 return Matrix[dtype, depth, complex=complex].strided_replication(
-                    size,
-                    1,
-                    0.031250,
-                    0.109375,
-                    0.218750,
-                    0.281250,
-                    0.218750,
-                    0.109375,
-                    0.031250,
+                    rows=size, cols=1, values=List[ScalarNumber[dtype, complex=complex]](0.031250, 0.109375, 0.218750, 0.281250, 0.218750, 0.109375, 0.031250)
                 )
             elif size == 9:
                 return Matrix[dtype, depth, complex=complex].strided_replication(
-                    size,
-                    1,
-                    0.015625000,
-                    0.050781250,
-                    0.117187500,
-                    0.199218750,
-                    0.234375000,
-                    0.199218750,
-                    0.117187500,
-                    0.050781250,
-                    0.015625000,
+                    rows=size,
+                    cols=1,
+                    values=List[ScalarNumber[dtype, complex=complex]](
+                        0.015625000, 0.050781250, 0.117187500, 0.199218750, 0.234375000, 0.199218750, 0.117187500, 0.050781250, 0.015625000
+                    ),
                 )
             else:
                 var result = Matrix[DType.float64, depth, complex=complex](rows=size, cols=1)
                 var variance = (0.3 * ((size - 1) * 0.5 - 1.0) + 0.8) ** 2
 
-                for i in range(size):
-                    result.store_full_depth(
-                        row=i,
-                        col=0,
-                        value=result.create_full_depth_value(exp(-((i - (size - 1) / 2) ** 2) / (2 * variance))),
-                    )
+                try:
+                    for i in range(size):
+                        result.store_full_depth(result.create_full_depth_value(exp(-((i - (size - 1) / 2) ** 2) / (2 * variance))), row=i, col=0)
+                except error:
+                    fatal_error(error)
 
                 result.strided_normalize()
 

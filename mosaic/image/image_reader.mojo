@@ -5,12 +5,11 @@
 # Created by Christian Bator on 03/11/2025
 #
 
-from os import abort
 from pathlib import Path
 from sys.ffi import DLHandle, c_int
 from memory import UnsafePointer
 
-from mosaic.utility import dynamic_library_filepath
+from mosaic.utility import dynamic_library_filepath, fatal_error
 
 
 #
@@ -56,7 +55,7 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
         var libcodec = DLHandle(dynamic_library_filepath("libcodec"))
 
         if not libcodec:
-            abort("Failed to load libcodec")
+            fatal_error("Failed to load libcodec")
 
         return libcodec
 
@@ -204,12 +203,6 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
         #
         else:
             raise Error("Unsupported bit depth in ImageReader.read()")
-            # abort("Unsupported bit depth")
-            # while True: pass
-            # # Bypass the pass manager
-            # is_valid_data = 0
-            # image = Image[dtype, color_space](width=width, height=height)
-            # ##
 
         if not is_valid_data:
             raise Error("Failed to read image from file (invalid data): ", self._path)

@@ -5,11 +5,10 @@
 # Created by Christian Bator on 12/14/2024
 #
 
-from os import abort
 from sys.ffi import DLHandle, c_int, c_char, c_float
 from memory import UnsafePointer
 
-from mosaic.utility import dynamic_library_filepath
+from mosaic.utility import dynamic_library_filepath, fatal_error
 from mosaic.image import Image, ImageSlice, ImagePointer, ColorSpace
 from mosaic.video import VideoCapture
 
@@ -28,7 +27,7 @@ struct Visualizer:
         var libvisualizer = DLHandle(dynamic_library_filepath("libvisualizer"))
 
         if not libvisualizer:
-            abort("Failed to load libvisualizer")
+            fatal_error("Failed to load libvisualizer")
 
         return libvisualizer
 

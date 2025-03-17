@@ -5,7 +5,7 @@
 # Created by Christian Bator on 02/27/2025
 #
 
-from os import abort
+from mosaic.utility import fatal_error
 
 
 #
@@ -23,7 +23,7 @@ struct Border(EqualityComparable, Stringable, Writable):
         self._raw_value = raw_value
 
         if raw_value not in [0, 1, 2]:
-            abort("Unsupported border: ", raw_value)
+            fatal_error("Unsupported border: ", raw_value)
 
     fn __eq__(self, other: Self) -> Bool:
         return self._raw_value == other._raw_value

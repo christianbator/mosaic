@@ -5,14 +5,13 @@
 # Created by Christian Bator on 12/14/2024
 #
 
-from os import abort
 from pathlib import Path
 from memory import UnsafePointer
 from algorithm import vectorize, parallelize
 from collections import Optional
 
 from mosaic.numeric import Matrix, MatrixSlice, Number, ScalarNumber, StridedRange
-from mosaic.utility import optimal_simd_width, unroll_factor
+from mosaic.utility import optimal_simd_width, unroll_factor, fatal_error
 
 from .image_reader import ImageReader
 from .image_writer import ImageWriter
@@ -42,24 +41,16 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     fn __init__(out self, width: Int, height: Int):
         self._matrix = Matrix[dtype, color_space.channels()](rows=height, cols=width)
 
+    # This is an unsafe convenience constructor
     fn __init__(out self, width: Int, height: Int, owned data: UnsafePointer[Scalar[dtype]]):
         self._matrix = Matrix[dtype, color_space.channels()](rows=height, cols=width, data=data)
 
+    @implicit
     fn __init__(out self, owned matrix: Matrix[dtype, color_space.channels()]):
         self._matrix = matrix^
 
-    fn __init__(out self, single_channel_matrix: Matrix[dtype], channel: Int):
-        self._matrix = Matrix[dtype, color_space.channels()](rows=single_channel_matrix.rows(), cols=single_channel_matrix.cols())
-
-        @parameter
-        fn process_row(row: Int):
-            @parameter
-            fn process_col[width: Int](col: Int):
-                self.strided_store(y=row, x=col, channel=channel, value=single_channel_matrix.strided_load[width](row=row, col=col, component=0).value)
-
-            vectorize[process_col, Self.optimal_simd_width, unroll_factor=unroll_factor](single_channel_matrix.cols())
-
-        parallelize[process_row](single_channel_matrix.rows())
+    fn __init__(out self, single_channel_matrix: Matrix[dtype], channel: Int) raises:
+        self._matrix = single_channel_matrix.copied_to_component[color_space.channels()](channel)
 
     fn __moveinit__(out self, owned existing: Self):
         self._matrix = existing._matrix^
@@ -99,44 +90,44 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     # Public Access
     #
     @always_inline
-    fn __getitem__(self, y: Int, x: Int) -> Scalar[dtype]:
+    fn __getitem__(self, y: Int, x: Int) raises -> Scalar[dtype]:
         constrained[color_space.channels() == 1, "Must specify channel for image in color space with channels > 1"]()
 
         return self[y, x, 0]
 
     @always_inline
-    fn __getitem__(self, y: Int, x: Int, channel: Int) -> Scalar[dtype]:
+    fn __getitem__(self, y: Int, x: Int, channel: Int) raises -> Scalar[dtype]:
         return self._matrix[y, x, channel].value
 
     @always_inline
-    fn __setitem__(mut self, y: Int, x: Int, value: Scalar[dtype]):
+    fn __setitem__(mut self, y: Int, x: Int, value: Scalar[dtype]) raises:
         constrained[color_space.channels() == 1, "Must specify channel for image in color space with channels > 1"]()
 
         self[y, x, 0] = value
 
     @always_inline
-    fn __setitem__(mut self, y: Int, x: Int, channel: Int, value: Scalar[dtype]):
+    fn __setitem__(mut self, y: Int, x: Int, channel: Int, value: Scalar[dtype]) raises:
         self._matrix[y, x, channel] = value
 
     @always_inline
-    fn load[width: Int](self, y: Int, x: Int) -> SIMD[dtype, width]:
+    fn load[width: Int](self, y: Int, x: Int) raises -> SIMD[dtype, width]:
         constrained[color_space.channels() == 1, "Must specify channel for image in color space with channels > 1"]()
 
         return self.strided_load[width](y=y, x=x, channel=0)
 
     @always_inline
-    fn strided_load[width: Int](self, y: Int, x: Int, channel: Int) -> SIMD[dtype, width]:
+    fn strided_load[width: Int](self, y: Int, x: Int, channel: Int) raises -> SIMD[dtype, width]:
         return self._matrix.strided_load[width](row=y, col=x, component=channel).value
 
     @always_inline
-    fn store[width: Int](mut self, y: Int, x: Int, value: SIMD[dtype, width]):
+    fn store[width: Int](mut self, value: SIMD[dtype, width], y: Int, x: Int) raises:
         constrained[color_space.channels() == 1, "Must specify channel for image in color space with channels > 1"]()
 
-        self.strided_store(y=y, x=x, channel=0, value=value)
+        self.strided_store(value, y=y, x=x, channel=0)
 
     @always_inline
-    fn strided_store[width: Int](mut self, y: Int, x: Int, channel: Int, value: SIMD[dtype, width]):
-        self._matrix.strided_store[width](row=y, col=x, component=channel, value=value)
+    fn strided_store[width: Int](mut self, value: SIMD[dtype, width], y: Int, x: Int, channel: Int) raises:
+        self._matrix.strided_store[width](value, row=y, col=x, component=channel)
 
     #
     # Unsafe Access
@@ -274,6 +265,14 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
         return result^
 
     fn converted_astype_into[new_color_space: ColorSpace, new_dtype: DType](self, mut dest: Image[new_dtype, new_color_space]):
+        debug_assert[assert_mode="safe"](
+            dest.width() == self.width() and dest.height() == self.height(),
+            "Invalid destination Image provided to converted_astype_into(), expected: ",
+            self,
+            "received: ",
+            dest,
+        )
+
         @parameter
         if new_color_space == color_space:
             self._matrix._unsafe_astype_into[new_dtype, new_color_space.channels()](dest._matrix)
@@ -283,34 +282,32 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
             fn convert_row(y: Int):
                 @parameter
                 fn convert_row_pixels[width: Int](x: Int):
-                    # Greyscale ->
-                    @parameter
-                    if color_space == ColorSpace.greyscale:
-                        var grey = self.strided_load[width](y=y, x=x, channel=0).cast[new_dtype]()
-
-                        # RGB
+                    try:
+                        # Greyscale ->
                         @parameter
-                        if new_color_space == ColorSpace.rgb:
-                            dest.strided_store(y=y, x=x, channel=0, value=grey)
-                            dest.strided_store(y=y, x=x, channel=1, value=grey)
-                            dest.strided_store(y=y, x=x, channel=2, value=grey)
+                        if color_space == ColorSpace.greyscale:
+                            var grey = self.strided_load[width](y=y, x=x, channel=0).cast[new_dtype]()
 
-                    # RGB ->
-                    elif color_space == ColorSpace.rgb:
-                        var red = self.strided_load[width](y=y, x=x, channel=0)
-                        var green = self.strided_load[width](y=y, x=x, channel=1)
-                        var blue = self.strided_load[width](y=y, x=x, channel=2)
+                            # RGB
+                            @parameter
+                            if new_color_space == ColorSpace.rgb:
+                                dest.strided_store(grey, y=y, x=x, channel=0)
+                                dest.strided_store(grey, y=y, x=x, channel=1)
+                                dest.strided_store(grey, y=y, x=x, channel=2)
 
-                        # Greyscale
-                        @parameter
-                        if new_color_space == ColorSpace.greyscale:
-                            var grey = 0.299 * red.cast[DType.float64]() + 0.587 * green.cast[DType.float64]() + 0.114 * blue.cast[DType.float64]()
-                            dest.strided_store(
-                                y=y,
-                                x=x,
-                                channel=0,
-                                value=grey.cast[new_dtype](),
-                            )
+                        # RGB ->
+                        elif color_space == ColorSpace.rgb:
+                            var red = self.strided_load[width](y=y, x=x, channel=0)
+                            var green = self.strided_load[width](y=y, x=x, channel=1)
+                            var blue = self.strided_load[width](y=y, x=x, channel=2)
+
+                            # Greyscale
+                            @parameter
+                            if new_color_space == ColorSpace.greyscale:
+                                var grey = 0.299 * red.cast[DType.float64]() + 0.587 * green.cast[DType.float64]() + 0.114 * blue.cast[DType.float64]()
+                                dest.strided_store(grey.cast[new_dtype](), y=y, x=x, channel=0)
+                    except error:
+                        fatal_error(error)
 
                 vectorize[convert_row_pixels, Self.optimal_simd_width, unroll_factor=unroll_factor](self.width())
 
@@ -365,6 +362,14 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
         return result^
 
     fn filtered_into[border: Border](self, mut dest: Self, kernel: Matrix[dtype, color_space.channels()]):
+        debug_assert[assert_mode="safe"](
+            dest.width() == self.width() and dest.height() == self.height(),
+            "Invalid destination Image provided to filtered_into(), expected: ",
+            self,
+            "received: ",
+            dest,
+        )
+
         var count = kernel.strided_count()
 
         if count == 1:
@@ -384,7 +389,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
         elif count <= 128:
             self._direct_convolution[border, 128](dest=dest, kernel=kernel.rotated_180())
         else:
-            abort("Direct convolution for kernels with strided counts greater than 128 is not supported yet")
+            fatal_error("Direct convolution for kernels with strided counts greater than 128 is not supported yet")
 
     fn _direct_convolution[border: Border, width: Int](self, mut dest: Self, kernel: Matrix[dtype, color_space.channels()]):
         var half_kernel_width = kernel.cols() // 2
@@ -409,41 +414,47 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
             # TODO: Create strided slice of kernel data and fill the kernel vector from that, or create an as_simd() method on Matrix?
             for row in range(kernel.rows()):
                 for col in range(kernel.cols()):
-                    kernel_vector[row * kernel.cols() + col] = kernel.strided_load[1](row=row, col=col, component=channel).value
+                    try:
+                        kernel_vector[row * kernel.cols() + col] = kernel.strided_load[1](row=row, col=col, component=channel).value
+                    except error:
+                        fatal_error(error)
 
             @parameter
             fn process_row(y: Int):
                 var min_patch_y = y - half_kernel_height
                 var max_patch_y = y + half_kernel_height
 
-                for x in range(dest.width()):
-                    if max_patch_y < self.height() and min_patch_y >= 0 and (x + half_kernel_width) < self.width() and (x - half_kernel_width) >= 0:
-                        dest[y, x, channel] = (
-                            self._matrix.gather(
-                                row=y,
-                                col=x,
-                                component=channel,
-                                offset_vector=offset_vector,
-                                mask_vector=mask_vector,
-                            )
-                            * kernel_vector
-                        ).value.reduce_add()
-                    else:
-                        var pixel_sum = Scalar[dtype]()
-
-                        @parameter
-                        for index in range(width):
-                            if mask_vector[index]:
-                                pixel_sum = kernel_vector[index].fma(
-                                    self._bordered_load[border](
-                                        y=Int(y + y_offset_vector[index]),
-                                        x=Int(x + x_offset_vector[index]),
-                                        channel=channel,
-                                    ),
-                                    pixel_sum,
+                try:
+                    for x in range(dest.width()):
+                        if max_patch_y < self.height() and min_patch_y >= 0 and (x + half_kernel_width) < self.width() and (x - half_kernel_width) >= 0:
+                            dest[y, x, channel] = (
+                                self._matrix.gather(
+                                    row=y,
+                                    col=x,
+                                    component=channel,
+                                    offset_vector=offset_vector,
+                                    mask_vector=mask_vector,
                                 )
+                                * kernel_vector
+                            ).value.reduce_add()
+                        else:
+                            var pixel_sum = Scalar[dtype]()
 
-                        dest[y, x, channel] = pixel_sum
+                            @parameter
+                            for index in range(width):
+                                if mask_vector[index]:
+                                    pixel_sum = kernel_vector[index].fma(
+                                        self._bordered_load[border](
+                                            y=Int(y + y_offset_vector[index]),
+                                            x=Int(x + x_offset_vector[index]),
+                                            channel=channel,
+                                        ),
+                                        pixel_sum,
+                                    )
+
+                            dest[y, x, channel] = pixel_sum
+                except error:
+                    fatal_error(error)
 
             parallelize[process_row](dest.height())
 
@@ -452,7 +463,8 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     ](self, mut dest: Image[new_dtype, color_space], flipped_kernel: Matrix[dtype, color_space.channels()],):
         pass
 
-    fn _bordered_load[border: Border](self, y: Int, x: Int, channel: Int) -> Scalar[dtype]:
+    @always_inline
+    fn _bordered_load[border: Border](self, y: Int, x: Int, channel: Int) raises -> Scalar[dtype]:
         @parameter
         if border == Border.zero:
             if y >= 0 and y < self.height() and x >= 0 and x < self.width():
@@ -481,7 +493,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
 
             return self[reflected_y, reflected_x, channel]
         else:
-            abort("Unimplemented border type in Image._bordered_load()")
+            fatal_error("Unimplemented border type in Image._bordered_load()")
             while True:
                 pass
 

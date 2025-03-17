@@ -5,8 +5,7 @@
 # Created by Christian Bator on 02/02/2025
 #
 
-from os import abort
-from sys import info, simdwidthof
+from sys import info, simdwidthof, exit
 
 
 @parameter
@@ -32,6 +31,18 @@ fn dynamic_library_filepath(name: String) -> String:
     elif info.os_is_windows():
         return prefix + name + ".dll"
     else:
-        abort("Unsupported os for dynamic library filepath determination")
+        fatal_error("Unsupported os for dynamic library filepath determination")
         while True:
             pass
+
+
+@no_inline
+fn fatal_error(error: Error):
+    print(error)
+    exit(1)
+
+
+@no_inline
+fn fatal_error[*Ts: Writable](*messages: *Ts):
+    print(String(messages), flush=True)
+    exit(1)

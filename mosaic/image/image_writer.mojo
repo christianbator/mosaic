@@ -5,13 +5,13 @@
 # Created by Christian Bator on 12/14/2024
 #
 
-from os import abort, makedirs
+from os import makedirs
 from os.path import dirname
 from pathlib import Path
 from sys.ffi import DLHandle, c_int, c_char
 from memory import UnsafePointer
 
-from mosaic.utility import dynamic_library_filepath
+from mosaic.utility import dynamic_library_filepath, fatal_error
 
 
 #
@@ -28,7 +28,7 @@ struct ImageWriter:
         var libcodec = DLHandle(dynamic_library_filepath("libcodec"))
 
         if not libcodec:
-            abort("Failed to load libcodec")
+            fatal_error("Failed to load libcodec")
 
         return libcodec
 
@@ -51,7 +51,6 @@ struct ImageWriter:
         try:
             makedirs(path=dirname(self._path), exist_ok=True)
         except:
-            libcodec.close()
             raise ("Failed to create directory for image writing: " + String(self._path))
 
         var data: UnsafePointer[UInt8]
@@ -103,11 +102,7 @@ struct ImageWriter:
             )
         else:
             result = 0
-            libcodec.close()
-            abort("Unimplemented write() for image file type: ", file_type)
+            fatal_error("Unimplemented write() for image file type: ", file_type)
 
         if result != 1:
-            libcodec.close()
             raise Error("Failed to save image to file: ", self._path)
-
-        libcodec.close()

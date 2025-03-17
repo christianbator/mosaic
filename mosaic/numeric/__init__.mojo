@@ -6,7 +6,7 @@
 #
 
 from .number import Number, ScalarNumber
-from .number_array import NumberArray
+from .numeric_array import NumericArray
 from .matrix import Matrix
 from .matrix_slice import MatrixSlice
 from .strided_range import StridedRange

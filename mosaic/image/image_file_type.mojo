@@ -5,7 +5,7 @@
 # Created by Christian Bator on 03/11/2025
 #
 
-from os import abort
+from mosaic.utility import fatal_error
 
 
 #
@@ -36,7 +36,7 @@ struct ImageFileType(EqualityComparable, Stringable, Writable):
         self._raw_value = raw_value
 
         if raw_value not in Self._supported_image_file_types:
-            abort("Unsupported image file type: ", raw_value)
+            fatal_error("Unsupported image file type: ", raw_value)
 
     #
     # Properties
@@ -47,7 +47,7 @@ struct ImageFileType(EqualityComparable, Stringable, Writable):
         elif self == Self.jpeg:
             return ".jpeg"
         else:
-            abort("Unimplemented extension() for image file type: ", self._raw_value)
+            fatal_error("Unimplemented extension() for image file type: ", self._raw_value)
             while True:
                 pass
 

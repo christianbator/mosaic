@@ -5,7 +5,7 @@
 # Created by Christian Bator on 12/21/2024
 #
 
-from os import abort
+from mosaic.utility import fatal_error
 
 
 #
@@ -36,7 +36,7 @@ struct ColorSpace(EqualityComparable, Stringable, Writable):
         self._raw_value = raw_value
 
         if raw_value not in Self._supported_color_spaces:
-            abort("Unsupported color space: ", raw_value)
+            fatal_error("Unsupported color space: ", raw_value)
 
     #
     # Properties
@@ -47,7 +47,7 @@ struct ColorSpace(EqualityComparable, Stringable, Writable):
         elif self == Self.rgb:
             return 3
         else:
-            abort("Unimplemented channels() for color space: ", self._raw_value)
+            fatal_error("Unimplemented channels() for color space: ", self._raw_value)
             while True:
                 pass
 

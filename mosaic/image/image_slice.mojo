@@ -12,7 +12,7 @@ from pathlib import Path
 
 from mosaic.numeric import Matrix, MatrixSlice
 from mosaic.numeric import StridedRange
-from mosaic.utility import unroll_factor
+from mosaic.utility import unroll_factor, fatal_error
 
 
 #
@@ -81,48 +81,48 @@ struct ImageSlice[mut: Bool, //, dtype: DType, color_space: ColorSpace, origin: 
     # Access
     #
     @always_inline
-    fn __getitem__(self, y: Int, x: Int) -> Scalar[dtype]:
+    fn __getitem__(self, y: Int, x: Int) raises -> Scalar[dtype]:
         constrained[color_space.channels() == 1, "Must specify channel for image slice in color space with channels > 1"]()
 
         return self.strided_load[1](y=y, x=x, channel=0)
 
     @always_inline
-    fn __getitem__(self, y: Int, x: Int, channel: Int) -> Scalar[dtype]:
+    fn __getitem__(self, y: Int, x: Int, channel: Int) raises -> Scalar[dtype]:
         return self.strided_load[1](y=y, x=x, channel=channel)
 
     @always_inline
-    fn __setitem__[origin: MutableOrigin, //](mut self: ImageSlice[dtype, _, origin], y: Int, x: Int, value: Scalar[dtype]):
+    fn __setitem__[origin: MutableOrigin, //](mut self: ImageSlice[dtype, _, origin], y: Int, x: Int, value: Scalar[dtype]) raises:
         constrained[color_space.channels() == 1, "Must specify channel for image slice in color space with channels > 1"]()
 
-        self.strided_store(y=y, x=x, channel=0, value=value)
+        self.strided_store(value, y=y, x=x, channel=0)
 
     @always_inline
-    fn __setitem__[origin: MutableOrigin, //](mut self: ImageSlice[dtype, _, origin], y: Int, x: Int, channel: Int, value: Scalar[dtype]):
-        self.strided_store(y=y, x=x, channel=channel, value=value)
+    fn __setitem__[origin: MutableOrigin, //](mut self: ImageSlice[dtype, _, origin], y: Int, x: Int, channel: Int, value: Scalar[dtype]) raises:
+        self.strided_store(value, y=y, x=x, channel=channel)
 
     @always_inline
-    fn strided_load[width: Int](self, y: Int, x: Int) -> SIMD[dtype, width]:
+    fn strided_load[width: Int](self, y: Int, x: Int) raises -> SIMD[dtype, width]:
         constrained[color_space.channels() == 1, "Must specify channel for image slice in color space with channels > 1"]()
 
         return self.strided_load[width](y=y, x=x, channel=0)
 
     @always_inline
-    fn strided_load[width: Int](self, y: Int, x: Int, channel: Int) -> SIMD[dtype, width]:
+    fn strided_load[width: Int](self, y: Int, x: Int, channel: Int) raises -> SIMD[dtype, width]:
         return self._image[].strided_load[width](
             y=self._y_range.start + y * self._y_range.step, x=self._x_range.start + x * self._x_range.step, channel=channel
         )
 
     @always_inline
-    fn strided_store[origin: MutableOrigin, width: Int, //](mut self: ImageSlice[dtype, _, origin], y: Int, x: Int, value: SIMD[dtype, width]):
+    fn strided_store[origin: MutableOrigin, width: Int, //](mut self: ImageSlice[dtype, _, origin], value: SIMD[dtype, width], y: Int, x: Int) raises:
         constrained[color_space.channels() == 1, "Must specify channel for image slice in color space with channels > 1"]()
 
-        self.strided_store(y=y, x=x, channel=0, value=value)
+        self.strided_store(value, y=y, x=x, channel=0)
 
     @always_inline
-    fn strided_store[origin: MutableOrigin, width: Int, //](mut self: ImageSlice[dtype, _, origin], y: Int, x: Int, channel: Int, value: SIMD[dtype, width]):
-        self._image[].strided_store(
-            y=self._y_range.start + y * self._y_range.step, x=self._x_range.start + x * self._x_range.step, channel=channel, value=value
-        )
+    fn strided_store[
+        origin: MutableOrigin, width: Int, //
+    ](mut self: ImageSlice[dtype, _, origin], value: SIMD[dtype, width], y: Int, x: Int, channel: Int) raises:
+        self._image[].strided_store(value, y=self._y_range.start + y * self._y_range.step, x=self._x_range.start + x * self._x_range.step, channel=channel)
 
     #
     # Slicing
@@ -173,12 +173,10 @@ struct ImageSlice[mut: Bool, //, dtype: DType, color_space: ColorSpace, origin: 
                 fn process_col[width: Int](range_x: Int):
                     var x = self._x_range.start + range_x * self._x_range.step
 
-                    result.strided_store(
-                        y=range_y,
-                        x=range_x,
-                        channel=channel,
-                        value=self._image[].strided_load[width](y=y, x=x, channel=channel),
-                    )
+                    try:
+                        result.strided_store(self._image[].strided_load[width](y=y, x=x, channel=channel), y=range_y, x=range_x, channel=channel)
+                    except error:
+                        fatal_error(error)
 
                 vectorize[process_col, Image[dtype, color_space].optimal_simd_width, unroll_factor=unroll_factor](self._width)
 
