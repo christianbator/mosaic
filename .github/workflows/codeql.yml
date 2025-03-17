@@ -5,7 +5,7 @@
 # Created by Christian Bator on 01/02/2025
 #
 
-name: "CodeQL"
+name: CodeQL
 on:
   workflow_dispatch:
   schedule:
@@ -30,8 +30,6 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      with:
-        submodules: true
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:

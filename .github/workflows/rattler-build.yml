@@ -1,0 +1,33 @@
+#
+# rattler-build.yml
+# mosaic
+#
+# Created by Christian Bator on 03/17/2025
+#
+
+
+name: Rattler Build
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    strategy:
+      matrix:
+        label:
+          - ubuntu-latest
+          - macos-latest
+          - magic_arm64_8core
+    runs-on: ${{ matrix.label }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 2
+      - uses: prefix-dev/setup-pixi@92815284c57faa15cd896c4d5cfb2d59f32dc43d # v0.8.3
+        with:
+          pixi-version: v0.37.0
+      - name: Build package
+        shell: bash
+        run: pixi run build-all --channel https://prefix.dev/modular-community --channel https://conda.modular.com/max
+        env:
+          RATTLER_BUILD_ENABLE_GITHUB_INTEGRATION: true
+          RATTLER_BUILD_COLOR: always
