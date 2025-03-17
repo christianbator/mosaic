@@ -13,6 +13,9 @@ from memory import UnsafePointer, memset_zero
 #
 @value
 struct UnsafeNumberPointer[dtype: DType, *, complex: Bool]:
+    #
+    # Fields
+    #
     var _data: UnsafePointer[Scalar[dtype]]
 
     #
@@ -31,11 +34,12 @@ struct UnsafeNumberPointer[dtype: DType, *, complex: Bool]:
     fn __init__(out self, owned data: UnsafePointer[Scalar[dtype]]):
         self._data = data
 
+    @implicit
+    fn __init__(out self, owned data: UnsafePointer[ScalarNumber[dtype, complex=complex]]):
+        self._data = data.bitcast[Scalar[dtype]]()
+
     fn __del__(owned self):
         self._data.free()
-
-    fn unsafe_ptr(self) -> UnsafePointer[Scalar[dtype]]:
-        return self._data
 
     #
     # Access
@@ -59,7 +63,7 @@ struct UnsafeNumberPointer[dtype: DType, *, complex: Bool]:
         else:
             return Number[dtype, width, complex=complex](rebind[Number[dtype, width, complex=complex].Value](self._data.offset(index).load[width=width]()))
 
-    fn store[width: Int, //](mut self, index: Int, value: Number[dtype, width, complex=complex]):
+    fn store[width: Int, //](mut self, value: Number[dtype, width, complex=complex], index: Int):
         @parameter
         if complex:
             self._data.offset(index * 2).store(value.value)
@@ -78,9 +82,7 @@ struct UnsafeNumberPointer[dtype: DType, *, complex: Bool]:
                 rebind[Number[dtype, width, complex=complex].Value](self._data.offset(index).strided_load[width=width](stride))
             )
 
-    fn strided_store[
-        width: Int, //
-    ](mut self, index: Int, stride: Int, value: Number[dtype, width, complex=complex],):
+    fn strided_store[width: Int, //](mut self, value: Number[dtype, width, complex=complex], index: Int, stride: Int):
         @parameter
         if complex:
             self._data.offset(index * 2).strided_store(val=value.real().value, stride=stride * 2)
@@ -108,7 +110,7 @@ struct UnsafeNumberPointer[dtype: DType, *, complex: Bool]:
 
     fn scatter[
         width: Int, //
-    ](self, index: Int, value: Number[dtype, width, complex=complex], offset_vector: SIMD[DType.index, width], mask_vector: SIMD[DType.bool, width],):
+    ](self, value: Number[dtype, width, complex=complex], index: Int, offset_vector: SIMD[DType.index, width], mask_vector: SIMD[DType.bool, width],):
         @parameter
         if complex:
             self._data.offset(index * 2).scatter(
@@ -122,3 +124,14 @@ struct UnsafeNumberPointer[dtype: DType, *, complex: Bool]:
                 val=rebind[SIMD[dtype, width]](value.value),
                 mask=mask_vector,
             )
+
+    #
+    # Unsafe Access
+    #
+    @always_inline
+    fn unsafe_ptr(self) -> UnsafePointer[Scalar[dtype]]:
+        return self._data
+
+    @always_inline
+    fn unsafe_uint8_ptr(self) -> UnsafePointer[UInt8]:
+        return self._data.bitcast[UInt8]()

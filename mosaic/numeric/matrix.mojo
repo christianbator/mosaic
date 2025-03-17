@@ -50,17 +50,14 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
         self._data = UnsafeNumberPointer[dtype, complex=complex](rows * cols * depth)
 
         for index in range(len(values)):
-            self._store(index=index, value=values[index])
+            self._store(values[index], index=index)
 
-    fn __init__(out self, rows: Int, cols: Int, values: List[ScalarNumber[dtype, complex=complex]]):
+    fn __init__(out self, rows: Int, cols: Int, owned values: List[ScalarNumber[dtype, complex=complex]]):
         debug_assert[assert_mode="safe"](rows * cols * depth == len(values), "Mismatch in list length for Matrix constructor")
 
         self._rows = rows
         self._cols = cols
-        self._data = UnsafeNumberPointer[dtype, complex=complex](rows * cols * depth)
-
-        for index in range(len(values)):
-            self._store(index=index, value=values[index])
+        self._data = UnsafeNumberPointer[dtype, complex=complex](values.steal_data())
 
     fn __init__(out self, rows: Int, cols: Int, owned data: UnsafeNumberPointer[dtype, complex=complex]):
         self._rows = rows
@@ -181,12 +178,12 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
         return self._data.strided_load[width](index=self.index(row=row, col=col, component=component), stride=depth)
 
     @always_inline
-    fn store[width: Int, //](mut self: Matrix[dtype, 1, complex=complex], row: Int, col: Int, value: Number[dtype, width, complex=complex]):
-        self.strided_store(row=row, col=col, component=0, value=value)
+    fn store[width: Int, //](mut self: Matrix[dtype, 1, complex=complex], value: Number[dtype, width, complex=complex], row: Int, col: Int):
+        self.strided_store(value, row=row, col=col, component=0)
 
     @always_inline
-    fn strided_store[width: Int, //](mut self, row: Int, col: Int, component: Int, value: Number[dtype, width, complex=complex]):
-        self._data.strided_store(index=self.index(row=row, col=col, component=component), stride=depth, value=value)
+    fn strided_store[width: Int, //](mut self, value: Number[dtype, width, complex=complex], row: Int, col: Int, component: Int):
+        self._data.strided_store(value, index=self.index(row=row, col=col, component=component), stride=depth)
 
     @always_inline
     fn gather[
@@ -234,17 +231,19 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
         return self._data.load[width](index)
 
     @always_inline
-    fn _store[width: Int, //](mut self, index: Int, value: Number[dtype, width, complex=complex]):
-        self._data.store(index=index, value=value)
+    fn _store[width: Int, //](mut self, value: Number[dtype, width, complex=complex], index: Int):
+        self._data.store(value, index=index)
 
     #
     # Unsafe Access
     #
+    @always_inline
     fn unsafe_data_ptr(self) -> UnsafePointer[Scalar[dtype]]:
         return self._data.unsafe_ptr()
 
+    @always_inline
     fn unsafe_uint8_ptr(self) -> UnsafePointer[UInt8]:
-        return self._data.unsafe_ptr().bitcast[UInt8]()
+        return self._data.unsafe_uint8_ptr()
 
     #
     # Index Utilities
@@ -931,7 +930,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
                 fn convert_flattened_elements[width: Int](flattened_element: Int):
                     var index = self.flattened_index(row=row, offset=flattened_element)
                     var value = self._load[width](index).cast[new_dtype]()
-                    dest._store(index=index, value=value)
+                    dest._store(value, index=index)
 
                 vectorize[
                     convert_flattened_elements,
@@ -959,7 +958,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
                 fn convert_flattened_elements[width: Int](flattened_element: Int):
                     var index = self.flattened_index(row=row, offset=flattened_element)
                     var value = self._load[width](index).cast[new_dtype]()
-                    dest._store(index=index, value=value)
+                    dest._store(value, index=index)
 
                 vectorize[
                     convert_flattened_elements,

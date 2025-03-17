@@ -42,12 +42,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     fn __init__(out self, width: Int, height: Int):
         self._matrix = Matrix[dtype, color_space.channels()](rows=height, cols=width)
 
-    fn __init__(
-        out self,
-        width: Int,
-        height: Int,
-        owned data: UnsafePointer[Scalar[dtype]],
-    ):
+    fn __init__(out self, width: Int, height: Int, owned data: UnsafePointer[Scalar[dtype]]):
         self._matrix = Matrix[dtype, color_space.channels()](rows=height, cols=width, data=data)
 
     fn __init__(out self, owned matrix: Matrix[dtype, color_space.channels()]):
@@ -146,9 +141,11 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     #
     # Unsafe Access
     #
+    @always_inline
     fn unsafe_data_ptr(self) -> UnsafePointer[Scalar[dtype]]:
         return self._matrix.unsafe_data_ptr()
 
+    @always_inline
     fn unsafe_uint8_ptr(self) -> UnsafePointer[UInt8]:
         return self._matrix.unsafe_uint8_ptr()
 
