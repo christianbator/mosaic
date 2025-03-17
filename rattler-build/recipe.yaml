@@ -28,7 +28,7 @@ requirements:
   build:
     - clang
   host:
-    - max =25
+    - max >=25
   run:
     - ${{ pin_compatible('max') }}
 
