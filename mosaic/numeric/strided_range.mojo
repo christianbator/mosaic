@@ -5,6 +5,8 @@
 # Created by Christian Bator on 03/15/2025
 #
 
+from mosaic.utility import fatal_error
+
 
 #
 # StridedRange
@@ -77,6 +79,14 @@ struct StridedRange(Stringable, Writable):
             return Self(start, end, self.step)
         else:
             raise Error("Unable to normalize ", self, " in positive range: [0, ", end_of_range, ")")
+
+    # TODO: Remove this when calling raising function at compile-time works
+    fn can_normalize_in_positive_range(self, end_of_range: Int) -> Bool:
+        try:
+            _ = self.normalized_in_positive_range(end_of_range)
+            return True
+        except error:
+            return False
 
     #
     # Stringable & Writable

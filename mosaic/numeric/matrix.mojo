@@ -251,7 +251,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
     @always_inline
     fn __getitem__[
         mut: Bool, origin: Origin[mut], //
-    ](ref [origin]self, row_slice: Slice, col_slice: Slice) -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
+    ](ref [origin]self, row_slice: Slice, col_slice: Slice) raises -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
         return self.slice(
             row_range=StridedRange(
                 slice=row_slice,
@@ -268,72 +268,76 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
         )
 
     @always_inline
-    fn slice[mut: Bool, //, origin: Origin[mut]](ref [origin]self, row_range: StridedRange) -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
+    fn slice[
+        mut: Bool, //, origin: Origin[mut]
+    ](ref [origin]self, row_range: StridedRange) raises -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
         return self.slice(row_range=row_range, col_range=StridedRange(self._cols))
 
     @always_inline
     fn slice[
         mut: Bool, //, origin: Origin[mut]
-    ](ref [origin]self, *, col_range: StridedRange) -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
+    ](ref [origin]self, *, col_range: StridedRange) raises -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
         return self.slice(row_range=StridedRange(self._rows), col_range=col_range)
 
     @always_inline
     fn slice[
         mut: Bool, //, origin: Origin[mut]
-    ](ref [origin]self, row_range: StridedRange, col_range: StridedRange) -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
+    ](ref [origin]self, row_range: StridedRange, col_range: StridedRange) raises -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
         return MatrixSlice[StridedRange(depth), dtype, depth, complex, origin](matrix=self, row_range=row_range, col_range=col_range)
 
     @always_inline
     fn component_slice[
         component: Int, mut: Bool, origin: Origin[mut]
-    ](ref [origin]self) -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
+    ](ref [origin]self) raises -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
         return self.strided_slice[StridedRange(component, component + 1)]()
 
     @always_inline
     fn component_slice[
         component: Int, mut: Bool, origin: Origin[mut]
-    ](ref [origin]self, row_range: StridedRange) -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
+    ](ref [origin]self, row_range: StridedRange) raises -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
         return self.strided_slice[StridedRange(component, component + 1)](row_range)
 
     @always_inline
     fn component_slice[
         component: Int, mut: Bool, origin: Origin[mut]
-    ](ref [origin]self, *, col_range: StridedRange) -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
+    ](ref [origin]self, *, col_range: StridedRange) raises -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
         return self.strided_slice[StridedRange(component, component + 1)](col_range=col_range)
 
     @always_inline
     fn component_slice[
         component: Int, mut: Bool, origin: Origin[mut]
-    ](ref [origin]self, row_range: StridedRange, col_range: StridedRange) -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
+    ](ref [origin]self, row_range: StridedRange, col_range: StridedRange) raises -> MatrixSlice[
+        StridedRange(component, component + 1), dtype, depth, complex, origin
+    ]:
         return self.strided_slice[StridedRange(component, component + 1)](row_range=row_range, col_range=col_range)
 
     @always_inline
     fn strided_slice[
         component_range: StridedRange, mut: Bool, origin: Origin[mut]
-    ](ref [origin]self) -> MatrixSlice[component_range, dtype, depth, complex, origin]:
+    ](ref [origin]self) raises -> MatrixSlice[component_range, dtype, depth, complex, origin]:
         return self.strided_slice[component_range](row_range=StridedRange(self._rows), col_range=StridedRange(self._cols))
 
     @always_inline
     fn strided_slice[
         component_range: StridedRange, mut: Bool, origin: Origin[mut]
-    ](ref [origin]self, row_range: StridedRange) -> MatrixSlice[component_range, dtype, depth, complex, origin]:
+    ](ref [origin]self, row_range: StridedRange) raises -> MatrixSlice[component_range, dtype, depth, complex, origin]:
         return self.strided_slice[component_range](row_range=row_range, col_range=StridedRange(self._cols))
 
     @always_inline
     fn strided_slice[
         component_range: StridedRange, mut: Bool, origin: Origin[mut]
-    ](ref [origin]self, *, col_range: StridedRange) -> MatrixSlice[component_range, dtype, depth, complex, origin]:
+    ](ref [origin]self, *, col_range: StridedRange) raises -> MatrixSlice[component_range, dtype, depth, complex, origin]:
         return self.strided_slice[component_range](row_range=StridedRange(self._rows), col_range=col_range)
 
     @always_inline
     fn strided_slice[
         component_range: StridedRange, mut: Bool, origin: Origin[mut]
-    ](ref [origin]self, row_range: StridedRange, col_range: StridedRange) -> MatrixSlice[component_range, dtype, depth, complex, origin]:
+    ](ref [origin]self, row_range: StridedRange, col_range: StridedRange) raises -> MatrixSlice[component_range, dtype, depth, complex, origin]:
         return MatrixSlice[component_range, dtype, depth, complex, origin](matrix=self, row_range=row_range, col_range=col_range)
 
+    # TODO: Make a component-specified-at-runtime version of this
     @always_inline
-    fn extract_component[component: Int](self) -> Matrix[dtype, complex=complex]:
-        # TODO: Make a component-specified-at-runtime version of this
+    fn extract_component[component: Int](self) raises -> Matrix[dtype, complex=complex]:
         return self.component_slice[component]().rebound_copy[depth=1]()
 
     #

@@ -175,53 +175,57 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
         return ImageSlice[dtype, color_space, origin](image=self, y_range=y_range, x_range=x_range)
 
     @always_inline
-    fn channel_slice[channel: Int](self) -> MatrixSlice[StridedRange(channel, channel + 1), dtype, color_space.channels(), False, __origin_of(self._matrix)]:
+    fn channel_slice[
+        channel: Int
+    ](self) raises -> MatrixSlice[StridedRange(channel, channel + 1), dtype, color_space.channels(), False, __origin_of(self._matrix)]:
         return self._matrix.component_slice[channel]()
 
     @always_inline
     fn channel_slice[
         channel: Int
-    ](self, y_range: StridedRange) -> MatrixSlice[StridedRange(channel, channel + 1), dtype, color_space.channels(), False, __origin_of(self._matrix)]:
+    ](self, y_range: StridedRange) raises -> MatrixSlice[StridedRange(channel, channel + 1), dtype, color_space.channels(), False, __origin_of(self._matrix)]:
         return self._matrix.component_slice[channel](row_range=y_range)
 
     @always_inline
     fn channel_slice[
         channel: Int
-    ](self, *, x_range: StridedRange) -> MatrixSlice[StridedRange(channel, channel + 1), dtype, color_space.channels(), False, __origin_of(self._matrix)]:
+    ](self, *, x_range: StridedRange) raises -> MatrixSlice[
+        StridedRange(channel, channel + 1), dtype, color_space.channels(), False, __origin_of(self._matrix)
+    ]:
         return self._matrix.component_slice[channel](col_range=x_range)
 
     @always_inline
     fn channel_slice[
         channel: Int
-    ](self, y_range: StridedRange, x_range: StridedRange) -> MatrixSlice[
+    ](self, y_range: StridedRange, x_range: StridedRange) raises -> MatrixSlice[
         StridedRange(channel, channel + 1), dtype, color_space.channels(), False, __origin_of(self._matrix)
     ]:
         return self._matrix.component_slice[channel](row_range=y_range, col_range=x_range)
 
     @always_inline
-    fn strided_slice[channel_range: StridedRange](self) -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
+    fn strided_slice[channel_range: StridedRange](self) raises -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
         return self._matrix.strided_slice[channel_range]()
 
     @always_inline
     fn strided_slice[
         channel_range: StridedRange
-    ](self, y_range: StridedRange) -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
+    ](self, y_range: StridedRange) raises -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
         return self._matrix.strided_slice[channel_range](row_range=y_range)
 
     @always_inline
     fn strided_slice[
         channel_range: StridedRange
-    ](self, *, x_range: StridedRange) -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
+    ](self, *, x_range: StridedRange) raises -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
         return self._matrix.strided_slice[channel_range](col_range=x_range)
 
     @always_inline
     fn strided_slice[
         channel_range: StridedRange
-    ](self, y_range: StridedRange, x_range: StridedRange) -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
+    ](self, y_range: StridedRange, x_range: StridedRange) raises -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
         return self._matrix.strided_slice[channel_range](y_range, x_range)
 
     @always_inline
-    fn extract_channel[channel: Int](self) -> Matrix[dtype]:
+    fn extract_channel[channel: Int](self) raises -> Matrix[dtype]:
         return self._matrix.extract_component[channel]()
 
     #
