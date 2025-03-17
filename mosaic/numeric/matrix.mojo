@@ -26,7 +26,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
 
     var _rows: Int
     var _cols: Int
-    var _data: UnsafeNumberPointer[dtype, complex=complex]
+    var _data: NumberArray[dtype, complex=complex]
 
     #
     # Initialization
@@ -34,12 +34,12 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
     fn __init__(out self, rows: Int, cols: Int):
         self._rows = rows
         self._cols = cols
-        self._data = UnsafeNumberPointer[dtype, complex=complex](rows * cols * depth)
+        self._data = NumberArray[dtype, complex=complex](rows * cols * depth)
 
     fn __init__(out self, rows: Int, cols: Int, value: ScalarNumber[dtype, complex=complex]):
         self._rows = rows
         self._cols = cols
-        self._data = UnsafeNumberPointer[dtype, complex=complex](rows * cols * depth)
+        self._data = NumberArray[dtype, complex=complex](rows * cols * depth)
         self.fill(value)
 
     fn __init__(out self, rows: Int, cols: Int, *values: ScalarNumber[dtype, complex=complex]):
@@ -47,7 +47,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
 
         self._rows = rows
         self._cols = cols
-        self._data = UnsafeNumberPointer[dtype, complex=complex](rows * cols * depth)
+        self._data = NumberArray[dtype, complex=complex](rows * cols * depth)
 
         for index in range(len(values)):
             self._store(values[index], index=index)
@@ -57,9 +57,9 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
 
         self._rows = rows
         self._cols = cols
-        self._data = UnsafeNumberPointer[dtype, complex=complex](values.steal_data())
+        self._data = NumberArray[dtype, complex=complex](values.steal_data())
 
-    fn __init__(out self, rows: Int, cols: Int, owned data: UnsafeNumberPointer[dtype, complex=complex]):
+    fn __init__(out self, rows: Int, cols: Int, owned data: NumberArray[dtype, complex=complex]):
         self._rows = rows
         self._cols = cols
         self._data = data
@@ -77,7 +77,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
     @staticmethod
     fn ascending(rows: Int, cols: Int) -> Self:
         var count = rows * cols * depth
-        var data = UnsafeNumberPointer[dtype, complex=complex](count)
+        var data = NumberArray[dtype, complex=complex](count)
 
         for i in range(count):
 
@@ -91,7 +91,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
 
     @staticmethod
     fn random(rows: Int, cols: Int, min: Scalar[dtype] = Scalar[dtype].MIN_FINITE, max: Scalar[dtype] = Scalar[dtype].MAX_FINITE) -> Self:
-        var data = UnsafeNumberPointer[dtype, complex=complex](rows * cols * depth)
+        var data = NumberArray[dtype, complex=complex](rows * cols * depth)
 
         var scalar_count: Int
 

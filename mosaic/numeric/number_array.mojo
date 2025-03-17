@@ -1,5 +1,5 @@
 #
-# unsafe_number_pointer.mojo
+# number_array.mojo
 # mosaic
 #
 # Created by Christian Bator on 03/06/2025
@@ -9,10 +9,10 @@ from memory import UnsafePointer, memset_zero
 
 
 #
-# UnsafeNumberPointer
+# NumberArray
 #
 @value
-struct UnsafeNumberPointer[dtype: DType, *, complex: Bool]:
+struct NumberArray[dtype: DType, *, complex: Bool]:
     #
     # Fields
     #
@@ -48,7 +48,7 @@ struct UnsafeNumberPointer[dtype: DType, *, complex: Bool]:
         return self.load[1](index)
 
     fn __setitem__(
-        mut self: UnsafeNumberPointer[dtype, complex=complex],
+        mut self: NumberArray[dtype, complex=complex],
         index: Int,
         value: ScalarNumber[dtype, complex=complex],
     ):
