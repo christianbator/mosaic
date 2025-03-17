@@ -252,7 +252,7 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, 
                     ")",
                 )
         else:
-            if likely((0 <= shifted_index < self._count) and ((shifted_index + stride * width - 1) < self._count)):
+            if likely((0 <= shifted_index < self._count) and ((shifted_index + (stride - 1) * width) < self._count)):
                 return shifted_index
             else:
                 raise Error(
