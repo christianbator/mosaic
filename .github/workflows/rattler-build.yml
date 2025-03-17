@@ -13,34 +13,21 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: macos-latest
-            target-platform: osx-64
-          - os: macos-14
             target-platform: osx-arm64
           - os: ubuntu-latest
-            target-platform: linux-64
+            target-platform: linux-aarch64
           - os: ubuntu-latest
-            target-platform: linux-aarch64    
+            target-platform: linux-64
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Install rattler-build (Unix)
-        shell: bash
-        if: ${{ runner.os != 'Windows' }}
-        run: |
-          mkdir -p ${{ runner.temp }}/rattler-build
-          curl -Ls \
-            ${{ steps.url.outputs.url }} \
-            -o ${{ runner.temp }}/rattler-build/rattler-build
-          chmod +x ${{ runner.temp }}/rattler-build/rattler-build
-          echo ${{ runner.temp }}/rattler-build >> $GITHUB_PATH
       - name: Build package
-        shell: bash
-        working-directory: rattler-build
-        if: ${{ runner.os != 'Windows' }}
-        run: rattler-build build -c https://conda.modular.com/max-nightly -c conda-forge --recipe recipe.yaml
-        env:
-          RATTLER_BUILD_ENABLE_GITHUB_INTEGRATION: 'true'
-          RATTLER_BUILD_COLOR: 'always'
+        uses: prefix-dev/rattler-build-action@v0.2.33
+        with:
+          recipe-path: rattler-build/recipe.yaml
+          build-args: -c https://conda.modular.com/max-nightly -c https://conda.modular.com/max -c conda-forge --target-platform ${{ matrix.target-platform }}${{ matrix.target-platform == 'linux-aarch64' && ' --no-test' || '' }}
+          artifact-name: mosaic-${{ matrix.target-platform }}

@@ -10,16 +10,15 @@ name = "mosaic"
 version = "0.0.1"
 description = "Vision of the future"
 authors = ["Christian Bator <christian@bator.co>"]
-platforms = ["osx-arm64"]
+platforms = ["osx-arm64", "linux-aarch64", "linux-64"]
 channels = [
     "https://conda.modular.com/max-nightly",
     "https://conda.modular.com/max",
-    "https://repo.prefix.dev/modular-community", 
     "conda-forge"
 ]
 
 [dependencies]
-max = "=25.2.0"
+max = "~=25.1"
 
 [tasks]
 build = { cmd = "build/build.sh" }
