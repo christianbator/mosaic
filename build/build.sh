@@ -39,7 +39,7 @@ echo -e "> Building ${cyan}libcodec${reset} ..."
 if [[ "$os" == "Darwin" ]]; then
     clang -fPIC -shared -Wall -Werror -DSTBI_NEON -o $lib_dir/libcodec.dylib libcodec/libcodec.c
 else
-    clang -fPIC -shared -Wall -Werror -o $lib_dir/libcodec.dylib libcodec/libcodec.c
+    clang -fPIC -shared -Wall -Werror -o $lib_dir/libcodec.so libcodec/libcodec.c
 fi
 
 #

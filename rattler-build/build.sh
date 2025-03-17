@@ -17,7 +17,7 @@ mkdir -p $PREFIX/lib/mosaic
 # Build libcodec
 #
 if [[ -z "${OSX_ARCH+x}" ]]; then
-    clang -fPIC -shared -Wall -Werror -o $PREFIX/lib/mosaic/libcodec.dylib libcodec/libcodec.c
+    clang -fPIC -shared -Wall -Werror -o $PREFIX/lib/mosaic/libcodec.so libcodec/libcodec.c
 else
     clang -fPIC -shared -Wall -Werror -DSTBI_NEON -o $PREFIX/lib/mosaic/libcodec.dylib libcodec/libcodec.c
 fi
