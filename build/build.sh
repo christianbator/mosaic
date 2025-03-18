@@ -29,7 +29,7 @@ fi
 #
 # Locations
 #
-lib_dir=$PREFIX/lib
+lib_dir=$CONDA_PREFIX/lib
 mojo_package_dir=$lib_dir/mojo
 
 mkdir -p $lib_dir
