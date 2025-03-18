@@ -52,10 +52,10 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
 
     @staticmethod
     fn _libcodec() -> DLHandle:
-        var libcodec = DLHandle(dynamic_library_filepath("libcodec"))
+        var libcodec = DLHandle(dynamic_library_filepath("libmosaic-codec"))
 
         if not libcodec:
-            fatal_error("Failed to load libcodec")
+            fatal_error("Failed to load libmosaic-codec")
 
         return libcodec
 

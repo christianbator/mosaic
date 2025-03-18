@@ -15,12 +15,13 @@ package:
   version: ${{ version }}
 
 source:
-  - git: https://github.com/christianbator/mosaic
-    rev: main
+  - path: ../
+  # - git: https://github.com/christianbator/mosaic
+    # rev: main
 
 build:
   number: 0
-  script: build/build.sh
+  script: magic run build
   dynamic_linking:
     missing_dso_allowlist:
       - if: osx
@@ -36,11 +37,10 @@ requirements:
     - ${{ pin_compatible('max') }}
 
 tests:
-  - script: mojo test
+  - script: magic run test
     files:
       source:
-        - test/*.mojo
-        - data/
+        - test/
 
 about:
   homepage: https://mosaiclib.org

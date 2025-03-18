@@ -12,4 +12,4 @@ pixi.lock merge=binary linguist-language=YAML linguist-generated=true
 *.sh -linguist-detectable
 
 # Exclude third-party files from language statistics
-libcodec/*.h linguist-vendored
+libmosaic-codec/*.h linguist-vendored

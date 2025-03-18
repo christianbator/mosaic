@@ -24,10 +24,10 @@ struct Visualizer:
 
     @staticmethod
     fn _libvisualizer() -> DLHandle:
-        var libvisualizer = DLHandle(dynamic_library_filepath("libvisualizer"))
+        var libvisualizer = DLHandle(dynamic_library_filepath("libmosaic-visualizer"))
 
         if not libvisualizer:
-            fatal_error("Failed to load libvisualizer")
+            fatal_error("Failed to load libmosaic-visualizer")
 
         return libvisualizer
 

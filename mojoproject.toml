@@ -38,14 +38,14 @@ macos = "15"
 linux = "6.8"
 
 [target.osx.activation.env]
-PREFIX = "$PIXI_PROJECT_ROOT/build"
+PREFIX = "$CONDA_PREFIX"
 SHLIB_EXT = ".dylib"
 
 [target.linux.activation.env]
-PREFIX = "$PIXI_PROJECT_ROOT/build"
+PREFIX = "$CONDA_PREFIX"
 SHLIB_EXT = ".so"
 
 [tasks]
 build = { cmd = "build/build.sh" }
-test = { cmd = "mojo test", depends-on = ["build"], cwd = "test" }
+test = { cmd = "mojo test", cwd = "test" }
 format = { cmd = "mojo format --line-length 160 mosaic test examples" }

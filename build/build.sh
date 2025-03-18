@@ -30,17 +30,15 @@ fi
 # Locations
 #
 lib_dir=$PREFIX/lib
+mojo_package_dir=$lib_dir/mojo
 
-mojo_lib_dir=$PREFIX/lib/mojo
-mosaic_lib_dir=$PREFIX/lib/mosaic
-
-mkdir -p $mojo_lib_dir
-mkdir -p $mosaic_lib_dir
+mkdir -p $lib_dir
+mkdir -p $mojo_package_dir
 
 #
-# Build libcodec
+# Build libmosaic-codec
 #
-echo -e "> Building ${cyan}libcodec${reset} ..."
+echo -e "> Building ${cyan}libmosaic-codec${reset} ..."
 
 stb_options=""
 
@@ -48,25 +46,25 @@ if [[ "$os" == "macOS" ]]; then
     additional_stb_options="-DSTBI_NEON"
 fi
 
-clang -fPIC -shared -Wall -Werror $stb_options -o $mosaic_lib_dir/libcodec$SHLIB_EXT libcodec/libcodec.c
+clang -fPIC -shared -Wall -Werror $stb_options -o $lib_dir/libmosaic-codec$SHLIB_EXT libmosaic-codec/codec.c
 
 #
-# Build libvisualizer
+# Build libmosaic-visualizer
 #
-echo -e "> Building ${cyan}libvisualizer${reset} ..."
+echo -e "> Building ${cyan}libmosaic-visualizer${reset} ..."
 
 if [[ "$os" == "macOS" ]]; then
-    swift_source_files=$(find libvisualizer/mac/MacVisualizer -name "*.swift")
-    swiftc -emit-library -o $mosaic_lib_dir/libvisualizer$SHLIB_EXT $swift_source_files
+    swift_source_files=$(find libmosaic-visualizer/mac/MacVisualizer -name "*.swift")
+    swiftc -emit-library -o $lib_dir/libmosaic-visualizer$SHLIB_EXT $swift_source_files
 else
-    echo -e "  > ${bright_red}Warning:${reset} Unsupported os for libvisualizer: ${cyan}$os${reset}, skipping ..."
+    echo -e "  > ${bright_red}Warning:${reset} Unsupported os for libmosaic-visualizer: $os, skipping ..."
 fi
 
 #
 # Build mosaic
 #
-echo -e "> Building ${cyan}mosaic${reset} ..."
+echo -e "> Building ${cyan}mosaic.mojopkg${reset} ..."
 
-mojo package mosaic -o $mojo_lib_dir/mosaic.mojopkg
+mojo package mosaic -o $mojo_package_dir/mosaic.mojopkg
 
-echo -e "> Build succeeded: ${cyan}mosaic.mojopkg${reset} ${green}✔${reset}"
+echo -e "> Build succeeded ${green}✔${reset}"

@@ -38,12 +38,12 @@ jobs:
     - if: matrix.language == 'c-cpp'
       name: Compile (c-cpp)
       shell: bash
-      run: clang -fPIC -shared -Wall -Werror libcodec/libcodec.c
+      run: clang -fPIC -shared -Wall -Werror libmosaic-codec/codec.c
     - if: matrix.language == 'swift'
       name: Compile (swift)
       shell: bash
       run: |
-        swift_source_files=$(find libvisualizer/mac/MacVisualizer -name "*.swift")
+        swift_source_files=$(find libmosaic-visualizer/mac/MacVisualizer -name "*.swift")
         swiftc -emit-library $swift_source_files
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3

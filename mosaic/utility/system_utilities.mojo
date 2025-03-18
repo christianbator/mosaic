@@ -22,14 +22,12 @@ alias unroll_factor = 4
 
 @parameter
 fn dynamic_library_filepath(name: String) -> String:
-    alias prefix = "mosaic/"
-
     if info.os_is_linux():
-        return prefix + name + ".so"
+        return name + ".so"
     elif info.os_is_macos():
-        return prefix + name + ".dylib"
+        return name + ".dylib"
     elif info.os_is_windows():
-        return prefix + name + ".dll"
+        return name + ".dll"
     else:
         fatal_error("Unsupported os for dynamic library filepath determination")
         while True:

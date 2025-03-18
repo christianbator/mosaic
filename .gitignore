@@ -15,9 +15,6 @@
 # XCode
 *.xcodeproj
 
-# Build artifacts
-build/lib
-
 # Rattler-build
 rattler-build/output
 
