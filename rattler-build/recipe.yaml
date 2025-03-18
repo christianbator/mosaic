@@ -36,7 +36,9 @@ requirements:
     - ${{ pin_compatible('max') }}
 
 tests:
-  - script: cd test && mojo test
+  - script: |
+      cd test
+      mojo test
     files:
       source:
         - test/
