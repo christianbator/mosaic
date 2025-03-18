@@ -86,19 +86,19 @@ magic run mojo show_image.mojo
 - Reads an image file and displays it in the visualizer
 - Source: [examples/show_image.mojo](examples/show_image.mojo)
 <div align="center">
-  <img src="data/mandrill.png" alt="Mandrill" width="256" height="256">
+  <img src="assets/mandrill.png" alt="Mandrill" width="256" height="256">
 </div>
 
 #### Blur image
 - Reads an image file, converts it to a `float32` representation, and applies a box filter to blur the image
 - Source: [examples/blur_image.mojo](examples/blur_image.mojo)
 <div align="center">
-  <img src="data/mandrill-blurred.png" alt="Mandrill blurred" width="256" height="256">
+  <img src="assets/mandrill-blurred.png" alt="Mandrill blurred" width="256" height="256">
 </div>
 
 #### Slice image
 - Reads an image file, creates an image slice of the top half, and displays it in the visualizer
 - Source: [examples/slice_image.mojo](examples/slice_image.mojo)
 <div align="center">
-  <img src="data/mandrill-top-half.png" alt="Mandrill top half" width="256" height="128">
+  <img src="assets/mandrill-top-half.png" alt="Mandrill top half" width="256" height="128">
 </div>
