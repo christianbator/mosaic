@@ -20,38 +20,46 @@ reset="\033[0m"
 #
 # System Info
 #
-os=$(uname)
+if [[ "$(uname)" == "Darwin" ]]; then
+    os="macOS"
+else
+    os="linux"
+fi
 
 #
 # Locations
 #
-build_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-artifact_dir=$build_dir/artifacts
-mkdir -p $artifact_dir
-lib_dir=$artifact_dir/mosaic
-mkdir -p $lib_dir
+lib_dir=$PREFIX/lib
+
+mojo_lib_dir=$PREFIX/lib/mojo
+mosaic_lib_dir=$PREFIX/lib/mosaic
+
+mkdir -p $mojo_lib_dir
+mkdir -p $mosaic_lib_dir
 
 #
 # Build libcodec
 #
 echo -e "> Building ${cyan}libcodec${reset} ..."
 
-if [[ "$os" == "Darwin" ]]; then
-    clang -fPIC -shared -Wall -Werror -DSTBI_NEON -o $lib_dir/libcodec.dylib libcodec/libcodec.c
-else
-    clang -fPIC -shared -Wall -Werror -o $lib_dir/libcodec.so libcodec/libcodec.c
+stb_options=""
+
+if [[ "$os" == "macOS" ]]; then
+    additional_stb_options="-DSTBI_NEON"
 fi
+
+clang -fPIC -shared -Wall -Werror $stb_options -o $mosaic_lib_dir/libcodec$SHLIB_EXT libcodec/libcodec.c
 
 #
 # Build libvisualizer
 #
 echo -e "> Building ${cyan}libvisualizer${reset} ..."
 
-if [[ "$os" == "Darwin" ]]; then
+if [[ "$os" == "macOS" ]]; then
     swift_source_files=$(find libvisualizer/mac/MacVisualizer -name "*.swift")
-    swiftc -emit-library -o $lib_dir/libvisualizer.dylib $swift_source_files
+    swiftc -emit-library -o $mosaic_lib_dir/libvisualizer$SHLIB_EXT $swift_source_files
 else
-    echo -e "> Unsupported platform for libvisualizer: ${bright_red}$os${reset}"
+    echo -e "  > ${bright_red}Warning:${reset} Unsupported os for libvisualizer: ${cyan}$os${reset}, skipping ..."
 fi
 
 #
@@ -59,6 +67,6 @@ fi
 #
 echo -e "> Building ${cyan}mosaic${reset} ..."
 
-mojo package mosaic -o $artifact_dir/mosaic.mojopkg
+mojo package mosaic -o $mojo_lib_dir/mosaic.mojopkg
 
-echo -e "> Build succeeded (package: ${cyan}package/mosaic.mojopkg${reset}) ${green}✔${reset}"
+echo -e "> Build succeeded: ${cyan}mosaic.mojopkg${reset} ${green}✔${reset}"

@@ -5,7 +5,6 @@
 # Created by Christian Bator on 03/17/2025
 #
 
-
 name: Rattler Build
 on:
   workflow_dispatch:

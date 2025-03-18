@@ -26,6 +26,18 @@ channels = [
 [dependencies]
 max = "~=25.1"
 
+[system-requirements]
+macos = "15"
+linux = "6.8"
+
+[target.osx.activation.env]
+PREFIX = "$PIXI_PROJECT_ROOT/build"
+SHLIB_EXT = ".dylib"
+
+[target.linux.activation.env]
+PREFIX = "$PIXI_PROJECT_ROOT/build"
+SHLIB_EXT = ".so"
+
 [tasks]
 build = { cmd = "build/build.sh" }
 test = { cmd = "mojo test", depends-on = ["build"], cwd = "test" }
