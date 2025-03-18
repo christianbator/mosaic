@@ -5,6 +5,10 @@
 # Created by Christian Bator on 03/11/2025
 #
 
+# Basics
+.DS_Store
+.vscode
+
 # Magic
 .magic
 
