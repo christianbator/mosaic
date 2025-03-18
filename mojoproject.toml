@@ -6,16 +6,23 @@
 #
 
 [project]
-name = "mosaic"
-description = "An open source computer vision library in Mojo"
-authors = ["Christian Bator <christian@bator.co>"]
-readme = "README.md"
+# These should match rattler-build/recipe.yaml > context
+version = "0.0.1"
+
+# These should match rattler-build/recipe.yaml > about
+homepage = "https://mosaiclib.org"
 license = "Apache-2.0"
 license-file = "LICENSE"
-homepage = "https://mosaiclib.org"
+description = "An open source computer vision library in Mojo" # This is "summary" in recipe.yaml
 repository = "https://github.com/christianbator/mosaic"
 documentation = "https://mosaiclib.org/docs"
-version = "0.0.1"
+
+# These should match rattler-build/recipe.yaml > extra
+name = "mosaic"
+authors = ["Christian Bator <christian@bator.co>"]
+
+# These are only defined here
+readme = "README.md"
 platforms = ["osx-arm64", "linux-aarch64", "linux-64"]
 channels = [
     "https://conda.modular.com/max-nightly",
