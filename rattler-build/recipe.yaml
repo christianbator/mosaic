@@ -20,7 +20,7 @@ source:
 
 build:
   number: 0
-  script: magic run build
+  script: build/build.sh
   dynamic_linking:
     missing_dso_allowlist:
       - if: osx
@@ -36,7 +36,7 @@ requirements:
     - ${{ pin_compatible('max') }}
 
 tests:
-  - script: magic run test
+  - script: cd test && mojo test
     files:
       source:
         - test/
