@@ -802,7 +802,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
         parallelize[transform_row](self._rows)
 
     fn load_full_depth(self, row: Int, col: Int) raises -> InlineArray[ScalarNumber[dtype, complex=complex], depth]:
-        var result = InlineArray[ScalarNumber[dtype, complex=complex], depth](uninitialized=True)
+        var result = InlineArray[ScalarNumber[dtype, complex=complex], depth](unsafe_uninitialized=True)
 
         @parameter
         for component in range(depth):
@@ -816,7 +816,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
             self.strided_store(value[component], row=row, col=col, component=component)
 
     fn create_full_depth_value(self, value: ScalarNumber[dtype, complex=complex]) -> InlineArray[ScalarNumber[dtype, complex=complex], depth]:
-        var result = InlineArray[ScalarNumber[dtype, complex=complex], depth](uninitialized=True)
+        var result = InlineArray[ScalarNumber[dtype, complex=complex], depth](unsafe_uninitialized=True)
 
         @parameter
         for component in range(depth):
@@ -828,7 +828,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
         # TODO: Make this a compile-time check when possible
         debug_assert(depth == len(values), "mismatch in the number of values in the full depth value variadic constructor")
 
-        var result = InlineArray[ScalarNumber[dtype, complex=complex], depth](uninitialized=True)
+        var result = InlineArray[ScalarNumber[dtype, complex=complex], depth](unsafe_uninitialized=True)
 
         @parameter
         for component in range(depth):

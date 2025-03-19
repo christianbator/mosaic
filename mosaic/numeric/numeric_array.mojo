@@ -193,7 +193,7 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, 
         if complex:
             self._data.offset(verified_index * 2).scatter(
                 offset=(offset_vector * 2).interleave(offset_vector * 2 + 1),
-                val=rebind[SIMD[dtype, width * 2]](value.value),
+                val=rebind[SIMD[dtype, 2 * width]](value.value),
                 mask=mask_vector.interleave(mask_vector),
             )
         else:

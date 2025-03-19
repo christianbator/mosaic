@@ -28,5 +28,5 @@ jobs:
         uses: prefix-dev/rattler-build-action@v0.2.33
         with:
           recipe-path: rattler-build/recipe.yaml
-          build-args: --target-platform ${{ matrix.target-platform }} -c https://conda.modular.com/max-nightly -c https://conda.modular.com/max -c conda-forge
+          build-args: --target-platform ${{ matrix.target-platform }} -c https://conda.modular.com/max -c conda-forge
           artifact-name: mosaic-${{ matrix.target-platform }}

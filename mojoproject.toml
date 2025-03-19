@@ -25,13 +25,12 @@ authors = ["Christian Bator <christian@bator.co>"]
 readme = "README.md"
 platforms = ["osx-arm64", "linux-aarch64", "linux-64"]
 channels = [
-    "https://conda.modular.com/max-nightly",
     "https://conda.modular.com/max",
     "conda-forge"
 ]
 
 [dependencies]
-max = "~=25.1"
+max = "==25.1.0"
 
 [system-requirements]
 macos = "15"
