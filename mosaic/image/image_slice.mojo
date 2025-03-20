@@ -187,10 +187,10 @@ struct ImageSlice[mut: Bool, //, dtype: DType, color_space: ColorSpace, origin: 
     #
     # Saving to File
     #
-    fn save[file_type: ImageFileType](self, path: String) raises:
+    fn save[file_type: ImageFile](self, path: String) raises:
         self.copy().save[file_type](path)
 
-    fn save[file_type: ImageFileType](self, path: Path) raises:
+    fn save[file_type: ImageFile](self, path: Path) raises:
         self.copy().save[file_type](path)
 
     #

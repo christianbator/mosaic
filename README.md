@@ -17,7 +17,7 @@
 
 ## Overview
 #### Description
-Mosaic is a cross-platform (currently only macOS) computer vision library for prototyping and production.
+Mosaic is a cross-platform (macOS and linux) computer vision library for prototyping and production.
 
 By transparently leveraging hardware acceleration and using the latest MLIR compiler technology, Mosaic is the first computer vision library built specifically for heterogenous compute: CPUs, GPUs, XPUs.
 
@@ -41,7 +41,7 @@ It unifies the computer vision workflow into one language that runs on any hardw
   - Coming soon...
 - Video processing
   - Coming soon...
-- Visualization
+- Visualization (*currently only macOS*)
   - Native image and video rendering
 - Hardware acceleration
   - Parallelization and SIMD on CPUs

@@ -1,5 +1,5 @@
 #
-# image_file_type.mojo
+# image_file.mojo
 # mosaic
 #
 # Created by Christian Bator on 03/11/2025
@@ -9,15 +9,15 @@ from mosaic.utility import fatal_error
 
 
 #
-# ImageFileType
+# ImageFile
 #
 @value
-struct ImageFileType(EqualityComparable, Stringable, Writable):
+struct ImageFile(EqualityComparable, Stringable, Writable):
     #
     # Supported File Types
     #
-    alias png = Self(ImageFileType._png)
-    alias jpeg = Self(ImageFileType._jpeg)
+    alias png = Self(ImageFile._png)
+    alias jpeg = Self(ImageFile._jpeg)
 
     #
     # Fields
@@ -67,4 +67,4 @@ struct ImageFileType(EqualityComparable, Stringable, Writable):
         return String.write(self)
 
     fn write_to[W: Writer](self, mut writer: W):
-        writer.write("[ImageFileType: ", self._raw_value, "]")
+        writer.write("[ImageFile: ", self._raw_value, "]")

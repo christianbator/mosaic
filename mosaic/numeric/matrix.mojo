@@ -171,11 +171,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
     ) raises -> Number[
         dtype, width, complex=complex
     ]:
-        return self._data.gather(
-            index=self.index(row=row, col=col, component=component),
-            offset_vector=offset_vector,
-            mask_vector=mask_vector,
-        )
+        return self._data.gather(index=self.index(row=row, col=col, component=component), offset_vector=offset_vector, mask_vector=mask_vector)
 
     @always_inline
     fn scatter[
@@ -189,12 +185,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
         offset_vector: SIMD[DType.index, width],
         mask_vector: SIMD[DType.bool, width],
     ) raises:
-        self._data.scatter(
-            index=self.index(row=row, col=col, component=component),
-            value=value,
-            offset_vector=offset_vector,
-            mask_vector=mask_vector,
-        )
+        self._data.scatter(value, index=self.index(row=row, col=col, component=component), offset_vector=offset_vector, mask_vector=mask_vector)
 
     #
     # Private Access

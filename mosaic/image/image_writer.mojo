@@ -41,7 +41,7 @@ struct ImageWriter:
     #
     # Writing
     #
-    fn write[dtype: DType, //, file_type: ImageFileType](self, image: Image[dtype]) raises:
+    fn write[dtype: DType, //, file_type: ImageFile](self, image: Image[dtype]) raises:
         var libcodec = Self._libcodec()
 
         var path_string = self._path.__fspath__()
@@ -49,7 +49,9 @@ struct ImageWriter:
             raise Error("Mismatched file type and extension " + String(file_type) + ": " + path_string)
 
         try:
-            makedirs(path=dirname(self._path), exist_ok=True)
+            var dirname = dirname(self._path)
+            if len(dirname) > 0:
+                makedirs(path=dirname, exist_ok=True)
         except:
             raise ("Failed to create directory for image writing: " + String(self._path))
 
@@ -64,7 +66,7 @@ struct ImageWriter:
         var result: c_int
 
         @parameter
-        if file_type == ImageFileType.png:
+        if file_type == ImageFile.png:
             var write_image_data_png = libcodec.get_function[
                 fn (
                     filename: UnsafePointer[c_char],
@@ -82,7 +84,7 @@ struct ImageWriter:
                 height=c_int(image.height()),
                 channels=c_int(image.channels()),
             )
-        elif file_type == ImageFileType.jpeg:
+        elif file_type == ImageFile.jpeg:
             var write_image_data_jpeg = libcodec.get_function[
                 fn (
                     filename: UnsafePointer[c_char],

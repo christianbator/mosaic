@@ -10,7 +10,7 @@ from memory import UnsafePointer
 from algorithm import vectorize, parallelize
 from collections import Optional
 
-from mosaic.numeric import Matrix, MatrixSlice, Number, ScalarNumber, StridedRange
+from mosaic.numeric import Matrix, MatrixSlice, Number, ScalarNumber, StridedRange, SIMDRange
 from mosaic.utility import optimal_simd_width, unroll_factor, fatal_error
 
 from .image_reader import ImageReader
@@ -346,6 +346,41 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     fn rotated_180(self) -> Self:
         return Self(matrix=self._matrix.rotated_180())
 
+    fn resized[interpolation: Interpolation = Interpolation.nearest](self, width: Int, height: Int) -> Self:
+        var result = Self(width=width, height=height)
+
+        @parameter
+        for channel in range(color_space.channels()):
+
+            @parameter
+            fn process_row(y: Int):
+                @parameter
+                fn process_col[simd_width: Int](x: Int):
+                    try:
+                        var value = self._matrix.gather(
+                            row=y * self.height() // height,
+                            col=x * self.width() // width,
+                            component=channel,
+                            offset_vector=(SIMDRange[simd_width]() * self.width() // width) * color_space.channels(),
+                            mask_vector=True,
+                        )
+
+                        result.strided_store(value.value, y=y, x=x, channel=channel)
+                    except error:
+                        fatal_error(error)
+
+                vectorize[process_col, Self.optimal_simd_width, unroll_factor=unroll_factor](result.width())
+
+            parallelize[process_row](result.height())
+
+        return result^
+
+    fn scaled[interpolation: Interpolation](self, factor: Int) -> Self:
+        return self.resized[interpolation](width=factor * self.width(), height=factor * self.height())
+
+    fn scaled[interpolation: Interpolation, T: Floatable](self, factor: T) -> Self:
+        return self.resized[interpolation](width=Int(factor.__float__() * self.width()), height=Int(factor.__float__() * self.height()))
+
     #
     # Common Filters
     #
@@ -512,10 +547,10 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     #
     # Saving to File
     #
-    fn save[file_type: ImageFileType](self, path: String) raises:
+    fn save[file_type: ImageFile](self, path: String) raises:
         self.save[file_type](Path(path))
 
-    fn save[file_type: ImageFileType](self, path: Path) raises:
+    fn save[file_type: ImageFile](self, path: Path) raises:
         ImageWriter(path).write[file_type](self)
 
     #

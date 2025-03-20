@@ -10,3 +10,4 @@ from .numeric_array import NumericArray
 from .matrix import Matrix
 from .matrix_slice import MatrixSlice
 from .strided_range import StridedRange
+from .simd_extensions import SIMDRange

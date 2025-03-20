@@ -19,4 +19,4 @@
 rattler-build/output
 
 # Development
-main.mojo
+dev
