@@ -334,6 +334,12 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     fn flipped_vertically(self) -> Self:
         return Self(matrix=self._matrix.flipped_vertically())
 
+    fn rotate_90[*, clockwise: Bool](mut self):
+        self._matrix.rotate_90[clockwise=clockwise]()
+
+    fn rotated_90[*, clockwise: Bool](self) -> Self:
+        return Self(matrix=self._matrix.rotated_90[clockwise=clockwise]())
+
     fn rotate_180(mut self):
         self._matrix.rotate_180()
 

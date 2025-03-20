@@ -725,6 +725,26 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
 
         return result^
 
+    fn rotate_90[*, clockwise: Bool](mut self):
+        self.transpose()
+
+        @parameter
+        if clockwise:
+            self.flip_horizontally()
+        else:
+            self.flip_vertically()
+
+    fn rotated_90[*, clockwise: Bool](self) -> Self:
+        var result = self.transposed()
+
+        @parameter
+        if clockwise:
+            result.flip_horizontally()
+        else:
+            result.flip_vertically()
+
+        return result^
+
     fn rotate_180(mut self):
         var row_range = ceildiv(self._rows, 2)
 

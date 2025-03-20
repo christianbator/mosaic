@@ -24,7 +24,7 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, 
     fn _scalar_count(self) -> Int:
         @parameter
         if complex:
-            return self._count * 2
+            return 2 * self._count
         else:
             return self._count
 
@@ -36,8 +36,8 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, 
 
         @parameter
         if complex:
-            self._data = UnsafePointer[Scalar[dtype]].alloc(count * 2)
-            memset_zero(self._data, count * 2)
+            self._data = UnsafePointer[Scalar[dtype]].alloc(2 * count)
+            memset_zero(self._data, 2 * count)
         else:
             self._data = UnsafePointer[Scalar[dtype]].alloc(count)
             memset_zero(self._data, count)
