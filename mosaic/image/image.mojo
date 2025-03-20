@@ -9,6 +9,7 @@ from pathlib import Path
 from memory import UnsafePointer
 from algorithm import vectorize, parallelize
 from collections import Optional
+from math import floor
 
 from mosaic.numeric import Matrix, MatrixSlice, Number, ScalarNumber, StridedRange, SIMDRange
 from mosaic.utility import optimal_simd_width, unroll_factor, fatal_error
@@ -346,7 +347,24 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     fn rotated_180(self) -> Self:
         return Self(matrix=self._matrix.rotated_180())
 
-    fn resized[interpolation: Interpolation = Interpolation.nearest](self, width: Int, height: Int) -> Self:
+    fn scaled[interpolation: Interpolation](self, factor: Int) -> Self:
+        return self.resized[interpolation](width=factor * self.width(), height=factor * self.height())
+
+    fn scaled[interpolation: Interpolation, T: Floatable](self, factor: T) -> Self:
+        return self.resized[interpolation](width=Int(factor.__float__() * self.width()), height=Int(factor.__float__() * self.height()))
+
+    fn resized[interpolation: Interpolation = Interpolation.bilinear](self, width: Int, height: Int) -> Self:
+        @parameter
+        if interpolation == Interpolation.nearest:
+            return self._resize_nearest(width=width, height=height)
+        elif interpolation == Interpolation.bilinear:
+            return self._resize_bilinear(width=width, height=height)
+        else:
+            fatal_error("Unimplemented interpolation for Image.resized(): ", interpolation)
+            while True:
+                pass
+
+    fn _resize_nearest(self, width: Int, height: Int) -> Self:
         var result = Self(width=width, height=height)
 
         @parameter
@@ -357,15 +375,18 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
                 @parameter
                 fn process_col[simd_width: Int](x: Int):
                     try:
-                        var value = self._matrix.gather(
-                            row=y * self.height() // height,
-                            col=x * self.width() // width,
-                            component=channel,
-                            offset_vector=(SIMDRange[simd_width]() * self.width() // width) * color_space.channels(),
-                            mask_vector=True,
+                        result.strided_store(
+                            self._matrix.gather(
+                                row=y * self.height() // height,
+                                col=x * self.width() // width,
+                                component=channel,
+                                offset_vector=SIMDRange[simd_width, stride = color_space.channels()]() * self.width() // width,
+                                mask_vector=True,
+                            ).value,
+                            y=y,
+                            x=x,
+                            channel=channel,
                         )
-
-                        result.strided_store(value.value, y=y, x=x, channel=channel)
                     except error:
                         fatal_error(error)
 
@@ -375,11 +396,57 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
 
         return result^
 
-    fn scaled[interpolation: Interpolation](self, factor: Int) -> Self:
-        return self.resized[interpolation](width=factor * self.width(), height=factor * self.height())
+    fn _resize_bilinear(self, width: Int, height: Int) -> Self:
+        var result = Self(width=width, height=height)
 
-    fn scaled[interpolation: Interpolation, T: Floatable](self, factor: T) -> Self:
-        return self.resized[interpolation](width=Int(factor.__float__() * self.width()), height=Int(factor.__float__() * self.height()))
+        @parameter
+        for channel in range(color_space.channels()):
+
+            @parameter
+            fn process_row(y: Int):
+                @parameter
+                fn process_col[simd_width: Int](x: Int):
+                    try:
+                        # var offset_vector = SIMDRange[simd_width]()
+
+                        var fractional_y = y * self.height() / height
+                        var fractional_x = x * self.width() / width
+
+                        var x1 = Int(floor(fractional_x))
+                        var y1 = Int(floor(fractional_y))
+                        var x2 = min(x1 + 1, self.width() - 1)
+                        var y2 = min(y1 + 1, self.height() - 1)
+
+                        var y1_intermediate: Float64
+                        var y2_intermediate: Float64
+                        if x1 == x2:
+                            y1_intermediate = Float64(self[y1, x1, channel])
+                            y2_intermediate = Float64(self[y2, x1, channel])
+                        else:
+                            y1_intermediate = (x2 - fractional_x) * Float64(self[y1, x1, channel]) + (fractional_x - x1) * Float64(self[y1, x2, channel])
+                            y2_intermediate = (x2 - fractional_x) * Float64(self[y2, x1, channel]) + (fractional_x - x1) * Float64(self[y2, x2, channel])
+
+                        var value: Float64
+                        if y1 == y2:
+                            value = y1_intermediate
+                        else:
+                            value = (y2 - fractional_y) * y1_intermediate + (fractional_y - y1) * y2_intermediate
+
+                        result[y, x, channel] = value.cast[dtype]()
+
+                    except error:
+                        fatal_error(error)
+
+                # vectorize[process_col, Self.optimal_simd_width, unroll_factor=unroll_factor](result.width())
+
+                for i in range(result.width()):
+                    process_col[1](i)
+
+            for i in range(result.height()):
+                process_row(i)
+            # parallelize[process_row](result.height())
+
+        return result^
 
     #
     # Common Filters

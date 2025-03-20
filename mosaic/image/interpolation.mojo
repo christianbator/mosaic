@@ -14,8 +14,9 @@ from mosaic.utility import fatal_error
 @value
 struct Interpolation(EqualityComparable, Stringable, Writable):
     alias nearest = Self(0)
+    alias bilinear = Self(1)
+
     # TODO: Implement these
-    # alias bilinear = Self(1)
     # alias bicubic = Self(2)
     # alias lanczos4 = Self(3)
     # alias area = Self(4)
@@ -25,7 +26,7 @@ struct Interpolation(EqualityComparable, Stringable, Writable):
     fn __init__(out self, raw_value: Int):
         self._raw_value = raw_value
 
-        if raw_value not in [0]:
+        if raw_value not in [0, 1]:
             fatal_error("Unsupported interpolation: ", raw_value)
 
     fn __eq__(self, other: Self) -> Bool:
