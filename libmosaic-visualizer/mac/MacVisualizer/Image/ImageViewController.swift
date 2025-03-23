@@ -9,10 +9,15 @@ import AppKit
 
 public class ImageViewController: ViewController {
     
-    private let imageView: ImageView
+    // MARK: Properties
+
+    private(set) var imageSize: NSSize = .zero
+
+    private let imageView = ImageView()
+
+    // MARK: Initialization
 
     init(imageData: ImageData) {
-        imageView = ImageView()
         super.init()
 
         update(with: imageData)
@@ -35,6 +40,16 @@ public class ImageViewController: ViewController {
     
     // MARK: ImageView Management
 
+    func update(with imageData: ImageData) {
+        let representation = createRepresentation(from: imageData)
+        let imageSize = NSSize(width: imageData.width, height: imageData.height)
+        let image = NSImage(size: imageSize)
+        image.addRepresentation(representation)
+        imageView.image = image
+
+        self.imageSize = imageSize
+    }
+
     private func createRepresentation(from imageData: ImageData) -> NSImageRep {
         var mutableData: UnsafeMutablePointer? = UnsafeMutablePointer(mutating: imageData.data)
 
@@ -53,14 +68,5 @@ public class ImageViewController: ViewController {
         )!
         
         return bitmapRepresentation
-    }
-
-    func update(with imageData: ImageData) {
-        let representation = createRepresentation(from: imageData)
-        
-        let image = NSImage(size: NSSize(width: imageData.width, height: imageData.height))
-        image.addRepresentation(representation)
-        
-        imageView.image = image
     }
 }

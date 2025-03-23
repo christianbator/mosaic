@@ -33,6 +33,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         mainMenu.addItem(mainMenuItem)
 
         let appMenu = NSMenu()
+
+        let resetWindowSizeMenuItem = NSMenuItem(title: "Reset Window Size", action: #selector(resetWindowSize), keyEquivalent: "r")
+        appMenu.addItem(resetWindowSizeMenuItem)
         
         let closeWindowMenuItem = NSMenuItem(title: "Close Window", action: #selector(closeWindow), keyEquivalent: "w")
         appMenu.addItem(closeWindowMenuItem)
@@ -44,6 +47,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         mainMenuItem.submenu = appMenu
         
         return mainMenu
+    }
+
+    @objc
+    private func resetWindowSize() {
+        guard let window = application.keyWindow, let imageViewController = window.contentViewController as? ImageViewController else {
+            return
+        }
+
+        let scaledIntrinsicContentSize = scaledWindowContentSize(for: imageViewController.imageSize)
+        window.setContentSize(scaledIntrinsicContentSize)
     }
 
     @objc
@@ -83,8 +96,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             window.title = windowTitle
             window.isReleasedWhenClosed = true
             
-            let scaledIntrinsicContentSize = windowContentSize(from: imageData)
-            window.contentMinSize = scaledIntrinsicContentSize
+            let scaledIntrinsicContentSize = scaledWindowContentSize(from: imageData)
             window.setContentSize(scaledIntrinsicContentSize)
             centerWindow(window)
             window.delegate = self
@@ -98,11 +110,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return window.title == windowTitle
         }
     }
+
+    private func scaledWindowContentSize(from imageData: ImageData) -> NSSize {
+        return scaledWindowContentSize(for:
+            NSSize(width: imageData.width, height: imageData.height)
+        )
+    }
     
-    private func windowContentSize(from imageData: ImageData) -> NSSize {
-        let width = CGFloat(imageData.width)
-        let height = CGFloat(imageData.height)
-        
+    private func scaledWindowContentSize(for size: NSSize) -> NSSize {
+        let width = size.width
+        let height = size.height
+
         if let screenFrame = NSScreen.main?.frame, width > screenFrame.width || height > screenFrame.height {
             let aspectRatio = width / height
             
@@ -126,14 +144,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let windowWidth = window.frame.width
         let windowHeight = window.frame.height
         
-        var centeredOrigin = NSPoint(
+        let centeredOrigin = NSPoint(
             x: (screenFrame.width - windowWidth) / 2,
             y: 1.2 * (screenFrame.height - windowHeight) / 2
         )
-        
-        centeredOrigin.x += CGFloat(application.windows.count - 1) * 32
-        centeredOrigin.y -= CGFloat(application.windows.count - 1) * 32
-        
+    
         window.setFrameOrigin(centeredOrigin)
     }
     
