@@ -51,6 +51,16 @@ struct ImageFile(EqualityComparable, Stringable, Writable):
             while True:
                 pass
 
+    fn valid_extensions(self) -> List[String]:
+        if self == Self.png:
+            return List[String](".png")
+        elif self == Self.jpeg:
+            return List[String](".jpeg", "jpg")
+        else:
+            fatal_error("Unimplemented valid_extensions() for image file type: ", self._raw_value)
+            while True:
+                pass
+
     #
     # EqualityComparable
     #

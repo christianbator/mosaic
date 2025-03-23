@@ -44,9 +44,11 @@ struct ImageWriter:
     fn write[dtype: DType, //, file_type: ImageFile](self, image: Image[dtype]) raises:
         var libcodec = Self._libcodec()
 
-        var path_string = self._path.__fspath__()
-        if not path_string.endswith(file_type.extension()):
-            raise Error("Mismatched file type and extension " + String(file_type) + ": " + path_string)
+        var path_string: String
+        if self._path.suffix() in file_type.valid_extensions():
+            path_string = self._path.__fspath__()
+        else:
+            path_string = self._path.__fspath__() + file_type.extension()
 
         try:
             var dirname = dirname(self._path)
