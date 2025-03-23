@@ -166,15 +166,44 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
         row: Int,
         col: Int,
         component: Int,
-        offset_vector: SIMD[DType.index, width],
-        mask_vector: SIMD[DType.bool, width],
+        offset: SIMD[DType.index, width],
+        mask: SIMD[DType.bool, width],
     ) raises -> Number[
         dtype, width, complex=complex
     ]:
-        return self._data.gather(index=self.index(row=row, col=col, component=component), offset_vector=offset_vector, mask_vector=mask_vector)
+        return self._data.gather(index=self.index(row=row, col=col, component=component), offset=offset, mask=mask)
+
+    @always_inline
+    fn strided_gather[
+        width: Int, //
+    ](
+        self,
+        row: Int,
+        col: Int,
+        component: Int,
+        offset: SIMD[DType.index, width],
+        mask: SIMD[DType.bool, width],
+    ) raises -> Number[
+        dtype, width, complex=complex
+    ]:
+        return self.gather(row=row, col=col, component=component, offset=depth * offset, mask=mask)
 
     @always_inline
     fn scatter[
+        width: Int, //
+    ](
+        self,
+        value: Number[dtype, width, complex=complex],
+        row: Int,
+        col: Int,
+        component: Int,
+        offset: SIMD[DType.index, width],
+        mask: SIMD[DType.bool, width],
+    ) raises:
+        self._data.scatter(value, index=self.index(row=row, col=col, component=component), offset=offset, mask=mask)
+
+    @always_inline
+    fn strided_scatter[
         width: Int, //
     ](
         self,
@@ -182,10 +211,10 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
         col: Int,
         component: Int,
         value: Number[dtype, width, complex=complex],
-        offset_vector: SIMD[DType.index, width],
-        mask_vector: SIMD[DType.bool, width],
+        offset: SIMD[DType.index, width],
+        mask: SIMD[DType.bool, width],
     ) raises:
-        self._data.scatter(value, index=self.index(row=row, col=col, component=component), offset_vector=offset_vector, mask_vector=mask_vector)
+        self.scatter(value, row=row, col=col, component=component, offset=depth * offset, mask=mask)
 
     #
     # Private Access

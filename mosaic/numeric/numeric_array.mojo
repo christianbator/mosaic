@@ -165,39 +165,39 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, 
     @always_inline
     fn gather[
         width: Int, //
-    ](self, index: Int, offset_vector: SIMD[DType.index, width], mask_vector: SIMD[DType.bool, width]) raises -> Number[dtype, width, complex=complex]:
-        var verified_index = self._verified_index_with_offset_vector[width](index, offset_vector=offset_vector)
+    ](self, index: Int, offset: SIMD[DType.index, width], mask: SIMD[DType.bool, width]) raises -> Number[dtype, width, complex=complex]:
+        var verified_index = self._verified_index_with_offset[width](index, offset=offset)
 
         @parameter
         if complex:
             return Number[dtype, width, complex=complex](
                 rebind[Number[dtype, width, complex=complex].Value](
                     self._data.offset(verified_index * 2).gather(
-                        offset=(offset_vector * 2).interleave(offset_vector * 2 + 1),
-                        mask=mask_vector.interleave(mask_vector),
+                        offset=(offset * 2).interleave(offset * 2 + 1),
+                        mask=mask.interleave(mask),
                     )
                 )
             )
         else:
             return Number[dtype, width, complex=complex](
-                rebind[Number[dtype, width, complex=complex].Value](self._data.offset(verified_index).gather(offset=offset_vector, mask=mask_vector))
+                rebind[Number[dtype, width, complex=complex].Value](self._data.offset(verified_index).gather(offset=offset, mask=mask))
             )
 
     @always_inline
     fn scatter[
         width: Int, //
-    ](self, value: Number[dtype, width, complex=complex], index: Int, offset_vector: SIMD[DType.index, width], mask_vector: SIMD[DType.bool, width]) raises:
-        var verified_index = self._verified_index_with_offset_vector[width](index, offset_vector=offset_vector)
+    ](self, value: Number[dtype, width, complex=complex], index: Int, offset: SIMD[DType.index, width], mask: SIMD[DType.bool, width]) raises:
+        var verified_index = self._verified_index_with_offset[width](index, offset=offset)
 
         @parameter
         if complex:
             self._data.offset(verified_index * 2).scatter(
-                offset=(offset_vector * 2).interleave(offset_vector * 2 + 1),
+                offset=(offset * 2).interleave(offset * 2 + 1),
                 val=rebind[SIMD[dtype, 2 * width]](value.value),
-                mask=mask_vector.interleave(mask_vector),
+                mask=mask.interleave(mask),
             )
         else:
-            self._data.offset(verified_index).scatter(offset=offset_vector, val=rebind[SIMD[dtype, width]](value.value), mask=mask_vector)
+            self._data.offset(verified_index).scatter(offset=offset, val=rebind[SIMD[dtype, width]](value.value), mask=mask)
 
     #
     # Private Access
@@ -270,7 +270,7 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, 
                 )
 
     @always_inline
-    fn _verified_index_with_offset_vector[width: Int](self, index: Int, offset_vector: SIMD[DType.index, width]) raises -> Int:
+    fn _verified_index_with_offset[width: Int](self, index: Int, offset: SIMD[DType.index, width]) raises -> Int:
         var shifted_index: Int
 
         if unlikely(index < 0):
@@ -278,8 +278,8 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, 
         else:
             shifted_index = index
 
-        var min_offset = offset_vector.reduce_min()
-        var max_offset = offset_vector.reduce_max()
+        var min_offset = offset.reduce_min()
+        var max_offset = offset.reduce_max()
 
         if likely(((shifted_index + min_offset) >= 0) and ((shifted_index + max_offset) < self._count)):
             return shifted_index

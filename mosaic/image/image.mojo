@@ -356,15 +356,15 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     fn resized[interpolation: Interpolation = Interpolation.bilinear](self, width: Int, height: Int) -> Self:
         @parameter
         if interpolation == Interpolation.nearest:
-            return self._resize_nearest(width=width, height=height)
+            return self._resized_nearest(width=width, height=height)
         elif interpolation == Interpolation.bilinear:
-            return self._resize_bilinear(width=width, height=height)
+            return self._resized_bilinear(width=width, height=height)
         else:
             fatal_error("Unimplemented interpolation for Image.resized(): ", interpolation)
             while True:
                 pass
 
-    fn _resize_nearest(self, width: Int, height: Int) -> Self:
+    fn _resized_nearest(self, width: Int, height: Int) -> Self:
         var result = Self(width=width, height=height)
 
         @parameter
@@ -376,12 +376,12 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
                 fn process_col[simd_width: Int](x: Int):
                     try:
                         result.strided_store(
-                            self._matrix.gather(
+                            self._matrix.strided_gather(
                                 row=y * self.height() // height,
                                 col=x * self.width() // width,
                                 component=channel,
-                                offset_vector=SIMDRange[simd_width, stride = color_space.channels()]() * self.width() // width,
-                                mask_vector=True,
+                                offset=SIMDRange[simd_width]() * self.width() // width,
+                                mask=True,
                             ).value,
                             y=y,
                             x=x,
@@ -396,7 +396,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
 
         return result^
 
-    fn _resize_bilinear(self, width: Int, height: Int) -> Self:
+    fn _resized_bilinear(self, width: Int, height: Int) -> Self:
         var result = Self(width=width, height=height)
 
         @parameter
@@ -404,47 +404,56 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
 
             @parameter
             fn process_row(y: Int):
+                var fractional_y = y * self.height() / height
+                var y1 = Int(floor(fractional_y))
+                var y2 = min(y1 + 1, self.height() - 1)
+
                 @parameter
                 fn process_col[simd_width: Int](x: Int):
                     try:
-                        # var offset_vector = SIMDRange[simd_width]()
+                        var fractional_x = (x + SIMDRange[simd_width]().cast[DType.float64]()) * self.width() / width
+                        var x1 = floor(fractional_x).cast[DType.index]()
+                        var x2 = (x1 + 1).clamp(0, self.width() - 1)
+                        var x_in_bounds = (x1 != x2)
 
-                        var fractional_y = y * self.height() / height
-                        var fractional_x = x * self.width() / width
+                        var top_left = self._matrix.strided_gather(row=y1, col=Int(x1[0]), component=channel, offset=x1 - x1[0], mask=True).value.cast[
+                            DType.float64
+                        ]()
+                        var top_right = self._matrix.strided_gather(row=y1, col=Int(x2[0]), component=channel, offset=x2 - x2[0], mask=True).value.cast[
+                            DType.float64
+                        ]()
 
-                        var x1 = Int(floor(fractional_x))
-                        var y1 = Int(floor(fractional_y))
-                        var x2 = min(x1 + 1, self.width() - 1)
-                        var y2 = min(y1 + 1, self.height() - 1)
+                        var top_intermediate = x_in_bounds.select(
+                            true_case=(x2.cast[DType.float64]() - fractional_x) * top_left + (fractional_x - x1.cast[DType.float64]()) * top_right,
+                            false_case=top_left,
+                        )
 
-                        var y1_intermediate: Float64
-                        var y2_intermediate: Float64
-                        if x1 == x2:
-                            y1_intermediate = Float64(self[y1, x1, channel])
-                            y2_intermediate = Float64(self[y2, x1, channel])
-                        else:
-                            y1_intermediate = (x2 - fractional_x) * Float64(self[y1, x1, channel]) + (fractional_x - x1) * Float64(self[y1, x2, channel])
-                            y2_intermediate = (x2 - fractional_x) * Float64(self[y2, x1, channel]) + (fractional_x - x1) * Float64(self[y2, x2, channel])
-
-                        var value: Float64
+                        var value: SIMD[DType.float64, simd_width]
                         if y1 == y2:
-                            value = y1_intermediate
+                            value = top_intermediate
                         else:
-                            value = (y2 - fractional_y) * y1_intermediate + (fractional_y - y1) * y2_intermediate
+                            var bottom_left = self._matrix.strided_gather(row=y2, col=Int(x1[0]), component=channel, offset=x1 - x1[0], mask=True).value.cast[
+                                DType.float64
+                            ]()
+                            var bottom_right = self._matrix.strided_gather(row=y2, col=Int(x2[0]), component=channel, offset=x2 - x2[0], mask=True).value.cast[
+                                DType.float64
+                            ]()
 
-                        result[y, x, channel] = value.cast[dtype]()
+                            var bottom_intermediate = x_in_bounds.select(
+                                true_case=(x2.cast[DType.float64]() - fractional_x) * bottom_left + (fractional_x - x1.cast[DType.float64]()) * bottom_right,
+                                false_case=bottom_left,
+                            )
+
+                            value = (y2 - fractional_y) * top_intermediate + (fractional_y - y1) * bottom_intermediate
+
+                        result.strided_store(value.cast[dtype](), y=y, x=x, channel=channel)
 
                     except error:
                         fatal_error(error)
 
-                # vectorize[process_col, Self.optimal_simd_width, unroll_factor=unroll_factor](result.width())
+                vectorize[process_col, Self.optimal_simd_width, unroll_factor=unroll_factor](result.width())
 
-                for i in range(result.width()):
-                    process_col[1](i)
-
-            for i in range(result.height()):
-                process_row(i)
-            # parallelize[process_row](result.height())
+            parallelize[process_row](result.height())
 
         return result^
 
@@ -510,18 +519,18 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
         var half_kernel_height = kernel.rows() // 2
 
         var kernel_vector = SIMD[dtype, width]()
-        var y_offset_vector = SIMD[DType.index, width]()
-        var x_offset_vector = SIMD[DType.index, width]()
-        var offset_vector = SIMD[DType.index, width]()
-        var mask_vector = SIMD[DType.bool, width](False)
+        var y_offset = SIMD[DType.index, width]()
+        var x_offset = SIMD[DType.index, width]()
+        var offset = SIMD[DType.index, width]()
+        var mask = SIMD[DType.bool, width](False)
 
         for kernel_y in range(0, kernel.rows()):
             for kernel_x in range(0, kernel.cols()):
                 var index = kernel_y * kernel.cols() + kernel_x
-                y_offset_vector[index] = kernel_y - half_kernel_height
-                x_offset_vector[index] = kernel_x - half_kernel_width
-                offset_vector[index] = (y_offset_vector[index] * self.width() + x_offset_vector[index]) * color_space.channels()
-                mask_vector[index] = True
+                y_offset[index] = kernel_y - half_kernel_height
+                x_offset[index] = kernel_x - half_kernel_width
+                offset[index] = (y_offset[index] * self.width() + x_offset[index]) * color_space.channels()
+                mask[index] = True
 
         @parameter
         for channel in range(color_space.channels()):
@@ -546,8 +555,8 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
                                     row=y,
                                     col=x,
                                     component=channel,
-                                    offset_vector=offset_vector,
-                                    mask_vector=mask_vector,
+                                    offset=offset,
+                                    mask=mask,
                                 )
                                 * kernel_vector
                             ).value.reduce_add()
@@ -556,11 +565,11 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
 
                             @parameter
                             for index in range(width):
-                                if mask_vector[index]:
+                                if mask[index]:
                                     pixel_sum = kernel_vector[index].fma(
                                         self._bordered_load[border](
-                                            y=Int(y + y_offset_vector[index]),
-                                            x=Int(x + x_offset_vector[index]),
+                                            y=Int(y + y_offset[index]),
+                                            x=Int(x + x_offset[index]),
                                             channel=channel,
                                         ),
                                         pixel_sum,
