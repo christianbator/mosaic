@@ -457,6 +457,37 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
 
         return result^
 
+    fn padded[border: Border](self, size: Int) -> Self:
+        return self.padded[border](width=size, height=size)
+
+    fn padded[border: Border](self, width: Int, height: Int) -> Self:
+        var result = Self(matrix=self._matrix.padded(rows=height, cols=width))
+
+        @parameter
+        if border != Border.zero:
+            try:
+
+                @parameter
+                for channel in range(color_space.channels()):
+                    for y in range(height):
+                        for x in range(result.width()):
+                            result[y, x, channel] = self._bordered_load[border](y=y - height, x=x - width, channel=channel)
+
+                    for y in range(height, height + self.height()):
+                        for x in range(result.width()):
+                            result[y, x, channel] = self._bordered_load[border](y=y - height, x=x - width, channel=channel)
+
+                        for x in range(width + self.width(), result.width()):
+                            result[y, x, channel] = self._bordered_load[border](y=y - height, x=x - width, channel=channel)
+
+                    for y in range(height + self.height(), result.height()):
+                        for x in range(result.width()):
+                            result[y, x, channel] = self._bordered_load[border](y=y - height, x=x - width, channel=channel)
+            except error:
+                fatal_error(error)
+
+        return result^
+
     #
     # Common Filters
     #
@@ -587,36 +618,42 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
         pass
 
     @always_inline
-    fn _bordered_load[border: Border](self, y: Int, x: Int, channel: Int) raises -> Scalar[dtype]:
-        @parameter
-        if border == Border.zero:
-            if y >= 0 and y < self.height() and x >= 0 and x < self.width():
-                return self[y, x, channel]
-            else:
-                return Scalar[dtype](0)
-        elif border == Border.wrap:
-            return self[y % self.height(), x % self.width(), channel]
-        elif border == Border.reflect:
-            var reflected_y: Int
-            var reflected_x: Int
+    fn _bordered_load[border: Border](self, y: Int, x: Int, channel: Int) -> Scalar[dtype]:
+        try:
 
-            if y < 0:
-                reflected_y = abs(y)
-            elif y >= self.height():
-                reflected_y = 2 * (self.height() - 1) - y
-            else:
-                reflected_y = y
+            @parameter
+            if border == Border.zero:
+                if y >= 0 and y < self.height() and x >= 0 and x < self.width():
+                    return self[y, x, channel]
+                else:
+                    return Scalar[dtype](0)
+            elif border == Border.wrap:
+                return self[y % self.height(), x % self.width(), channel]
+            elif border == Border.reflect:
+                var reflected_y: Int
+                var reflected_x: Int
 
-            if x < 0:
-                reflected_x = abs(x)
-            elif x >= self.width():
-                reflected_x = 2 * (self.width() - 1) - x
-            else:
-                reflected_x = x
+                if y < 0:
+                    reflected_y = abs(y)
+                elif y >= self.height():
+                    reflected_y = 2 * (self.height() - 1) - y
+                else:
+                    reflected_y = y
 
-            return self[reflected_y, reflected_x, channel]
-        else:
-            fatal_error("Unimplemented border type in Image._bordered_load()")
+                if x < 0:
+                    reflected_x = abs(x)
+                elif x >= self.width():
+                    reflected_x = 2 * (self.width() - 1) - x
+                else:
+                    reflected_x = x
+
+                return self[reflected_y, reflected_x, channel]
+            else:
+                fatal_error("Unimplemented border type in Image._bordered_load()")
+                while True:
+                    pass
+        except error:
+            fatal_error(error)
             while True:
                 pass
 

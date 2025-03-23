@@ -792,6 +792,29 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
 
         return result^
 
+    fn padded(self, size: Int) -> Self:
+        return self.padded(rows=size, cols=size)
+
+    fn padded(self, rows: Int, cols: Int) -> Self:
+        debug_assert[assert_mode="safe"](rows >= 0 and cols >= 0, "Must specify rows >= 0 and cols >= 0 for Matrix.padded()")
+
+        var new_rows = self._rows + 2 * rows
+        var new_cols = self._cols + 2 * cols
+
+        var result = Self(rows=new_rows, cols=new_cols)
+        var result_base_data_ptr = result._data.unsafe_data_ptr().offset((rows * new_cols + cols) * depth)
+
+        var row_offset = self._cols * depth
+        var new_row_offset = new_cols * depth
+
+        @parameter
+        fn copy_row(row: Int):
+            memcpy(dest=result_base_data_ptr.offset(row * new_row_offset), src=self._data.unsafe_data_ptr().offset(row * row_offset), count=row_offset)
+
+        parallelize[copy_row](self._rows)
+
+        return result^
+
     fn fill(mut self, scalar: ScalarNumber[dtype, complex=complex]):
         @parameter
         fn fill[width: Int](value: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
