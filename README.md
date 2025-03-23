@@ -90,7 +90,7 @@ magic run mojo show_image.mojo
 </div>
 
 #### Blur image
-- Reads an image file, converts it to a `float32` representation, and applies a box filter to blur the image
+- Reads an image file, converts it to a `float64` representation, and applies a box filter to blur the image
 - Source: [examples/blur_image.mojo](examples/blur_image.mojo)
 <div align="center">
   <img src="assets/mandrill-blurred.png" alt="Mandrill blurred" width="256" height="256">

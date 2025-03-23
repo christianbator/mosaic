@@ -11,8 +11,8 @@ from mosaic.visualizer import Visualizer
 
 fn main():
     try:
-        # Step 1: Load the image from a path and convert it to float32 for processing
-        var image = Image[DType.float32, ColorSpace.rgb]("data/mandrill.png")
+        # Step 1: Load the image from a path and convert it to float64 for processing
+        var image = Image[DType.float64, ColorSpace.rgb]("data/mandrill.png")
 
         # Step 2: Blur the image with zero-padded border handling and a box filter of size 9
         image.box_blur[Border.zero](size=9)
