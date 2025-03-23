@@ -962,7 +962,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
 
     @staticmethod
     fn strided_replication(*, rows: Int, cols: Int, values: List[ScalarNumber[dtype, complex=complex]]) -> Self:
-        debug_assert[assert_mode="safe"](rows * cols * depth == len(values), "Mismatch in list length for Matrix strided replication constructor")
+        debug_assert[assert_mode="safe"](rows * cols == len(values), "Mismatch in list length for Matrix strided replication constructor")
 
         var result = Self(rows=rows, cols=cols)
 
@@ -970,7 +970,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
         fn process_row(row: Int):
             for col in range(cols):
                 try:
-                    result.store_full_depth(result.create_full_depth_value(values[row * col + col]), row=row, col=col)
+                    result.store_full_depth(result.create_full_depth_value(values[row * cols + col]), row=row, col=col)
                 except error:
                     fatal_error(error)
 
