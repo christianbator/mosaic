@@ -119,9 +119,16 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
     fn scalar_count(self) -> Int:
         @parameter
         if complex:
-            return self.count() * 2
+            return 2 * self.count()
         else:
             return self.count()
+
+    @parameter
+    fn scalar_depth(self) -> Int:
+        if complex:
+            return 2 * depth
+        else:
+            return depth
 
     #
     # Public Access
@@ -367,7 +374,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
         return Self(rows=self._rows, cols=self._cols, data=self._data.copy())
 
     fn copy_into(self, mut other: Self):
-        # This is bounds_checked by NumericArray
+        # This is bounds checked by NumericArray
         self._data.copy_into(other._data)
 
     #
@@ -802,16 +809,53 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
         var new_cols = self._cols + 2 * cols
 
         var result = Self(rows=new_rows, cols=new_cols)
-        var result_base_data_ptr = result._data.unsafe_data_ptr().offset((rows * new_cols + cols) * depth)
+        var result_base_data_ptr = result.unsafe_data_ptr().offset((rows * new_cols + cols) * self.scalar_depth())
 
-        var row_offset = self._cols * depth
-        var new_row_offset = new_cols * depth
+        var row_offset = self._cols * self.scalar_depth()
+        var new_row_offset = new_cols * self.scalar_depth()
 
         @parameter
         fn copy_row(row: Int):
-            memcpy(dest=result_base_data_ptr.offset(row * new_row_offset), src=self._data.unsafe_data_ptr().offset(row * row_offset), count=row_offset)
+            memcpy(dest=result_base_data_ptr.offset(row * new_row_offset), src=self.unsafe_data_ptr().offset(row * row_offset), count=row_offset)
 
         parallelize[copy_row](self._rows)
+
+        return result^
+
+    fn horizontally_stacked(self, other: Self) -> Self:
+        debug_assert[assert_mode="safe"](self._rows == other._rows, "Matrices must have same number of rows to stack horizontally")
+
+        var result = Self(rows=self._rows, cols=self._cols + other._cols)
+
+        var scalar_row_offset = self._cols * self.scalar_depth()
+        var other_scalar_row_offset = other._cols * other.scalar_depth()
+        var result_scalar_row_offset = result._cols * result.scalar_depth()
+        var right_side_base_data_ptr = result.unsafe_data_ptr().offset(scalar_row_offset)
+
+        @parameter
+        fn process_row(row: Int):
+            memcpy(
+                dest=result.unsafe_data_ptr().offset(row * result_scalar_row_offset),
+                src=self.unsafe_data_ptr().offset(row * scalar_row_offset),
+                count=scalar_row_offset,
+            )
+
+            memcpy(
+                dest=right_side_base_data_ptr.offset(row * result_scalar_row_offset),
+                src=other.unsafe_data_ptr().offset(row * other_scalar_row_offset),
+                count=other_scalar_row_offset,
+            )
+
+        parallelize[process_row](result._rows)
+
+        return result^
+
+    fn vertically_stacked(self, other: Self) -> Self:
+        debug_assert[assert_mode="safe"](self._cols == other._cols, "Matrices must have same number of cols to stack vertically")
+
+        var result = Self(rows=self._rows + other._rows, cols=self._cols)
+        memcpy(dest=result.unsafe_data_ptr(), src=self.unsafe_data_ptr(), count=self.scalar_count())
+        memcpy(dest=result.unsafe_data_ptr().offset(self.scalar_count()), src=other.unsafe_data_ptr(), count=other.scalar_count())
 
         return result^
 
@@ -970,8 +1014,8 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
         @parameter
         if new_dtype == dtype:
             memcpy(
-                dest=dest._data.unsafe_data_ptr(),
-                src=rebind[UnsafePointer[Scalar[new_dtype]]](self._data.unsafe_data_ptr()),
+                dest=dest.unsafe_data_ptr(),
+                src=rebind[UnsafePointer[Scalar[new_dtype]]](self.unsafe_data_ptr()),
                 count=self.scalar_count(),
             )
         else:
@@ -999,8 +1043,8 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
         @parameter
         if new_dtype == dtype:
             memcpy(
-                dest=dest._data.unsafe_data_ptr(),
-                src=rebind[UnsafePointer[Scalar[new_dtype]]](self._data.unsafe_data_ptr()),
+                dest=dest.unsafe_data_ptr(),
+                src=rebind[UnsafePointer[Scalar[new_dtype]]](self.unsafe_data_ptr()),
                 count=self.scalar_count(),
             )
         else:

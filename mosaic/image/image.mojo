@@ -488,6 +488,12 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
 
         return result^
 
+    fn horizontally_stacked(self, other: Self) -> Self:
+        return Self(matrix=self._matrix.horizontally_stacked(other._matrix))
+
+    fn vertically_stacked(self, other: Self) -> Self:
+        return Self(matrix=self._matrix.vertically_stacked(other._matrix))
+
     #
     # Common Filters
     #
