@@ -51,10 +51,10 @@ public class ImageViewController: ViewController {
     }
 
     private func createRepresentation(from imageData: ImageData) -> NSImageRep {
-        var mutableData: UnsafeMutablePointer? = UnsafeMutablePointer(mutating: imageData.data)
-
+        var dataReference: UnsafeMutablePointer? = imageData.data
+        
         let bitmapRepresentation = NSBitmapImageRep(
-            bitmapDataPlanes: &mutableData,
+            bitmapDataPlanes: &dataReference,
             pixelsWide: imageData.width,
             pixelsHigh: imageData.height,
             bitsPerSample: imageData.bitDepth,

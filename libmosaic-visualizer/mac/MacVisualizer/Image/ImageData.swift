@@ -8,7 +8,7 @@
 import Foundation
 
 struct ImageData {
-    let data: UnsafePointer<UInt8>
+    let data: UnsafeMutablePointer<UInt8>
     let width: Int
     let height: Int
     let channels: Int

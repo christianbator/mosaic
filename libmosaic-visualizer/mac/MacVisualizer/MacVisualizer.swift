@@ -15,9 +15,13 @@ let appDelegate = AppDelegate(application: application)
 
 @MainActor
 @_cdecl("show")
-public func show(data: UnsafePointer<UInt8>, width: CInt, height: CInt, channels: CInt, windowTitle: UnsafePointer<CChar>) {
+public func show(data: UnsafeMutablePointer<UInt8>, width: CInt, height: CInt, channels: CInt, windowTitle: UnsafePointer<CChar>) {
     autoreleasepool {
-        let imageData = ImageData(data: data, width: Int(width), height: Int(height), channels: Int(channels))
+        let count = Int(height * width * channels)
+        let dataCopy = UnsafeMutablePointer<UInt8>.allocate(capacity: count)
+        memcpy(dataCopy, data, count)
+
+        let imageData = ImageData(data: dataCopy, width: Int(width), height: Int(height), channels: Int(channels))
         let windowTitleString = String(cString: windowTitle)
     
         appDelegate.show(imageData: imageData, inWindowTitled: windowTitleString)
