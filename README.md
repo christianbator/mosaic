@@ -41,7 +41,7 @@ It unifies the computer vision workflow into one language that runs on any hardw
   - Coming soon...
 - Video processing
   - Coming soon...
-- Visualization (*currently only macOS*)
+- Visualization (currently only macOS)
   - Native image and video rendering
 - Hardware acceleration
   - Parallelization and SIMD on CPUs
