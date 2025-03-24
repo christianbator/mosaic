@@ -7,6 +7,9 @@
 
 from math import sqrt, Ceilable, CeilDivable, Floorable, Truncable
 from complex import ComplexSIMD
+from builtin.dtype import _integral_type_of
+from sys import is_big_endian
+from collections import InlineArray
 
 #
 # Aliases
@@ -273,10 +276,10 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
             return Self(self.value * rhs.value)
 
     @always_inline
-    fn __truediv__(self: Self, rhs: Self) -> Self:
+    fn __truediv__(self, rhs: Self) -> Self:
         @parameter
         if complex:
-            var denominator = rhs.squared_norm()
+            var denominator = rhs.squared_norm().value
 
             return Self(
                 real=(self.real() * rhs.real() + self.imaginary() * rhs.imaginary()) / denominator,
@@ -286,7 +289,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
             return Self(self.value / rhs.value)
 
     @always_inline
-    fn __floordiv__(self: Self, rhs: Self) -> Self:
+    fn __floordiv__(self, rhs: Self) -> Self:
         constrained[
             not complex,
             "__floordiv__() is only available for non-complex numbers",
@@ -295,13 +298,13 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
         return Self(self.value // rhs.value)
 
     @always_inline
-    fn __mod__(self: Self, rhs: Self) -> Self:
+    fn __mod__(self, rhs: Self) -> Self:
         constrained[not complex, "__mod__() is only available for non-complex numbers"]()
 
         return Self(self.value % rhs.value)
 
     @always_inline
-    fn __pow__(self: Self, rhs: Self) -> Self:
+    fn __pow__(self, rhs: Self) -> Self:
         constrained[not complex, "__pow__() is only available for non-complex numbers"]()
 
         return Self(self.value**rhs.value)
@@ -505,38 +508,21 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     #
     # Methods
     #
-
-    #
-    # TODO: Wrap other SIMD method implementations
-    #
-
-    fn reduce_add(self) -> ScalarNumber[dtype, complex=complex]:
-        @parameter
-        if complex:
-            return ScalarNumber[dtype, complex=complex](
-                real=self.real().reduce_add(),
-                imaginary=self.imaginary().reduce_add(),
-            )
-        else:
-            return self.value.reduce_add()
-
-    fn reduce_min(self: Number[dtype, width, complex=False]) -> ScalarNumber[dtype, complex=False]:
-        return self.value.reduce_min()
-
-    fn reduce_max(self: Number[dtype, width, complex=False]) -> ScalarNumber[dtype, complex=False]:
-        return self.value.reduce_max()
-
     @always_inline
-    fn squared_norm(self: Self) -> SIMD[dtype, width]:
-        constrained[complex, "squared_norm() is only available for complex numbers"]()
+    fn to_bits[int_dtype: DType = _integral_type_of[dtype]()](self) -> Number[int_dtype, width, complex=complex]:
+        return Number[int_dtype, width, complex=complex](self.value.to_bits())
 
-        return self.real() * self.real() + self.imaginary() * self.imaginary()
+    @staticmethod
+    fn from_bytes[big_endian: Bool = is_big_endian()](bytes: InlineArray[Byte, dtype.sizeof()]) -> ScalarNumber[dtype, complex=False]:
+        return ScalarNumber[dtype, complex=False](Scalar[dtype].from_bytes(bytes))
 
-    @always_inline
-    fn norm(self: Self) -> SIMD[dtype, width]:
-        constrained[complex, "norm() is only available for complex numbers"]()
+    fn as_bytes[big_endian: Bool = is_big_endian()](self: ScalarNumber[dtype, complex=False]) -> InlineArray[Byte, dtype.sizeof()]:
+        return self.value.as_bytes()
 
-        return sqrt(self.squared_norm())
+    fn clamp(
+        self: Number[dtype, width, complex=False], lower_bound: Number[dtype, width, complex=False], upper_bound: Number[dtype, width, complex=False]
+    ) -> Number[dtype, width, complex=False]:
+        return self.value.clamp(lower_bound=lower_bound.value, upper_bound=upper_bound.value)
 
     @always_inline
     fn fma(self, multiplier: Self, accumulator: Self) -> Self:
@@ -550,6 +536,115 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
             return Self(real=result.re, imaginary=result.im)
         else:
             return Self(self.value.fma(multiplier=multiplier.value, accumulator=accumulator.value))
+
+    #
+    # TODO: shuffle
+    #
+
+    @always_inline
+    fn slice[output_width: Int, /, *, offset: Int = 0](self) -> Number[dtype, output_width, complex=complex]:
+        return Number[dtype, output_width, complex=complex](
+            rebind[Number[dtype, output_width, complex=complex].Value](
+                self.value.slice[2 * output_width if complex else output_width, offset = 2 * offset if complex else offset]()
+            )
+        )
+
+    @always_inline
+    fn insert[*, offset: Int = 0](self, value: Number[dtype, _, complex=complex]) -> Self:
+        return Self(self.value.insert[offset = 2 * offset if complex else offset](value.value))
+
+    @always_inline
+    fn join(self, other: Self, out result: Number[dtype, 2 * width, complex=complex]):
+        result = Number[dtype, 2 * width, complex=complex](rebind[Number[dtype, 2 * width, complex=complex].Value](self.value.join(other.value)))
+
+    @always_inline
+    fn interleave(self, other: Self) -> Number[dtype, 2 * width, complex=complex]:
+        @parameter
+        if complex:
+            return Number[dtype, 2 * width, complex=complex](
+                real=self.real().interleave(other.real()), imaginary=self.imaginary().interleave(other.imaginary())
+            )
+        else:
+            return Number[dtype, 2 * width, complex=complex](rebind[Number[dtype, 2 * width, complex=complex].Value](self.value.interleave(other.value)))
+
+    @always_inline
+    fn split(self) -> (Number[dtype, width // 2, complex=complex], Number[dtype, width // 2, complex=complex]):
+        var split = self.value.split()
+
+        return (
+            Number[dtype, width // 2, complex=complex](rebind[Number[dtype, width // 2, complex=complex].Value](split[0])),
+            Number[dtype, width // 2, complex=complex](rebind[Number[dtype, width // 2, complex=complex].Value](split[1])),
+        )
+
+    @always_inline
+    fn deinterleave(self) -> (Number[dtype, width // 2, complex=complex], Number[dtype, width // 2, complex=complex]):
+        @parameter
+        if complex:
+            var real = self.real().deinterleave()
+            var imaginary = self.imaginary().deinterleave()
+
+            return (
+                Number[dtype, width // 2, complex=complex](real=real[0], imaginary=imaginary[0]),
+                Number[dtype, width // 2, complex=complex](real=real[1], imaginary=imaginary[1]),
+            )
+        else:
+            var deinterleaved = self.value.deinterleave()
+
+            return (
+                Number[dtype, width // 2, complex=complex](rebind[Number[dtype, width // 2, complex=complex].Value](deinterleaved[0])),
+                Number[dtype, width // 2, complex=complex](rebind[Number[dtype, width // 2, complex=complex].Value](deinterleaved[1])),
+            )
+
+    @always_inline
+    fn reduce[
+        func: fn[dtype: DType, width: Int] (Number[dtype, width, complex=complex], Number[dtype, width, complex=complex]) capturing -> Number[
+            dtype, width, complex=complex
+        ],
+        size_out: Int = 1,
+    ](self) -> Number[dtype, size_out, complex=complex]:
+        constrained[size_out <= width, "Reduce must specify width less than original number width"]()
+
+        @parameter
+        if width == size_out:
+            return rebind[Number[dtype, size_out, complex=complex]](self)
+        else:
+            var lhs: Number[dtype, width // 2, complex=complex]
+            var rhs: Number[dtype, width // 2, complex=complex]
+            lhs, rhs = self.split()
+
+            return func(lhs, rhs).reduce[func, size_out]()
+
+    fn reduce_max(self: Number[dtype, width, complex=False]) -> ScalarNumber[dtype, complex=False]:
+        return ScalarNumber[dtype, complex=False](self.value.reduce_max())
+
+    fn reduce_min(self: Number[dtype, width, complex=False]) -> ScalarNumber[dtype, complex=False]:
+        return ScalarNumber[dtype, complex=False](self.value.reduce_min())
+
+    fn reduce_add(self) -> ScalarNumber[dtype, complex=complex]:
+        @parameter
+        if complex:
+            return ScalarNumber[dtype, complex=complex](
+                real=self.real().reduce_add(),
+                imaginary=self.imaginary().reduce_add(),
+            )
+        else:
+            return ScalarNumber[dtype, complex=complex](self.value.reduce_add())
+
+    #
+    # TODO: reduce_mul, reduce_and, reduce_or, reduce_bit_count, select, rotate_left, rotate_right, shift_left, shift_right, reversed
+    #
+
+    @always_inline
+    fn squared_norm(self) -> Number[dtype, width]:
+        constrained[complex, "squared_norm() is only available for complex numbers"]()
+
+        return self.real() * self.real() + self.imaginary() * self.imaginary()
+
+    @always_inline
+    fn norm(self) -> Number[dtype, width]:
+        constrained[complex, "norm() is only available for complex numbers"]()
+
+        return sqrt(self.squared_norm().value)
 
     #
     # Numeric Trait Implementations
