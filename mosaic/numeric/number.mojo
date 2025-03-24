@@ -10,6 +10,7 @@ from complex import ComplexSIMD
 from builtin.dtype import _integral_type_of
 from sys import is_big_endian
 from collections import InlineArray
+from utils import IndexList
 
 #
 # Aliases
@@ -151,10 +152,6 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
             @parameter
             for i in range(width):
                 self.value[i] = elems[i]
-
-    #
-    # TODO: Remove constrained and specify the type of self instead for all constrained methods below?
-    #
 
     @always_inline
     fn __init__(out self, real: SIMD[dtype, width], imaginary: SIMD[dtype, width]):
@@ -526,9 +523,29 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
         else:
             return Self(self.value.fma(multiplier=multiplier.value, accumulator=accumulator.value))
 
-    #
-    # TODO: shuffle
-    #
+    @always_inline
+    fn shuffle[*mask: Int](self) -> Self:
+        return self.shuffle[*mask](self)
+
+    @always_inline
+    fn shuffle[*mask: Int](self, other: Self) -> Self:
+        @parameter
+        if complex:
+            return Self(real=self.real().shuffle[*mask](other.real()), imaginary=self.imaginary().shuffle[*mask](other.imaginary()))
+        else:
+            return Self(self.value.shuffle[*mask](other.value))
+
+    @always_inline
+    fn shuffle[mask: IndexList[width, **_]](self) -> Self:
+        return self.shuffle[mask=mask](self)
+
+    @always_inline
+    fn shuffle[mask: IndexList[width, **_]](self, other: Self) -> Self:
+        @parameter
+        if complex:
+            return Self(real=self.real().shuffle[mask=mask](other.real()), imaginary=self.imaginary().shuffle[mask=mask](other.imaginary()))
+        else:
+            return Self(rebind[Self.Value](rebind[SIMD[dtype, width]](self.value).shuffle[mask=mask](rebind[SIMD[dtype, width]](other.value))))
 
     @always_inline
     fn slice[output_width: Int, /, *, offset: Int = 0](self) -> Number[dtype, output_width, complex=complex]:
@@ -603,29 +620,101 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
             return func(lhs, rhs).reduce[func, size_out]()
 
-    fn reduce_max(self) -> ScalarNumber[dtype, complex=complex]:
+    @always_inline
+    fn reduce_max[size_out: Int = 1](self) -> Number[dtype, size_out, complex=complex]:
         constrained[not complex, "reduce_max() is only available for non-complex numbers"]()
 
-        return ScalarNumber[dtype, complex=complex](self.value.reduce_max())
+        return Number[dtype, size_out, complex=complex](rebind[Number[dtype, size_out, complex=complex].Value](self.value.reduce_max[size_out]()))
 
-    fn reduce_min(self) -> ScalarNumber[dtype, complex=complex]:
+    @always_inline
+    fn reduce_min[size_out: Int = 1](self) -> Number[dtype, size_out, complex=complex]:
         constrained[not complex, "reduce_min() is only available for non-complex numbers"]()
 
-        return ScalarNumber[dtype, complex=complex](self.value.reduce_min())
+        return Number[dtype, size_out, complex=complex](rebind[Number[dtype, size_out, complex=complex].Value](self.value.reduce_min[size_out]()))
 
-    fn reduce_add(self) -> ScalarNumber[dtype, complex=complex]:
+    @always_inline
+    fn reduce_add[size_out: Int = 1](self) -> Number[dtype, size_out, complex=complex]:
+        @always_inline
         @parameter
-        if complex:
-            return ScalarNumber[dtype, complex=complex](
-                real=self.real().reduce_add(),
-                imaginary=self.imaginary().reduce_add(),
+        fn reduce_add_body[
+            dtype: DType, width: Int
+        ](v1: Number[dtype, width, complex=complex], v2: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return v1 + v2
+
+        return self.reduce[reduce_add_body, size_out]()
+
+    @always_inline
+    fn reduce_mul[size_out: Int = 1](self) -> Number[dtype, size_out, complex=complex]:
+        @always_inline
+        @parameter
+        fn reduce_mul_body[
+            dtype: DType, width: Int
+        ](v1: Number[dtype, width, complex=complex], v2: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return v1 * v2
+
+        return self.reduce[reduce_mul_body, size_out]()
+
+    @always_inline
+    fn reduce_and[size_out: Int = 1](self) -> Number[dtype, size_out, complex=complex]:
+        constrained[not complex, "reduce_and() is only available for non-complex numbers"]()
+
+        return Number[dtype, size_out, complex=complex](rebind[Number[dtype, size_out, complex=complex].Value](self.value.reduce_and[size_out]()))
+
+    @always_inline
+    fn reduce_or[size_out: Int = 1](self) -> Number[dtype, size_out, complex=complex]:
+        constrained[not complex, "reduce_or() is only available for non-complex numbers"]()
+
+        return Number[dtype, size_out, complex=complex](rebind[Number[dtype, size_out, complex=complex].Value](self.value.reduce_or[size_out]()))
+
+    @always_inline
+    fn reduce_bit_count(self) -> Int:
+        return self.value.reduce_bit_count()
+
+    @always_inline
+    fn select[
+        dtype_out: DType, complex_out: Bool, //
+    ](self, true_case: Number[dtype_out, width, complex=complex_out], false_case: Number[dtype_out, width, complex=complex_out]) -> Number[
+        dtype_out, width, complex=complex_out
+    ]:
+        constrained[dtype == DType.bool and not complex, "select() is only available for bool, non-complex numbers"]()
+
+        var value = rebind[SIMD[DType.bool, width]](self.value)
+
+        @parameter
+        if complex_out:
+            return Number[dtype_out, width, complex=complex_out](
+                real=value.select(true_case=true_case.real(), false_case=false_case.real()),
+                imaginary=value.select(true_case=true_case.imaginary(), false_case=false_case.imaginary()),
             )
         else:
-            return ScalarNumber[dtype, complex=complex](self.value.reduce_add())
+            return Number[dtype_out, width, complex=complex_out](
+                rebind[Number[dtype_out, width, complex=complex_out].Value](
+                    value.select(true_case=rebind[SIMD[dtype_out, width]](true_case.value), false_case=rebind[SIMD[dtype_out, width]](false_case.value))
+                )
+            )
 
-    #
-    # TODO: reduce_mul, reduce_and, reduce_or, reduce_bit_count, select, rotate_left, rotate_right, shift_left, shift_right, reversed
-    #
+    @always_inline
+    fn rotate_left[shift: Int](self) -> Self:
+        return Self(self.value.rotate_left[2 * shift if complex else shift]())
+
+    @always_inline
+    fn rotate_right[shift: Int](self) -> Self:
+        return Self(self.value.rotate_right[2 * shift if complex else shift]())
+
+    @always_inline
+    fn shift_left[shift: Int](self) -> Self:
+        return Self(self.value.shift_left[2 * shift if complex else shift]())
+
+    @always_inline
+    fn shift_right[shift: Int](self) -> Self:
+        return Self(self.value.shift_right[2 * shift if complex else shift]())
+
+    fn reversed(self) -> Self:
+        @parameter
+        if complex:
+            return Self(real=self.real().reversed(), imaginary=self.imaginary().reversed())
+        else:
+            return Self(self.value.reversed())
 
     @always_inline
     fn squared_norm(self) -> Number[dtype, width, complex=False]:
