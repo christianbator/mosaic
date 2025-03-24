@@ -158,10 +158,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     fn __init__(out self, real: SIMD[dtype, width], imaginary: SIMD[dtype, width]):
-        constrained[
-            complex,
-            "__init__(real, imaginary) is only available for complex numbers",
-        ]()
+        constrained[complex, "__init__(real, imaginary) is only available for complex numbers"]()
 
         self.value = rebind[Self.Value](real.interleave(imaginary))
 
@@ -207,7 +204,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     fn __getitem__(self, index: Int) -> ScalarNumber[dtype, complex=complex]:
         @parameter
         if complex:
-            return ScalarNumber[dtype, complex=complex](self.value[index], self.value[index + 1])
+            return ScalarNumber[dtype, complex=complex](real=self.value[index], imaginary=self.value[index + 1])
         else:
             return ScalarNumber[dtype, complex=complex](self.value[index])
 
@@ -290,10 +287,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     fn __floordiv__(self, rhs: Self) -> Self:
-        constrained[
-            not complex,
-            "__floordiv__() is only available for non-complex numbers",
-        ]()
+        constrained[not complex, "__floordiv__() is only available for non-complex numbers"]()
 
         return Self(self.value // rhs.value)
 
@@ -329,19 +323,13 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     fn __lshift__(self, rhs: Self) -> Self:
-        constrained[
-            not complex,
-            "__lshift__() is only available for non-complex numbers",
-        ]()
+        constrained[not complex, "__lshift__() is only available for non-complex numbers"]()
 
         return Self(self.value << rhs.value)
 
     @always_inline
     fn __rshift__(self, rhs: Self) -> Self:
-        constrained[
-            not complex,
-            "__rshift__() is only available for non-complex numbers",
-        ]()
+        constrained[not complex, "__rshift__() is only available for non-complex numbers"]()
 
         return Self(self.value >> rhs.value)
 
@@ -389,10 +377,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     fn __invert__(self) -> Self:
-        constrained[
-            not complex,
-            "__invert__() is only available for non-complex numbers",
-        ]()
+        constrained[not complex, "__invert__() is only available for non-complex numbers"]()
 
         return Self(self.value.__invert__())
 
@@ -513,16 +498,20 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
         return Number[int_dtype, width, complex=complex](self.value.to_bits())
 
     @staticmethod
-    fn from_bytes[big_endian: Bool = is_big_endian()](bytes: InlineArray[Byte, dtype.sizeof()]) -> ScalarNumber[dtype, complex=False]:
-        return ScalarNumber[dtype, complex=False](Scalar[dtype].from_bytes(bytes))
+    fn from_bytes[big_endian: Bool = is_big_endian()](bytes: InlineArray[Byte, dtype.sizeof()]) -> Self:
+        constrained[width == 1 and not complex, "from_bytes() is only available for scalar, non-complex numbers"]()
 
-    fn as_bytes[big_endian: Bool = is_big_endian()](self: ScalarNumber[dtype, complex=False]) -> InlineArray[Byte, dtype.sizeof()]:
+        return Self(Scalar[dtype].from_bytes(bytes))
+
+    fn as_bytes[big_endian: Bool = is_big_endian()](self) -> InlineArray[Byte, dtype.sizeof()]:
+        constrained[width == 1 and not complex, "as_bytes() is only available for scalar, non-complex numbers"]()
+
         return self.value.as_bytes()
 
-    fn clamp(
-        self: Number[dtype, width, complex=False], lower_bound: Number[dtype, width, complex=False], upper_bound: Number[dtype, width, complex=False]
-    ) -> Number[dtype, width, complex=False]:
-        return self.value.clamp(lower_bound=lower_bound.value, upper_bound=upper_bound.value)
+    fn clamp(self, lower_bound: Self, upper_bound: Self) -> Self:
+        constrained[not complex, "clamp() is only available for non-complex numbers"]()
+
+        return Self(self.value.clamp(lower_bound=lower_bound.value, upper_bound=upper_bound.value))
 
     @always_inline
     fn fma(self, multiplier: Self, accumulator: Self) -> Self:
@@ -614,11 +603,15 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
             return func(lhs, rhs).reduce[func, size_out]()
 
-    fn reduce_max(self: Number[dtype, width, complex=False]) -> ScalarNumber[dtype, complex=False]:
-        return ScalarNumber[dtype, complex=False](self.value.reduce_max())
+    fn reduce_max(self) -> ScalarNumber[dtype, complex=complex]:
+        constrained[not complex, "reduce_max() is only available for non-complex numbers"]()
 
-    fn reduce_min(self: Number[dtype, width, complex=False]) -> ScalarNumber[dtype, complex=False]:
-        return ScalarNumber[dtype, complex=False](self.value.reduce_min())
+        return ScalarNumber[dtype, complex=complex](self.value.reduce_max())
+
+    fn reduce_min(self) -> ScalarNumber[dtype, complex=complex]:
+        constrained[not complex, "reduce_min() is only available for non-complex numbers"]()
+
+        return ScalarNumber[dtype, complex=complex](self.value.reduce_min())
 
     fn reduce_add(self) -> ScalarNumber[dtype, complex=complex]:
         @parameter
@@ -635,13 +628,13 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     #
 
     @always_inline
-    fn squared_norm(self) -> Number[dtype, width]:
+    fn squared_norm(self) -> Number[dtype, width, complex=False]:
         constrained[complex, "squared_norm() is only available for complex numbers"]()
 
         return self.real() * self.real() + self.imaginary() * self.imaginary()
 
     @always_inline
-    fn norm(self) -> Number[dtype, width]:
+    fn norm(self) -> Number[dtype, width, complex=False]:
         constrained[complex, "norm() is only available for complex numbers"]()
 
         return sqrt(self.squared_norm().value)
@@ -651,10 +644,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     #
     @always_inline
     fn __abs__(self) -> Self:
-        constrained[
-            not complex,
-            "__abs__() is only available for non-complex numbers, see norm() instead",
-        ]()
+        constrained[not complex, "__abs__() is only available for non-complex numbers, see norm() instead"]()
 
         return Self(self.value.__abs__())
 
@@ -672,10 +662,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     fn __ceildiv__(self, denominator: Self) -> Self:
-        constrained[
-            not complex,
-            "__ceildiv__() is only available for non-complex numbers",
-        ]()
+        constrained[not complex, "__ceildiv__() is only available for non-complex numbers"]()
 
         return Self(self.value.__ceildiv__(denominator.value))
 
@@ -714,10 +701,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     fn __round__(self, ndigits: Int) -> Self:
-        constrained[
-            not complex,
-            "__round__(ndigits) is only available for non-complex numbers",
-        ]()
+        constrained[not complex, "__round__(ndigits) is only available for non-complex numbers"]()
 
         return Self(self.value.__round__(ndigits))
 
