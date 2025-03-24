@@ -19,4 +19,6 @@
 rattler-build/output
 
 # Development
-dev
+main.mojo
+/*.png
+/*.jpeg
