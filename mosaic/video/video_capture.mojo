@@ -5,8 +5,6 @@
 # Created by Christian Bator on 02/17/2025
 #
 
-from compile import compile_info
-
 from memory import Pointer, UnsafePointer
 from sys.ffi import DLHandle, OpaquePointer, c_int
 
@@ -65,9 +63,6 @@ struct VideoCapture(VideoCapturing):
         self._video_capture = video_capture
         self._frame_buffer = Image[Self.dtype, Self.color_space](width=Int(dimensions.width), height=Int(dimensions.height))
         self._is_next_frame_available = 1
-
-        var info = compile_info[Self.is_next_frame_available]()
-        print(info.asm)
 
     fn __del__(owned self):
         var deinitialize = Self._libvideocapture().get_function[fn (videoCapture: OpaquePointer) -> None]("deinitialize")
