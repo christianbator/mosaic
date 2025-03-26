@@ -18,6 +18,7 @@ struct VideoCaptureDimensions {
 
 // MARK: - C Interface
 
+@MainActor
 @_cdecl("initialize")
 public func initialize() -> OpaquePointer {
     let videoCapture = VideoCapture()
@@ -26,23 +27,39 @@ public func initialize() -> OpaquePointer {
     return OpaquePointer(rawPointer)
 }
 
+@MainActor
 @_cdecl("open")
-public func open(pointer: OpaquePointer, dimensions: UnsafeMutableRawPointer) -> CInt {
+public func open(pointer: OpaquePointer, dimensions: UnsafeMutableRawPointer) -> CBool {
     let dimensions = dimensions.assumingMemoryBound(to: VideoCaptureDimensions.self)
     
     return videoCapture(from: pointer).open(dimensions: dimensions)
 }
 
+@MainActor
 @_cdecl("start")
-public func start(pointer: OpaquePointer, frameBuffer: UnsafeMutablePointer<UInt8>, isNextFrameAvailable: UnsafeMutablePointer<CInt>) {
-    videoCapture(from: pointer).start(frameBuffer: frameBuffer, isNextFrameAvailable: isNextFrameAvailable)
+public func start(pointer: OpaquePointer, frameBuffer: UnsafeMutablePointer<UInt8>) {
+    videoCapture(from: pointer).start(frameBuffer: frameBuffer)
 }
 
+@MainActor
+@_cdecl("is_next_frame_available")
+public func isNextFrameAvailable(pointer: OpaquePointer) -> CBool {
+    return videoCapture(from: pointer).isNextFrameAvailable
+}
+
+@MainActor
+@_cdecl("did_read_next_frame")
+public func didReadNextFrame(pointer: OpaquePointer) {
+    return videoCapture(from: pointer).didReadNextFrame()
+}
+
+@MainActor
 @_cdecl("stop")
 public func stop(pointer: OpaquePointer) {
     videoCapture(from: pointer).stop()
 }
 
+@MainActor
 @_cdecl("deinitialize")
 public func deinitialize(pointer: OpaquePointer) {
     videoCapture(from: pointer).release()
@@ -50,6 +67,7 @@ public func deinitialize(pointer: OpaquePointer) {
 
 // MARK: Pointer Conversion
 
+@MainActor
 private func videoCapture(from pointer: OpaquePointer) -> VideoCapture {
     let rawPointer = UnsafeRawPointer(pointer)
     return Unmanaged<VideoCapture>.fromOpaque(rawPointer).takeUnretainedValue()
@@ -57,14 +75,13 @@ private func videoCapture(from pointer: OpaquePointer) -> VideoCapture {
 
 // MARK: - VideoCapture
 
-class VideoCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
-
-    private var session: AVCaptureSession?
-    private let queue = DispatchQueue(label: "mosaic.video_capture")
-    private var destBuffer: vImage_Buffer?
+@MainActor
+class VideoCapture: NSObject, @preconcurrency AVCaptureVideoDataOutputSampleBufferDelegate {
     
-    private var frameBuffer: UnsafeMutableRawPointer?
-    private var isNextFrameAvailable: UnsafeMutablePointer<CInt>?
+    private(set) var isNextFrameAvailable: CBool = false
+    
+    private var session: AVCaptureSession?
+    private var destBuffer: vImage_Buffer?
 
     override init() {
         super.init()
@@ -72,14 +89,14 @@ class VideoCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
         _ = Unmanaged<VideoCapture>.passRetained(self)
     }
     
-    func open(dimensions: UnsafeMutablePointer<VideoCaptureDimensions>) -> CInt {
+    func open(dimensions: UnsafeMutablePointer<VideoCaptureDimensions>) -> CBool {
         let session = AVCaptureSession()
         
         session.beginConfiguration()
         
         guard let device = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera, .external], mediaType: .video, position: .unspecified).devices.first else {
             print("Error initializing capture device: no devices available")
-            return 0
+            return false
         }
 
         let activeFormat = device.activeFormat
@@ -96,7 +113,7 @@ class VideoCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
             }
             else {
                 print("Error initializing capture device: failed to add input")
-                return 0
+                return false
             }
             
             let output = AVCaptureVideoDataOutput()
@@ -105,14 +122,14 @@ class VideoCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
                 (kCVPixelBufferPixelFormatTypeKey as String): Int(kCVPixelFormatType_32ARGB)
             ]
 
-            output.setSampleBufferDelegate(self, queue: queue)
+            output.setSampleBufferDelegate(self, queue: DispatchQueue.main)
 
             if session.canAddOutput(output) {
                 session.addOutput(output)
             }
             else {
                 print("Error initializing capture device: failed to add output")
-                return 0
+                return false
             }
             
             session.commitConfiguration()
@@ -120,7 +137,7 @@ class VideoCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
             self.session = session
             
             destBuffer = vImage_Buffer(
-                data: malloc(height * width * 3),
+                data: nil,
                 height: vImagePixelCount(height),
                 width: vImagePixelCount(width),
                 rowBytes: width * 3
@@ -129,18 +146,23 @@ class VideoCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
             dimensions.pointee.width = CInt(width)
             dimensions.pointee.height = CInt(height)
             
-            return 1
+            return true
         }
         catch {
             print("Error initializing capture device: \(error)")
-            return 0
+            return false
         }
     }
     
-    func start(frameBuffer: UnsafeMutablePointer<UInt8>, isNextFrameAvailable: UnsafeMutablePointer<CInt>) {
-        self.frameBuffer = UnsafeMutableRawPointer(frameBuffer)
-        self.isNextFrameAvailable = isNextFrameAvailable
+    func start(frameBuffer: UnsafeMutablePointer<UInt8>) {
+        destBuffer?.data = UnsafeMutableRawPointer(frameBuffer)
+        isNextFrameAvailable = true
+        
         session?.startRunning()
+    }
+    
+    func didReadNextFrame() {
+        isNextFrameAvailable = false
     }
     
     func stop() {
@@ -151,18 +173,14 @@ class VideoCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
         stop()
         session = nil
         
-        if let destBufferData = destBuffer?.data {
-            free(destBufferData)
-        }
-        
         Unmanaged<VideoCapture>.passUnretained(self).release()
     }
 
     // MARK: AVCaptureVideoDataOutputSampleBufferDelegate
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        guard var destBuffer = destBuffer else {
-            print("No destBuffer set")
+        guard var destBuffer = destBuffer, destBuffer.data != nil else {
+            print("Destination buffer not set")
             return
         }
         
@@ -174,7 +192,7 @@ class VideoCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
         CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
 
         guard let data = CVPixelBufferGetBaseAddress(pixelBuffer) else {
-            print("Failed to get base address")
+            print("Failed to get base address of pixel buffer")
             CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly)
             return 
         }
@@ -192,19 +210,11 @@ class VideoCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
         let error = vImageConvert_ARGB8888toRGB888(&sourceBuffer, &destBuffer, vImage_Flags(kvImageNoFlags))
         CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly)
 
-        guard error == kvImageNoError else {
-            print("Error during conversion: \(error)")
-            return
+        if error == kvImageNoError {
+            isNextFrameAvailable = true
         }
-
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self, let capturedFrameBuffer = self.frameBuffer, let capturedDestBuffer = self.destBuffer else {
-                return
-            }
-            
-            memcpy(capturedFrameBuffer, capturedDestBuffer.data, height * width * 3)
-            
-            self.isNextFrameAvailable?.pointee = 1
+        else {
+            print("Error during conversion to RGB: \(error)")
         }
     }
 }

@@ -33,75 +33,74 @@ struct VideoCapture(VideoCapturing):
     alias color_space = ColorSpace.rgb
 
     var _video_capture: OpaquePointer
+    var _dimensions: Size
     var _frame_buffer: Image[Self.dtype, Self.color_space]
-    var _is_next_frame_available: c_int
 
-    @staticmethod
-    fn _libvideocapture() -> DLHandle:
-        var libvideocapture = DLHandle(dynamic_library_filepath("libmosaic-videocapture"))
-
-        if not libvideocapture:
-            fatal_error("Failed to load libmosaic-videocapture")
-
-        return libvideocapture
+    var _start: fn (video_capture: OpaquePointer, frame_buffer: UnsafePointer[UInt8]) -> None
+    var _is_next_frame_available: fn (video_capture: OpaquePointer) -> Bool
+    var _did_read_next_frame: fn (video_capture: OpaquePointer) -> None
+    var _stop: fn (video_capture: OpaquePointer) -> None
+    var _deinitialize: fn (videoCapture: OpaquePointer) -> None
 
     #
     # Initialization
     #
     fn __init__(out self) raises:
-        var initialize = Self._libvideocapture().get_function[fn () -> OpaquePointer]("initialize")
+        # Load libvideocapture
+        var libvideocapture = DLHandle(dynamic_library_filepath("libmosaic-videocapture"))
+
+        # Initialize system video capture
+        var initialize = libvideocapture.get_function[fn () -> OpaquePointer]("initialize")
         var video_capture = initialize()
 
-        var open = Self._libvideocapture().get_function[fn (video_capture: OpaquePointer, dimensions: UnsafePointer[_VideoCaptureDimensions]) -> c_int]("open")
-
+        # Open system video capture
+        var open = libvideocapture.get_function[fn (video_capture: OpaquePointer, dimensions: UnsafePointer[_VideoCaptureDimensions]) -> Bool]("open")
         var dimensions = _VideoCaptureDimensions(width=0, height=0)
-        var result = open(video_capture, dimensions=UnsafePointer.address_of(dimensions))
 
-        if result != 1:
+        if not open(video_capture, dimensions=UnsafePointer.address_of(dimensions)):
             raise ("Failed to open VideoCapture")
 
+        # Prepare properties and cache functions
+        var width = Int(dimensions.width)
+        var height = Int(dimensions.height)
+
         self._video_capture = video_capture
-        self._frame_buffer = Image[Self.dtype, Self.color_space](width=Int(dimensions.width), height=Int(dimensions.height))
-        self._is_next_frame_available = 1
+        self._dimensions = Size(width=width, height=height)
+        self._frame_buffer = Image[Self.dtype, Self.color_space](width=width, height=height)
+
+        self._start = libvideocapture.get_function[fn (video_capture: OpaquePointer, frame_buffer: UnsafePointer[UInt8]) -> None]("start")
+        self._is_next_frame_available = libvideocapture.get_function[fn (video_capture: OpaquePointer) -> Bool]("is_next_frame_available")
+        self._did_read_next_frame = libvideocapture.get_function[fn (video_capture: OpaquePointer) -> None]("did_read_next_frame")
+        self._stop = libvideocapture.get_function[fn (video_capture: OpaquePointer) -> None]("stop")
+        self._deinitialize = libvideocapture.get_function[fn (videoCapture: OpaquePointer) -> None]("deinitialize")
 
     fn __del__(owned self):
-        var deinitialize = Self._libvideocapture().get_function[fn (videoCapture: OpaquePointer) -> None]("deinitialize")
-        deinitialize(self._video_capture)
+        self._deinitialize(self._video_capture)
 
     #
     # Properties
     #
     @always_inline
     fn dimensions(self) -> Size:
-        return Size(width=self._frame_buffer.width(), height=self._frame_buffer.height())
-
-    #
-    # VideoCapturing
-    #
-    fn is_next_frame_available(self) -> Bool:
-        return self._is_next_frame_available == 1
-
-    fn next_frame(self) -> Pointer[Image[Self.dtype, Self.color_space], ImmutableAnyOrigin]:
-        return rebind[Pointer[Image[Self.dtype, Self.color_space], ImmutableAnyOrigin]](Pointer.address_of(self._frame_buffer))
-
-    fn did_read_next_frame(mut self):
-        self._is_next_frame_available = 0
+        return self._dimensions
 
     #
     # Methods
     #
     fn start(mut self):
-        var start = Self._libvideocapture().get_function[
-            fn (video_capture: OpaquePointer, frame_buffer: UnsafePointer[UInt8], is_next_frame_available: UnsafePointer[c_int]) -> None
-        ]("start")
-
-        start(
-            self._video_capture,
-            frame_buffer=self._frame_buffer.unsafe_uint8_ptr(),
-            is_next_frame_available=UnsafePointer.address_of(self._is_next_frame_available),
-        )
+        self._start(self._video_capture, frame_buffer=self._frame_buffer.unsafe_uint8_ptr())
 
     fn stop(mut self):
-        var stop = Self._libvideocapture().get_function[fn (video_capture: OpaquePointer) -> None]("stop")
+        self._stop(self._video_capture)
 
-        stop(self._video_capture)
+    #
+    # VideoCapturing
+    #
+    fn is_next_frame_available(self) -> Bool:
+        return self._is_next_frame_available(self._video_capture)
+
+    fn next_frame(self) -> Pointer[Image[Self.dtype, Self.color_space], ImmutableAnyOrigin]:
+        return rebind[Pointer[Image[Self.dtype, Self.color_space], ImmutableAnyOrigin]](Pointer.address_of(self._frame_buffer))
+
+    fn did_read_next_frame(mut self):
+        self._did_read_next_frame(self._video_capture)
