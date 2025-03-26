@@ -1,8 +1,8 @@
 //
 //  MacVisualizer.swift
-//  MacVisualizer
+//  mosaic
 //
-//  Created by Christian Bator on 2/9/2025.
+//  Created by Christian Bator on 02/09/2025
 //
 
 import AppKit

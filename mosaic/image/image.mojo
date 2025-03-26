@@ -680,23 +680,3 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
 
     fn write_to[W: Writer](self, mut writer: W):
         writer.write("[Image: width = ", self.width(), ", height = ", self.height(), ", color_space = ", color_space, ", bit_depth = ", dtype.bitwidth(), "]")
-
-
-#
-# ImagePointer
-#
-@value
-struct ImagePointer[dtype: DType, color_space: ColorSpace](EqualityComparable):
-    var _pointer: Pointer[Image[dtype, color_space], ImmutableAnyOrigin]
-
-    fn __init__(out self, image: Image[dtype, color_space]):
-        self._pointer = rebind[Pointer[Image[dtype, color_space], ImmutableAnyOrigin]](Pointer.address_of(image))
-
-    fn __getitem__(self) -> ref [self._pointer[]] Image[dtype, color_space]:
-        return self._pointer[]
-
-    fn __eq__(self, other: Self) -> Bool:
-        return self._pointer == other._pointer
-
-    fn __ne__(self, other: Self) -> Bool:
-        return not (self == other)

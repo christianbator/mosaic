@@ -1,14 +1,14 @@
 //
 //  ImageData.swift
-//  MacVisualizer
+//  mosaic
 //
-//  Created by Christian Bator on 2/9/2025.
+//  Created by Christian Bator on 02/09/2025
 //
 
 import Foundation
 
 struct ImageData {
-    let data: UnsafeMutablePointer<UInt8>
+    let data: UnsafePointer<UInt8>
     let width: Int
     let height: Int
     let channels: Int

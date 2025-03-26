@@ -1,8 +1,8 @@
 //
 //  ImageViewController.swift
-//  MacVisualizer
+//  mosaic
 //
-//  Created by Christian Bator on 12/14/2024.
+//  Created by Christian Bator on 12/14/2024
 //
 
 import AppKit
@@ -51,7 +51,7 @@ public class ImageViewController: ViewController {
     }
 
     private func createRepresentation(from imageData: ImageData) -> NSImageRep {
-        var dataReference: UnsafeMutablePointer? = imageData.data
+        var dataReference: UnsafeMutablePointer? = UnsafeMutablePointer(mutating: imageData.data)
         
         let bitmapRepresentation = NSBitmapImageRep(
             bitmapDataPlanes: &dataReference,
