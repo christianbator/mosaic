@@ -9,14 +9,12 @@ from testing import assert_equal
 
 from mosaic.numeric import Matrix, Number, ScalarNumber
 
-#
-# TODO: Re-enable this test once stable Mojo catches up to nightly and this compiles
-#
-# fn test_matrix_multiplication_int32_square() raises:
-#     var matrix = Matrix[DType.int32].ascending(rows=3, cols=3)
 
-#     var result = matrix @ matrix
+fn test_matrix_multiplication_int32_square() raises:
+    var matrix = Matrix[DType.int32].ascending(rows=3, cols=3)
 
-#     var correct_result = Matrix[DType.int32](rows=3, cols=3, values=List[ScalarNumber[DType.int32]](15, 18, 21, 42, 54, 66, 69, 90, 111))
+    var result = matrix @ matrix
 
-#     assert_equal(result, correct_result)
+    var correct_result = Matrix[DType.int32](rows=3, cols=3, values=List[ScalarNumber[DType.int32]](15, 18, 21, 42, 54, 66, 69, 90, 111))
+
+    assert_equal(result, correct_result)

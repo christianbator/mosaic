@@ -12,7 +12,6 @@ from mosaic.utility import fatal_error
 # StridedRange
 #
 @value
-@register_passable("trivial")
 struct StridedRange(Stringable, Writable):
     #
     # Fields

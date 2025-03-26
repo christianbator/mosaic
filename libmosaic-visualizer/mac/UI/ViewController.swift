@@ -1,6 +1,6 @@
 //
 //  ViewController.swift
-//  MacVisualizer
+//  mosaic
 //
 //  Created by Christian Bator on 12/14/2024
 //

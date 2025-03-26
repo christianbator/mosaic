@@ -9,8 +9,8 @@ from sys.ffi import DLHandle, c_int, c_char, c_float
 from memory import UnsafePointer
 
 from mosaic.utility import dynamic_library_filepath, fatal_error
-from mosaic.image import Image, ImageSlice, ImagePointer, ColorSpace
-from mosaic.video import VideoCapture
+from mosaic.image import Image, ImageSlice, ColorSpace
+from mosaic.video import VideoCapturing
 
 
 #
@@ -81,32 +81,12 @@ struct Visualizer:
     # Video
     #
     @staticmethod
-    fn stream[VideoCaptureType: VideoCapture, //](mut video_capture: VideoCaptureType, window_title: String):
+    fn stream[V: VideoCapturing, //](mut video_capture: V, window_title: String):
         while True:
             if video_capture.is_next_frame_available():
                 var frame = video_capture.next_frame()
                 video_capture.did_read_next_frame()
                 Self.show(image=frame[], window_title=window_title)
-
-            if not Self.wait(0.001):
-                break
-
-    #
-    # Video (w/ Frame Processor)
-    #
-    @staticmethod
-    fn stream[
-        VideoCaptureType: VideoCapture,
-        out_dtype: DType,
-        out_color_space: ColorSpace, //,
-        frame_processor: fn[V: VideoCapture] (ImagePointer[V.dtype, V.color_space]) capturing [_] -> ImagePointer[out_dtype, out_color_space],
-    ](mut video_capture: VideoCaptureType, window_title: String):
-        while True:
-            if video_capture.is_next_frame_available():
-                var frame = video_capture.next_frame()
-                video_capture.did_read_next_frame()
-                var processed_frame = frame_processor(frame)
-                Self.show(image=processed_frame[], window_title=window_title)
 
             if not Self.wait(0.001):
                 break
