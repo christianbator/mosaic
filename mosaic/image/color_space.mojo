@@ -18,14 +18,16 @@ struct ColorSpace(EqualityComparable, Stringable, Writable):
     #
     alias greyscale = Self(ColorSpace._greyscale)
     alias rgb = Self(ColorSpace._rgb)
+    alias yuv = Self(ColorSpace._yuv)
 
     #
     # Fields
     #
     alias _greyscale = String("greyscale")
     alias _rgb = String("rgb")
+    alias _yuv = String("yuv")
 
-    alias _supported_color_spaces = [Self._greyscale, Self._rgb]
+    alias _supported_color_spaces = [Self._greyscale, Self._rgb, Self._yuv]
 
     var _raw_value: String
 
@@ -45,6 +47,8 @@ struct ColorSpace(EqualityComparable, Stringable, Writable):
         if self == Self.greyscale:
             return 1
         elif self == Self.rgb:
+            return 3
+        elif self == Self.yuv:
             return 3
         else:
             fatal_error("Unimplemented channels() for color space: ", self._raw_value)

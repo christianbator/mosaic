@@ -444,9 +444,8 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
         return result^
 
-    fn copied_to_component[new_depth: Int](self: Matrix[dtype, 1, complex=complex], component: Int) raises -> Matrix[dtype, new_depth, complex=complex]:
-        if not (0 <= component < new_depth):
-            raise Error("Attempt to copy to out of bounds component: ", component, ", specified depth = ", new_depth)
+    fn copied_to_component[new_depth: Int](self: Matrix[dtype, 1, complex=complex], component: Int) -> Matrix[dtype, new_depth, complex=complex]:
+        debug_assert[assert_mode="safe"](0 <= component < new_depth, "Component must be within range of depth for copied_to_component()")
 
         var result = Matrix[dtype, new_depth, complex=complex](rows=self._rows, cols=self._cols)
 
@@ -1354,16 +1353,11 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     # Type Conversion
     #
     fn astype[new_dtype: DType](self) -> Matrix[new_dtype, depth, complex=complex]:
-        var result = Matrix[new_dtype, depth, complex=complex](rows=self._rows, cols=self._cols)
-
         @parameter
         if new_dtype == dtype:
-            memcpy(
-                dest=result.unsafe_data_ptr(),
-                src=rebind[UnsafePointer[Scalar[new_dtype]]](self.unsafe_data_ptr()),
-                count=self.scalar_count(),
-            )
+            return Matrix[new_dtype, depth, complex=complex](rows=self._rows, cols=self._cols, data=self._data.bitcast_copy[new_dtype]())
         else:
+            var result = Matrix[new_dtype, depth, complex=complex](rows=self._rows, cols=self._cols)
 
             @parameter
             fn convert_row(row: Int):
@@ -1380,38 +1374,15 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
             parallelize[convert_row](self._rows)
 
-        return result^
+            return result^
 
-    fn rebound_copy[new_dtype: DType, new_depth: Int](self) -> Matrix[new_dtype, new_depth, complex=complex]:
+    #
+    # Rebind
+    #
+    fn rebound_copy[new_depth: Int](self) -> Matrix[dtype, new_depth, complex=complex]:
         constrained[new_depth == depth]()
 
-        var result = Matrix[new_dtype, new_depth, complex=complex](rows=self._rows, cols=self._cols)
-
-        @parameter
-        if new_dtype == dtype:
-            memcpy(
-                dest=result.unsafe_data_ptr(),
-                src=self.unsafe_data_ptr().bitcast[Scalar[new_dtype]](),
-                count=self.scalar_count(),
-            )
-        else:
-
-            @parameter
-            fn convert_row(row: Int):
-                @parameter
-                fn convert_flattened_elements[width: Int](flattened_element: Int):
-                    try:
-                        var index = self.flattened_index(row=row, offset=flattened_element)
-                        var value = self._load[width](index).cast[new_dtype]()
-                        result._store(value, index=index)
-                    except error:
-                        fatal_error(error)
-
-                vectorize[convert_flattened_elements, Self.optimal_simd_width, unroll_factor=unroll_factor](self._cols * depth)
-
-            parallelize[convert_row](self._rows)
-
-        return result^
+        return Matrix[dtype, new_depth, complex=complex](rows=self._rows, cols=self._cols, data=self._data.copy())
 
     #
     # Stringable & Writable

@@ -51,7 +51,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
     fn __init__(out self, owned matrix: Matrix[dtype, color_space.channels()]):
         self._matrix = matrix^
 
-    fn __init__(out self, single_channel_matrix: Matrix[dtype], channel: Int) raises:
+    fn __init__(out self, single_channel_matrix: Matrix[dtype], channel: Int):
         self._matrix = single_channel_matrix.copied_to_component[color_space.channels()](channel)
 
     fn __moveinit__(out self, owned existing: Self):
@@ -231,7 +231,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
         return self._matrix.strided_slice[channel_range](y_range, x_range)
 
     @always_inline
-    fn extract_channel[channel: Int](self) raises -> Matrix[dtype]:
+    fn extract_channel[channel: Int](self) -> Matrix[dtype]:
         return self._matrix.extract_component[channel]()
 
     #
@@ -918,24 +918,26 @@ struct Image[dtype: DType, color_space: ColorSpace](
     # Color Space Conversion
     #
     fn converted[new_color_space: ColorSpace](self) -> Image[dtype, new_color_space]:
-        return self.converted_astype[dtype, new_color_space]()
-
-    fn converted_astype[new_dtype: DType, new_color_space: ColorSpace](self) -> Image[new_dtype, new_color_space]:
         @parameter
         if new_color_space == color_space:
-            return Image[new_dtype, new_color_space](self._matrix.rebound_copy[new_dtype, new_color_space.channels()]())
+            return Image[dtype, new_color_space](self._matrix.rebound_copy[new_color_space.channels()]())
+        # Greyscale <-> YUV
+        elif (color_space == ColorSpace.yuv and new_color_space == ColorSpace.greyscale) or (
+            color_space == ColorSpace.greyscale and new_color_space == ColorSpace.yuv
+        ):
+            return Image[dtype, new_color_space](self.extract_channel[0](), channel=0)
         else:
-            var result = Image[new_dtype, new_color_space](width=self.width(), height=self.height())
+            var result = Image[dtype, new_color_space](width=self.width(), height=self.height())
 
             @parameter
             fn convert_row(y: Int):
                 @parameter
-                fn convert_row_pixels[width: Int](x: Int):
+                fn convert_cols[width: Int](x: Int):
                     try:
                         # Greyscale ->
                         @parameter
                         if color_space == ColorSpace.greyscale:
-                            var grey = self.strided_load[width](y=y, x=x, channel=0).cast[new_dtype]()
+                            var grey = self.strided_load[width](y=y, x=x, channel=0)
 
                             # RGB
                             @parameter
@@ -946,19 +948,46 @@ struct Image[dtype: DType, color_space: ColorSpace](
 
                         # RGB ->
                         elif color_space == ColorSpace.rgb:
-                            var red = self.strided_load[width](y=y, x=x, channel=0)
-                            var green = self.strided_load[width](y=y, x=x, channel=1)
-                            var blue = self.strided_load[width](y=y, x=x, channel=2)
+                            var red = self.strided_load[width](y=y, x=x, channel=0).cast[DType.float64]()
+                            var green = self.strided_load[width](y=y, x=x, channel=1).cast[DType.float64]()
+                            var blue = self.strided_load[width](y=y, x=x, channel=2).cast[DType.float64]()
 
                             # Greyscale
                             @parameter
                             if new_color_space == ColorSpace.greyscale:
-                                var grey = 0.299 * red.cast[DType.float64]() + 0.587 * green.cast[DType.float64]() + 0.114 * blue.cast[DType.float64]()
-                                result.strided_store(grey.cast[new_dtype](), y=y, x=x, channel=0)
+                                var grey = 0.299 * red + 0.587 * green + 0.114 * blue
+                                result.strided_store(grey.cast[dtype](), y=y, x=x, channel=0)
+                            # YUV
+                            elif new_color_space == ColorSpace.yuv:
+                                var y_lum = 0.299 * red + 0.587 * green + 0.114 * blue
+                                var u = 128 - 0.168736 * red - 0.331264 * green + 0.5 * blue
+                                var v = 128 + 0.5 * red - 0.418688 * green - 0.081312 * blue
+
+                                result.strided_store(y_lum.cast[dtype](), y=y, x=x, channel=0)
+                                result.strided_store(u.cast[dtype](), y=y, x=x, channel=1)
+                                result.strided_store(v.cast[dtype](), y=y, x=x, channel=2)
+
+                        # YUV ->
+                        elif color_space == ColorSpace.yuv:
+                            var y_lum = self.strided_load[width](y=y, x=x, channel=0).cast[DType.float64]()
+                            var u = self.strided_load[width](y=y, x=x, channel=1).cast[DType.float64]()
+                            var v = self.strided_load[width](y=y, x=x, channel=2).cast[DType.float64]()
+
+                            # RGB
+                            @parameter
+                            if new_color_space == ColorSpace.rgb:
+                                var red = y_lum + 1.402 * (v - 128)
+                                var green = y_lum - 0.344136 * (u - 128) - 0.714136 * (v - 128)
+                                var blue = y_lum + 1.772 * (u - 128)
+
+                                result.strided_store(red.cast[dtype](), y=y, x=x, channel=0)
+                                result.strided_store(green.cast[dtype](), y=y, x=x, channel=1)
+                                result.strided_store(blue.cast[dtype](), y=y, x=x, channel=2)
+
                     except error:
                         fatal_error(error)
 
-                vectorize[convert_row_pixels, Self.optimal_simd_width, unroll_factor=unroll_factor](self.width())
+                vectorize[convert_cols, Self.optimal_simd_width, unroll_factor=unroll_factor](self.width())
 
             parallelize[convert_row](num_work_items=self.height())
 

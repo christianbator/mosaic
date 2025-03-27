@@ -53,7 +53,7 @@ struct Visualizer:
             )
         else:
             Self._show(
-                image=image.converted_astype[Self.display_dtype, ColorSpace.rgb](),
+                image=image.converted[ColorSpace.rgb]().astype[Self.display_dtype](),
                 window_title=window_title,
             )
 
