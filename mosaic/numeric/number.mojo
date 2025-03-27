@@ -5,7 +5,7 @@
 # Created by Christian Bator on 03/04/2025
 #
 
-from math import sqrt, Ceilable, CeilDivable, Floorable, Truncable
+from math import sqrt, log, atan2, Ceilable, CeilDivable, Floorable, Truncable
 from complex import ComplexSIMD
 from builtin.dtype import _integral_type_of
 from sys import is_big_endian
@@ -255,8 +255,24 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
         return Self(self.value + rhs.value)
 
     @always_inline
+    fn __radd__(self, lhs: Self) -> Self:
+        return lhs + self
+
+    @always_inline
+    fn __iadd__(mut self, rhs: Self):
+        self = self + rhs
+
+    @always_inline
     fn __sub__(self, rhs: Self) -> Self:
         return Self(self.value - rhs.value)
+
+    @always_inline
+    fn __rsub__(self, lhs: Self) -> Self:
+        return lhs - self
+
+    @always_inline
+    fn __isub__(mut self, rhs: Self):
+        self = self - rhs.value
 
     @always_inline
     fn __mul__(self, rhs: Self) -> Self:
@@ -268,6 +284,14 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
             )
         else:
             return Self(self.value * rhs.value)
+
+    @always_inline
+    fn __rmul__(self, lhs: Self) -> Self:
+        return lhs * self
+
+    @always_inline
+    fn __imul__(mut self, rhs: Self):
+        self = self * rhs
 
     @always_inline
     fn __truediv__(self, rhs: Self) -> Self:
@@ -283,10 +307,26 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
             return Self(self.value / rhs.value)
 
     @always_inline
+    fn __rtruediv__(self, lhs: Self) -> Self:
+        return lhs / self
+
+    @always_inline
+    fn __itruediv__(mut self, rhs: Self):
+        self = self / rhs
+
+    @always_inline
     fn __floordiv__(self, rhs: Self) -> Self:
         constrained[not complex, "__floordiv__() is only available for non-complex numbers"]()
 
         return Self(self.value // rhs.value)
+
+    @always_inline
+    fn __rfloordiv__(self, lhs: Self) -> Self:
+        return lhs // lhs
+
+    @always_inline
+    fn __ifloordiv__(mut self, rhs: Self):
+        self = self // rhs
 
     @always_inline
     fn __mod__(self, rhs: Self) -> Self:
@@ -295,10 +335,26 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
         return Self(self.value % rhs.value)
 
     @always_inline
+    fn __rmod__(self, lhs: Self) -> Self:
+        return lhs % self
+
+    @always_inline
+    fn __imod__(mut self, rhs: Self):
+        self = self % rhs
+
+    @always_inline
     fn __pow__(self, rhs: Self) -> Self:
         constrained[not complex, "__pow__() is only available for non-complex numbers"]()
 
         return Self(self.value**rhs.value)
+
+    @always_inline
+    fn __rpow__(self, lhs: Self) -> Self:
+        return lhs**self
+
+    @always_inline
+    fn __ipow__(mut self, rhs: Self):
+        self = self**rhs
 
     @always_inline
     fn __and__(self, rhs: Self) -> Self:
@@ -307,10 +363,26 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
         return Self(self.value & rhs.value)
 
     @always_inline
+    fn __rand__(self, lhs: Self) -> Self:
+        return lhs & self
+
+    @always_inline
+    fn __iand__(mut self, rhs: Self):
+        self = self & rhs
+
+    @always_inline
     fn __or__(self, rhs: Self) -> Self:
         constrained[not complex, "__or__() is only available for non-complex numbers"]()
 
         return Self(self.value | rhs.value)
+
+    @always_inline
+    fn __ror__(self, lhs: Self) -> Self:
+        return lhs | self
+
+    @always_inline
+    fn __ior__(mut self, rhs: Self):
+        self = self | rhs
 
     @always_inline
     fn __xor__(self, rhs: Self) -> Self:
@@ -319,16 +391,40 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
         return Self(self.value ^ rhs.value)
 
     @always_inline
+    fn __rxor__(self, lhs: Self) -> Self:
+        return lhs ^ self
+
+    @always_inline
+    fn __ixor__(mut self, rhs: Self):
+        self = self ^ rhs
+
+    @always_inline
     fn __lshift__(self, rhs: Self) -> Self:
         constrained[not complex, "__lshift__() is only available for non-complex numbers"]()
 
         return Self(self.value << rhs.value)
 
     @always_inline
+    fn __rlshift__(self, lhs: Self) -> Self:
+        return lhs << self
+
+    @always_inline
+    fn __ilshift__(mut self, rhs: Self):
+        self = self << rhs
+
+    @always_inline
     fn __rshift__(self, rhs: Self) -> Self:
         constrained[not complex, "__rshift__() is only available for non-complex numbers"]()
 
         return Self(self.value >> rhs.value)
+
+    @always_inline
+    fn __rrshift__(self, lhs: Self) -> Self:
+        return lhs >> self
+
+    @always_inline
+    fn __irshift__(mut self, rhs: Self):
+        self = self >> rhs
 
     @always_inline
     fn __lt__(self, rhs: Self) -> SIMD[DType.bool, width]:
@@ -379,116 +475,79 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
         return Self(self.value.__invert__())
 
     #
-    # Reverse Operators
+    # Numeric Traits
     #
     @always_inline
-    fn __radd__(self, lhs: Self) -> Self:
-        return lhs + self
+    fn __abs__(self) -> Self:
+        constrained[not complex, "__abs__() is only available for non-complex numbers, see norm() instead"]()
+
+        return Self(self.value.__abs__())
 
     @always_inline
-    fn __rsub__(self, lhs: Self) -> Self:
-        return lhs - self
+    fn __bool__(self) -> Bool:
+        constrained[not complex, "__bool__() is only available for non-complex numbers"]()
+
+        return self.value.__bool__()
 
     @always_inline
-    fn __rmul__(self, lhs: Self) -> Self:
-        return lhs * self
+    fn __ceil__(self) -> Self:
+        constrained[not complex, "__ceil__() is only available for non-complex numbers"]()
+
+        return Self(self.value.__ceil__())
 
     @always_inline
-    fn __rtruediv__(self, lhs: Self) -> Self:
-        return lhs / self
+    fn __ceildiv__(self, denominator: Self) -> Self:
+        constrained[not complex, "__ceildiv__() is only available for non-complex numbers"]()
+
+        return Self(self.value.__ceildiv__(denominator.value))
 
     @always_inline
-    fn __rfloordiv__(self, lhs: Self) -> Self:
-        return lhs // lhs
+    fn __float__(self) -> Float64:
+        constrained[not complex, "__float__() is only available for non-complex numbers"]()
+
+        return self.value.__float__()
 
     @always_inline
-    fn __rmod__(self, lhs: Self) -> Self:
-        return lhs % self
+    fn __floor__(self) -> Self:
+        constrained[not complex, "__floor__() is only available for non-complex numbers"]()
+
+        return Self(self.value.__floor__())
+
+    fn __hash__(self) -> UInt:
+        return self.value.__hash__()
 
     @always_inline
-    fn __rpow__(self, lhs: Self) -> Self:
-        return lhs**self
+    fn __int__(self) -> Int:
+        constrained[not complex, "__int__() is only available for non-complex numbers"]()
+
+        return self.value.__int__()
 
     @always_inline
-    fn __rand__(self, lhs: Self) -> Self:
-        return lhs & self
+    fn __index__(self) -> __mlir_type.index:
+        constrained[not complex, "__index__() is only available for non-complex numbers"]()
+
+        return self.value.__index__()
 
     @always_inline
-    fn __ror__(self, lhs: Self) -> Self:
-        return lhs | self
+    fn __round__(self) -> Self:
+        constrained[not complex, "__round__() is only available for non-complex numbers"]()
+
+        return Self(self.value.__round__())
 
     @always_inline
-    fn __rxor__(self, lhs: Self) -> Self:
-        return lhs ^ self
+    fn __round__(self, ndigits: Int) -> Self:
+        constrained[not complex, "__round__(ndigits) is only available for non-complex numbers"]()
+
+        return Self(self.value.__round__(ndigits))
 
     @always_inline
-    fn __rlshift__(self, lhs: Self) -> Self:
-        return lhs << self
+    fn __trunc__(self) -> Self:
+        constrained[not complex, "__trunc__() is only available for non-complex numbers"]()
 
-    @always_inline
-    fn __rrshift__(self, lhs: Self) -> Self:
-        return lhs >> self
+        return Self(self.value.__trunc__())
 
     #
-    # In-place Operators
-    #
-    @always_inline
-    fn __iadd__(mut self, rhs: Self):
-        self = self + rhs
-
-    @always_inline
-    fn __isub__(mut self, rhs: Self):
-        self = self - rhs.value
-
-    @always_inline
-    fn __imul__(mut self, rhs: Self):
-        self = self * rhs
-
-    @always_inline
-    fn __itruediv__(mut self, rhs: Self):
-        self = self / rhs
-
-    @always_inline
-    fn __ifloordiv__(mut self, rhs: Self):
-        self = self // rhs
-
-    @always_inline
-    fn __imod__(mut self, rhs: Self):
-        self = self % rhs
-
-    @always_inline
-    fn __ipow__(mut self, rhs: Self):
-        self = self**rhs
-
-    @always_inline
-    fn __iand__(mut self, rhs: Self):
-        self = self & rhs
-
-    @always_inline
-    fn __ior__(mut self, rhs: Self):
-        self = self | rhs
-
-    @always_inline
-    fn __ixor__(mut self, rhs: Self):
-        self = self ^ rhs
-
-    @always_inline
-    fn __ilshift__(mut self, rhs: Self):
-        self = self << rhs
-
-    @always_inline
-    fn __irshift__(mut self, rhs: Self):
-        self = self >> rhs
-
-    #
-    # Type Conversion
-    #
-    @always_inline
-    fn cast[new_dtype: DType](self) -> Number[new_dtype, width, complex=complex]:
-        return Number[new_dtype, width, complex=complex](self.value.cast[new_dtype]())
-
-    #
-    # Methods
+    # Numeric Methods
     #
     @always_inline
     fn to_bits[int_dtype: DType = _integral_type_of[dtype]()](self) -> Number[int_dtype, width, complex=complex]:
@@ -728,77 +787,26 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
         return sqrt(self.squared_norm().value)
 
+    @always_inline
+    fn phase(self) -> Number[dtype, width, complex=False]:
+        constrained[complex, "phase() is only available for complex numbers"]()
+
+        return atan2(self.imaginary(), self.real())
+
+    @always_inline
+    fn log(self) -> Self:
+        @parameter
+        if complex:
+            return Self(real=log(self.norm().value), imaginary=self.phase().value)
+        else:
+            return Self(log(self.value))
+
     #
-    # Numeric Trait Implementations
+    # Type Conversion
     #
     @always_inline
-    fn __abs__(self) -> Self:
-        constrained[not complex, "__abs__() is only available for non-complex numbers, see norm() instead"]()
-
-        return Self(self.value.__abs__())
-
-    @always_inline
-    fn __bool__(self) -> Bool:
-        constrained[not complex, "__bool__() is only available for non-complex numbers"]()
-
-        return self.value.__bool__()
-
-    @always_inline
-    fn __ceil__(self) -> Self:
-        constrained[not complex, "__ceil__() is only available for non-complex numbers"]()
-
-        return Self(self.value.__ceil__())
-
-    @always_inline
-    fn __ceildiv__(self, denominator: Self) -> Self:
-        constrained[not complex, "__ceildiv__() is only available for non-complex numbers"]()
-
-        return Self(self.value.__ceildiv__(denominator.value))
-
-    @always_inline
-    fn __float__(self) -> Float64:
-        constrained[not complex, "__float__() is only available for non-complex numbers"]()
-
-        return self.value.__float__()
-
-    @always_inline
-    fn __floor__(self) -> Self:
-        constrained[not complex, "__floor__() is only available for non-complex numbers"]()
-
-        return Self(self.value.__floor__())
-
-    fn __hash__(self) -> UInt:
-        return self.value.__hash__()
-
-    @always_inline
-    fn __int__(self) -> Int:
-        constrained[not complex, "__int__() is only available for non-complex numbers"]()
-
-        return self.value.__int__()
-
-    @always_inline
-    fn __index__(self) -> __mlir_type.index:
-        constrained[not complex, "__index__() is only available for non-complex numbers"]()
-
-        return self.value.__index__()
-
-    @always_inline
-    fn __round__(self) -> Self:
-        constrained[not complex, "__round__() is only available for non-complex numbers"]()
-
-        return Self(self.value.__round__())
-
-    @always_inline
-    fn __round__(self, ndigits: Int) -> Self:
-        constrained[not complex, "__round__(ndigits) is only available for non-complex numbers"]()
-
-        return Self(self.value.__round__(ndigits))
-
-    @always_inline
-    fn __trunc__(self) -> Self:
-        constrained[not complex, "__trunc__() is only available for non-complex numbers"]()
-
-        return Self(self.value.__trunc__())
+    fn cast[new_dtype: DType](self) -> Number[new_dtype, width, complex=complex]:
+        return Number[new_dtype, width, complex=complex](self.value.cast[new_dtype]())
 
     #
     # Stringable & Writable

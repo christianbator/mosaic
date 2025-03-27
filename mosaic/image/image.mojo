@@ -279,8 +279,6 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
         return result^
 
     fn __iadd__(mut self, rhs: Self):
-        debug_assert[assert_mode="safe"](self.samples() == rhs.samples(), "Cannot subtract images of different sizes")
-
         @parameter
         fn transformer[width: Int](value: SIMD[dtype, width], rhs: SIMD[dtype, width]) -> SIMD[dtype, width]:
             return value + rhs
@@ -288,8 +286,6 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
         self.for_each_zipped[transformer](rhs)
 
     fn __isub__(mut self, rhs: Self):
-        debug_assert[assert_mode="safe"](self.samples() == rhs.samples(), "Cannot subtract images of different sizes")
-
         @parameter
         fn transformer[width: Int](value: SIMD[dtype, width], rhs: SIMD[dtype, width]) -> SIMD[dtype, width]:
             return value - rhs

@@ -7,7 +7,7 @@
 
 from memory import UnsafePointer, memset_zero, memcpy
 from algorithm import vectorize, parallelize
-from math import ceildiv, isclose
+from math import floor, ceil, trunc, ceildiv, isclose, Ceilable, CeilDivable, Floorable, Truncable
 from collections import InlineArray
 
 from mosaic.utility import optimal_simd_width, unroll_factor, fatal_error
@@ -16,7 +16,9 @@ from mosaic.utility import optimal_simd_width, unroll_factor, fatal_error
 #
 # Matrix
 #
-struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, EqualityComparable, ExplicitlyCopyable, Stringable, Writable):
+struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
+    Absable, Ceilable, CeilDivable, EqualityComparable, ExplicitlyCopyable, Floorable, Movable, Roundable, Stringable, Truncable, Writable
+):
     #
     # Fields
     #
@@ -405,6 +407,9 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
     #
     # Operators (Scalar)
     #
+    fn __neg__(self) -> Self:
+        return -1 * self
+
     fn __add__(self, rhs: ScalarNumber[dtype, complex=complex]) -> Self:
         var result = self.copy()
         result += rhs
@@ -433,6 +438,9 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
         var result = self.copy()
         result *= rhs
         return result^
+
+    fn __rmul__(self, lhs: ScalarNumber[dtype, complex=complex]) -> Self:
+        return self * lhs
 
     fn __imul__(mut self, rhs: ScalarNumber[dtype, complex=complex]):
         @parameter
@@ -488,6 +496,22 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
             return value**rhs
 
         self.for_each[pow]()
+
+    #
+    # Operators (Matrix)
+    #
+    fn __ceildiv__(self, rhs: Self) -> Self:
+        var result = self.copy()
+
+        @parameter
+        fn _ceildiv[
+            width: Int
+        ](value: Number[dtype, width, complex=complex], rhs: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return ceildiv(value, rhs)
+
+        result.for_each_zipped[_ceildiv](rhs)
+
+        return result^
 
     fn __matmul__(self, rhs: Self) -> Self:
         debug_assert[assert_mode="safe"](
@@ -565,6 +589,69 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
             parallelize[calculate_row](dest._rows)
 
     #
+    # Numeric Traits
+    #
+    fn __floor__(self) -> Self:
+        var result = self.copy()
+
+        @parameter
+        fn floor[width: Int](value: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return floor(value)
+
+        result.for_each[floor]()
+        return result^
+
+    fn __ceil__(self) -> Self:
+        var result = self.copy()
+
+        @parameter
+        fn _ceil[width: Int](value: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return ceil(value)
+
+        result.for_each[_ceil]()
+        return result^
+
+    fn __round__(self) -> Self:
+        var result = self.copy()
+
+        @parameter
+        fn _round[width: Int](value: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return round(value)
+
+        result.for_each[_round]()
+        return result^
+
+    fn __round__(self, ndigits: Int) -> Self:
+        var result = self.copy()
+
+        @parameter
+        fn _round[width: Int](value: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return round(value, ndigits=ndigits)
+
+        result.for_each[_round]()
+        return result^
+
+    fn __trunc__(self) -> Self:
+        var result = self.copy()
+
+        @parameter
+        fn _trunc[width: Int](value: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return trunc(value)
+
+        result.for_each[_trunc]()
+        return result^
+
+    fn __abs__(self) -> Self:
+        var result = self.copy()
+
+        @parameter
+        fn _abs[width: Int](value: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return abs(value)
+
+        result.for_each[_abs]()
+        return result^
+
+    #
     # Numeric Methods
     #
     fn strided_sum(self, component: Int) -> ScalarNumber[dtype, complex=complex]:
@@ -629,6 +716,16 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
 
     fn max(self: Matrix[dtype, 1, complex=False]) -> Scalar[dtype]:
         return self.strided_max(0)
+
+    fn log(self) -> Self:
+        var result = self.copy()
+
+        @parameter
+        fn log[width: Int](value: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return value.log()
+
+        result.for_each[log]()
+        return result^
 
     fn strided_normalize(mut self):
         @parameter
@@ -696,6 +793,8 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](Movable, E
             dtype, width, complex=complex
         ]
     ](mut self, other: Self):
+        debug_assert[assert_mode="safe"](self.count() == other.count(), "Cannot perform elementwise transformation on two matrices of different sizes")
+
         @parameter
         fn transform_row(row: Int):
             @parameter
