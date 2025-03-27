@@ -9,7 +9,7 @@ from pathlib import Path
 from memory import UnsafePointer
 from algorithm import vectorize, parallelize
 from collections import Optional
-from math import floor
+from math import floor, ceil, ceildiv, trunc, Ceilable, CeilDivable, Floorable, Truncable
 
 from mosaic.numeric import Matrix, MatrixSlice, StridedRange, SIMDRange, Number
 from mosaic.utility import optimal_simd_width, unroll_factor, fatal_error
@@ -22,7 +22,9 @@ from .filters import Filters
 #
 # Image
 #
-struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable, ExplicitlyCopyable, Stringable, Writable):
+struct Image[dtype: DType, color_space: ColorSpace](
+    Absable, Ceilable, CeilDivable, EqualityComparable, ExplicitlyCopyable, Floorable, Movable, Roundable, Stringable, Truncable, Writable
+):
     #
     # Fields
     #
@@ -33,7 +35,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     #
     # Initialization
     #
-    fn __init__(out self, path: String) raises:
+    fn __init__(out self, path: StringLiteral) raises:
         self = Self(Path(path))
 
     fn __init__(out self, path: Path) raises:
@@ -46,7 +48,6 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     fn __init__(out self, width: Int, height: Int, owned data: UnsafePointer[Scalar[dtype]]):
         self._matrix = Matrix[dtype, color_space.channels()](rows=height, cols=width, data=data)
 
-    @implicit
     fn __init__(out self, owned matrix: Matrix[dtype, color_space.channels()]):
         self._matrix = matrix^
 
@@ -87,6 +88,10 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     fn bytes(self) -> Int:
         return self.samples() * self.bit_depth() // 8
 
+    @always_inline
+    fn matrix(self) -> ref [__origin_of(self._matrix)] Matrix[dtype, color_space.channels()]:
+        return self._matrix
+
     #
     # Public Access
     #
@@ -111,7 +116,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
         self._matrix[y, x, channel] = value
 
     @always_inline
-    fn load[width: Int](self, y: Int, x: Int) raises -> SIMD[dtype, width]:
+    fn strided_load[width: Int](self, y: Int, x: Int) raises -> SIMD[dtype, width]:
         constrained[color_space.channels() == 1, "Must specify channel for image in color space with channels > 1"]()
 
         return self.strided_load[width](y=y, x=x, channel=0)
@@ -121,7 +126,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
         return self._matrix.strided_load[width](row=y, col=x, component=channel).value
 
     @always_inline
-    fn store[width: Int](mut self, value: SIMD[dtype, width], y: Int, x: Int) raises:
+    fn strided_store[width: Int](mut self, value: SIMD[dtype, width], y: Int, x: Int) raises:
         constrained[color_space.channels() == 1, "Must specify channel for image in color space with channels > 1"]()
 
         self.strided_store(value, y=y, x=x, channel=0)
@@ -233,7 +238,10 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     # ExplicitlyCopyable
     #
     fn copy(self) -> Self:
-        return Self(matrix=self._matrix.copy())
+        return Self(self._matrix.copy())
+
+    fn copy_into(self, mut other: Self):
+        self._matrix.copy_into(other._matrix)
 
     #
     # EqualityComparable
@@ -247,81 +255,294 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     #
     # Operators (Scalar)
     #
-    fn __mul__(self, rhs: Scalar[dtype]) -> Self:
-        var result = self.copy()
-        result *= rhs
+    fn __neg__(self) -> Self:
+        return self * -1
 
-        return result^
+    fn __add__(self, rhs: Scalar[dtype]) -> Self:
+        return Self(self._matrix + rhs)
+
+    fn __iadd__(mut self, rhs: Scalar[dtype]):
+        self._matrix += rhs
+
+    fn __sub__(self, rhs: Scalar[dtype]) -> Self:
+        return Self(self._matrix - rhs)
+
+    fn __isub__(mut self, rhs: Scalar[dtype]):
+        self._matrix -= rhs
+
+    fn __mul__(self, rhs: Scalar[dtype]) -> Self:
+        return Self(self._matrix * rhs)
 
     fn __rmul__(self, lhs: Scalar[dtype]) -> Self:
         return self * lhs
 
     fn __imul__(mut self, rhs: Scalar[dtype]):
-        @parameter
-        fn transformer[width: Int](value: SIMD[dtype, width]) -> SIMD[dtype, width]:
-            return value * rhs
+        self._matrix *= rhs
 
-        self.for_each[transformer]()
+    fn __truediv__(self, rhs: Scalar[dtype]) -> Self:
+        return Self(self._matrix / rhs)
+
+    fn __itruediv__(mut self, rhs: Scalar[dtype]):
+        self._matrix /= rhs
+
+    fn __floordiv__(self, rhs: Scalar[dtype]) -> Self:
+        return Self(self._matrix // rhs)
+
+    fn __ifloordiv__(mut self, rhs: Scalar[dtype]):
+        self._matrix //= rhs
+
+    fn __mod__(self, rhs: Scalar[dtype]) -> Self:
+        return Self(self._matrix % rhs)
+
+    fn __imod__(mut self, rhs: Scalar[dtype]):
+        self._matrix %= rhs
+
+    fn __pow__(self, rhs: Scalar[dtype]) -> Self:
+        return Self(self._matrix**rhs)
+
+    fn __ipow__(mut self, rhs: Scalar[dtype]):
+        self._matrix **= rhs
+
+    fn __and__(self, rhs: Scalar[dtype]) -> Self:
+        return Self(self._matrix & rhs)
+
+    fn __iand__(mut self, rhs: Scalar[dtype]):
+        self._matrix &= rhs
+
+    fn __or__(self, rhs: Scalar[dtype]) -> Self:
+        return Self(self._matrix | rhs)
+
+    fn __ior__(mut self, rhs: Scalar[dtype]):
+        self._matrix |= rhs
+
+    fn __xor__(self, rhs: Scalar[dtype]) -> Self:
+        return Self(self._matrix ^ rhs)
+
+    fn __ixor__(mut self, rhs: Scalar[dtype]):
+        self._matrix ^= rhs
+
+    fn __lshift__(self, rhs: Scalar[dtype]) -> Self:
+        return Self(self._matrix << rhs)
+
+    fn __ilshift__(mut self, rhs: Scalar[dtype]):
+        self._matrix <<= rhs
+
+    fn __rshift__(self, rhs: Scalar[dtype]) -> Self:
+        return Self(self._matrix >> rhs)
+
+    fn __irshift__(mut self, rhs: Scalar[dtype]):
+        self._matrix >>= rhs
+
+    #
+    # Operators (Matrix)
+    #
+    fn __add__(self, rhs: Matrix[dtype, color_space.channels()]) -> Self:
+        return Self(self._matrix + rhs)
+
+    fn __iadd__(mut self, rhs: Matrix[dtype, color_space.channels()]):
+        self._matrix += rhs
+
+    fn __sub__(self, rhs: Matrix[dtype, color_space.channels()]) -> Self:
+        return Self(self._matrix - rhs)
+
+    fn __isub__(mut self, rhs: Matrix[dtype, color_space.channels()]):
+        self._matrix -= rhs
+
+    fn __truediv__(self, rhs: Matrix[dtype, color_space.channels()]) -> Self:
+        return Self(self._matrix / rhs)
+
+    fn __itruediv__(mut self, rhs: Matrix[dtype, color_space.channels()]):
+        self._matrix /= rhs
+
+    fn __floordiv__(self, rhs: Matrix[dtype, color_space.channels()]) -> Self:
+        return Self(self._matrix // rhs)
+
+    fn __ifloordiv__(mut self, rhs: Matrix[dtype, color_space.channels()]):
+        self._matrix //= rhs
+
+    fn __mod__(self, rhs: Matrix[dtype, color_space.channels()]) -> Self:
+        return Self(self._matrix % rhs)
+
+    fn __imod__(mut self, rhs: Matrix[dtype, color_space.channels()]):
+        self._matrix %= rhs
+
+    fn __pow__(self, rhs: Matrix[dtype, color_space.channels()]) -> Self:
+        return Self(self._matrix**rhs)
+
+    fn __ipow__(mut self, rhs: Matrix[dtype, color_space.channels()]):
+        self._matrix **= rhs
+
+    fn __and__(self, rhs: Matrix[dtype, color_space.channels()]) -> Self:
+        return Self(self._matrix & rhs)
+
+    fn __iand__(mut self, rhs: Matrix[dtype, color_space.channels()]):
+        self._matrix &= rhs
+
+    fn __or__(self, rhs: Matrix[dtype, color_space.channels()]) -> Self:
+        return Self(self._matrix | rhs)
+
+    fn __ior__(mut self, rhs: Matrix[dtype, color_space.channels()]):
+        self._matrix |= rhs
+
+    fn __xor__(self, rhs: Matrix[dtype, color_space.channels()]) -> Self:
+        return Self(self._matrix ^ rhs)
+
+    fn __ixor__(mut self, rhs: Matrix[dtype, color_space.channels()]):
+        self._matrix ^= rhs
+
+    fn __lshift__(self, rhs: Matrix[dtype, color_space.channels()]) -> Self:
+        return Self(self._matrix << rhs)
+
+    fn __ilshift__(mut self, rhs: Matrix[dtype, color_space.channels()]):
+        self._matrix <<= rhs
+
+    fn __rshift__(self, rhs: Matrix[dtype, color_space.channels()]) -> Self:
+        return Self(self._matrix >> rhs)
+
+    fn __irshift__(mut self, rhs: Matrix[dtype, color_space.channels()]):
+        self._matrix >>= rhs
 
     #
     # Operators (Image)
     #
     fn __add__(self, rhs: Self) -> Self:
-        var result = self.copy()
-        result += rhs
-
-        return result^
-
-    fn __sub__(self, rhs: Self) -> Self:
-        var result = self.copy()
-        result -= rhs
-
-        return result^
+        return Self(self._matrix + rhs._matrix)
 
     fn __iadd__(mut self, rhs: Self):
-        @parameter
-        fn transformer[width: Int](value: SIMD[dtype, width], rhs: SIMD[dtype, width]) -> SIMD[dtype, width]:
-            return value + rhs
+        self._matrix += rhs._matrix
 
-        self.for_each_zipped[transformer](rhs)
+    fn __sub__(self, rhs: Self) -> Self:
+        return Self(self._matrix - rhs._matrix)
 
     fn __isub__(mut self, rhs: Self):
-        @parameter
-        fn transformer[width: Int](value: SIMD[dtype, width], rhs: SIMD[dtype, width]) -> SIMD[dtype, width]:
-            return value - rhs
+        self._matrix -= rhs._matrix
 
-        self.for_each_zipped[transformer](rhs)
+    fn __truediv__(self, rhs: Self) -> Self:
+        return Self(self._matrix / rhs._matrix)
+
+    fn __itruediv__(mut self, rhs: Self):
+        self._matrix /= rhs._matrix
+
+    fn __floordiv__(self, rhs: Self) -> Self:
+        return Self(self._matrix // rhs._matrix)
+
+    fn __ifloordiv__(mut self, rhs: Self):
+        self._matrix //= rhs._matrix
+
+    fn __mod__(self, rhs: Self) -> Self:
+        return Self(self._matrix % rhs._matrix)
+
+    fn __imod__(mut self, rhs: Self):
+        self._matrix %= rhs._matrix
+
+    fn __pow__(self, rhs: Self) -> Self:
+        return Self(self._matrix**rhs._matrix)
+
+    fn __ipow__(mut self, rhs: Self):
+        self._matrix **= rhs._matrix
+
+    fn __and__(self, rhs: Self) -> Self:
+        return Self(self._matrix & rhs._matrix)
+
+    fn __iand__(mut self, rhs: Self):
+        self._matrix &= rhs._matrix
+
+    fn __or__(self, rhs: Self) -> Self:
+        return Self(self._matrix | rhs._matrix)
+
+    fn __ior__(mut self, rhs: Self):
+        self._matrix |= rhs._matrix
+
+    fn __xor__(self, rhs: Self) -> Self:
+        return Self(self._matrix ^ rhs._matrix)
+
+    fn __ixor__(mut self, rhs: Self):
+        self._matrix ^= rhs._matrix
+
+    fn __lshift__(self, rhs: Self) -> Self:
+        return Self(self._matrix << rhs._matrix)
+
+    fn __ilshift__(mut self, rhs: Self):
+        self._matrix <<= rhs._matrix
+
+    fn __rshift__(self, rhs: Self) -> Self:
+        return Self(self._matrix >> rhs._matrix)
+
+    fn __irshift__(mut self, rhs: Self):
+        self._matrix >>= rhs._matrix
+
+    #
+    # Numeric Traits
+    #
+    fn __floor__(self) -> Self:
+        return Self(floor(self._matrix))
+
+    fn __ceil__(self) -> Self:
+        return Self(ceil(self._matrix))
+
+    fn __ceildiv__(self, rhs: Self) -> Self:
+        return Self(ceildiv(self._matrix, rhs._matrix))
+
+    fn __round__(self) -> Self:
+        return Self(round(self._matrix))
+
+    fn __round__(self, ndigits: Int) -> Self:
+        return Self(round(self._matrix, ndigits=ndigits))
+
+    fn __trunc__(self) -> Self:
+        return Self(trunc(self._matrix))
+
+    fn __abs__(self) -> Self:
+        return Self(abs(self._matrix))
 
     #
     # Numeric Methods
     #
-    fn invert(mut self):
-        constrained[dtype == DType.uint8, "invert() is only available for UInt8 images, since inversion is ambiguous otherwise"]()
-
-        @parameter
-        fn transformer[width: Int](value: SIMD[dtype, width]) -> SIMD[dtype, width]:
-            return 255 - value
-
-        self.for_each[transformer]()
-
-    fn inverted(self) -> Self:
-        var result = self.copy()
-        result.invert()
-
-        return result^
+    fn log(self) -> Self:
+        return Self(self._matrix.log())
 
     fn clamp(mut self, lower_bound: Scalar[dtype], upper_bound: Scalar[dtype]):
-        @parameter
-        fn transformer[width: Int](value: SIMD[dtype, width]) -> SIMD[dtype, width]:
-            return value.clamp(lower_bound=lower_bound, upper_bound=upper_bound)
-
-        self.for_each[transformer]()
+        self._matrix.clamp(lower_bound=lower_bound, upper_bound=upper_bound)
 
     fn clamped(self, lower_bound: Scalar[dtype], upper_bound: Scalar[dtype]) -> Self:
-        var result = self.copy()
-        result.clamp(lower_bound=lower_bound, upper_bound=upper_bound)
+        return Self(self._matrix.clamped(lower_bound=lower_bound, upper_bound=upper_bound))
 
-        return result^
+    fn strided_sum(self, channel: Int) -> Scalar[dtype]:
+        return self._matrix.strided_sum(channel).value
+
+    fn strided_average(self, channel: Int) -> Scalar[DType.float64]:
+        return self._matrix.strided_average(channel).value
+
+    fn strided_min(self, channel: Int) -> Scalar[dtype]:
+        return self._matrix.strided_min(channel).value
+
+    fn strided_max(self, channel: Int) -> Scalar[dtype]:
+        return self._matrix.strided_max(channel).value
+
+    fn strided_normalize(mut self):
+        self._matrix.strided_normalize()
+
+    fn strided_fill(mut self, value: Scalar[dtype], channel: Int):
+        self._matrix.strided_fill(value, component=channel)
+
+    fn fill(mut self, value: Scalar[dtype]):
+        self._matrix.fill(value)
+
+    fn strided_for_each[transformer: fn[width: Int] (value: SIMD[dtype, width]) capturing -> SIMD[dtype, width]](mut self, channel: Int):
+        @parameter
+        fn number_transformer[width: Int](value: Number[dtype, width]) -> Number[dtype, width]:
+            return Number[dtype, width](transformer(value.value))
+
+        self._matrix.strided_for_each[number_transformer](channel)
+
+    fn strided_for_each_zipped[
+        transformer: fn[width: Int] (value: SIMD[dtype, width], rhs: SIMD[dtype, width]) capturing -> SIMD[dtype, width]
+    ](mut self, other: Self, channel: Int):
+        @parameter
+        fn number_transformer[width: Int](value: Number[dtype, width], rhs: Number[dtype, width]) -> Number[dtype, width]:
+            return Number[dtype, width](transformer(value=value.value, rhs=rhs.value))
+
+        self._matrix.strided_for_each_zipped[number_transformer](other._matrix, component=channel)
 
     fn for_each[transformer: fn[width: Int] (value: SIMD[dtype, width]) capturing -> SIMD[dtype, width]](mut self):
         @parameter
@@ -338,31 +559,49 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
         self._matrix.for_each_zipped[number_transformer](other._matrix)
 
     #
-    # Geometric Methods
+    # Numeric Transformations
+    #
+    fn invert(mut self):
+        constrained[dtype == DType.uint8, "invert() is only available for UInt8 images, since inversion is ambiguous otherwise"]()
+
+        @parameter
+        fn transformer[width: Int](value: SIMD[dtype, width]) -> SIMD[dtype, width]:
+            return 255 - value
+
+        self.for_each[transformer]()
+
+    fn inverted(self) -> Self:
+        var result = self.copy()
+        result.invert()
+
+        return result^
+
+    #
+    # Geometric Transformations
     #
     fn flip_horizontally(mut self):
         self._matrix.flip_horizontally()
 
     fn flipped_horizontally(self) -> Self:
-        return Self(matrix=self._matrix.flipped_horizontally())
+        return Self(self._matrix.flipped_horizontally())
 
     fn flip_vertically(mut self):
         self._matrix.flip_vertically()
 
     fn flipped_vertically(self) -> Self:
-        return Self(matrix=self._matrix.flipped_vertically())
+        return Self(self._matrix.flipped_vertically())
 
     fn rotate_90[*, clockwise: Bool](mut self):
         self._matrix.rotate_90[clockwise=clockwise]()
 
     fn rotated_90[*, clockwise: Bool](self) -> Self:
-        return Self(matrix=self._matrix.rotated_90[clockwise=clockwise]())
+        return Self(self._matrix.rotated_90[clockwise=clockwise]())
 
     fn rotate_180(mut self):
         self._matrix.rotate_180()
 
     fn rotated_180(self) -> Self:
-        return Self(matrix=self._matrix.rotated_180())
+        return Self(self._matrix.rotated_180())
 
     fn scaled[interpolation: Interpolation = Interpolation.bilinear](self, factor: Int) -> Self:
         return self.resized[interpolation](width=factor * self.width(), height=factor * self.height())
@@ -478,7 +717,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
         return self.padded[border](width=size, height=size)
 
     fn padded[border: Border = Border.zero](self, width: Int, height: Int) -> Self:
-        var result = Self(matrix=self._matrix.padded(rows=height, cols=width))
+        var result = Self(self._matrix.padded(rows=height, cols=width))
 
         @parameter
         if border != Border.zero:
@@ -506,10 +745,10 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
         return result^
 
     fn horizontally_stacked(self, other: Self) -> Self:
-        return Self(matrix=self._matrix.horizontally_stacked(other._matrix))
+        return Self(self._matrix.horizontally_stacked(other._matrix))
 
     fn vertically_stacked(self, other: Self) -> Self:
-        return Self(matrix=self._matrix.vertically_stacked(other._matrix))
+        return Self(self._matrix.vertically_stacked(other._matrix))
 
     #
     # Common Filters
@@ -530,43 +769,32 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     # Filtering
     #
     fn filter[border: Border](mut self, kernel: Matrix[dtype, color_space.channels()]):
-        self.filtered[border](kernel)._matrix.copy_into(self._matrix)
+        self.filtered[border](kernel).copy_into(self)
 
     fn filtered[border: Border](self, kernel: Matrix[dtype, color_space.channels()]) -> Self:
         var result = Self(width=self.width(), height=self.height())
-        self.filtered_into[border](dest=result, kernel=kernel)
-
-        return result^
-
-    fn filtered_into[border: Border](self, mut dest: Self, kernel: Matrix[dtype, color_space.channels()]):
-        debug_assert[assert_mode="safe"](
-            dest.width() == self.width() and dest.height() == self.height(),
-            "Invalid destination Image provided to filtered_into(), expected: ",
-            self,
-            "received: ",
-            dest,
-        )
-
         var count = kernel.strided_count()
 
         if count == 1:
-            self._direct_convolution[border, 1](dest=dest, kernel=kernel.rotated_180())
+            self._direct_convolution[border, 1](dest=result, kernel=kernel.rotated_180())
         elif count == 2:
-            self._direct_convolution[border, 2](dest=dest, kernel=kernel.rotated_180())
+            self._direct_convolution[border, 2](dest=result, kernel=kernel.rotated_180())
         elif count <= 4:
-            self._direct_convolution[border, 4](dest=dest, kernel=kernel.rotated_180())
+            self._direct_convolution[border, 4](dest=result, kernel=kernel.rotated_180())
         elif count <= 8:
-            self._direct_convolution[border, 8](dest=dest, kernel=kernel.rotated_180())
+            self._direct_convolution[border, 8](dest=result, kernel=kernel.rotated_180())
         elif count <= 16:
-            self._direct_convolution[border, 16](dest=dest, kernel=kernel.rotated_180())
+            self._direct_convolution[border, 16](dest=result, kernel=kernel.rotated_180())
         elif count <= 32:
-            self._direct_convolution[border, 32](dest=dest, kernel=kernel.rotated_180())
+            self._direct_convolution[border, 32](dest=result, kernel=kernel.rotated_180())
         elif count <= 64:
-            self._direct_convolution[border, 64](dest=dest, kernel=kernel.rotated_180())
+            self._direct_convolution[border, 64](dest=result, kernel=kernel.rotated_180())
         elif count <= 128:
-            self._direct_convolution[border, 128](dest=dest, kernel=kernel.rotated_180())
+            self._direct_convolution[border, 128](dest=result, kernel=kernel.rotated_180())
         else:
             fatal_error("Direct convolution for kernels with strided counts greater than 128 is not supported yet")
+
+        return result^
 
     fn _direct_convolution[border: Border, width: Int](self, mut dest: Self, kernel: Matrix[dtype, color_space.channels()]):
         var half_kernel_width = kernel.cols() // 2
@@ -684,13 +912,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     # Type Conversion
     #
     fn astype[new_dtype: DType](self) -> Image[new_dtype, color_space]:
-        var result = Image[new_dtype, color_space](width=self.width(), height=self.height())
-        self.astype_into(result)
-
-        return result^
-
-    fn astype_into[new_dtype: DType](self, mut dest: Image[new_dtype, color_space]):
-        self._matrix.astype_into[new_dtype](dest._matrix)
+        return Image[new_dtype, color_space](self._matrix.astype[new_dtype]())
 
     #
     # Color Space Conversion
@@ -698,28 +920,12 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     fn converted[new_color_space: ColorSpace](self) -> Image[dtype, new_color_space]:
         return self.converted_astype[dtype, new_color_space]()
 
-    fn converted_into[new_color_space: ColorSpace](self, mut dest: Image[dtype, new_color_space]):
-        self.converted_astype_into(dest)
-
     fn converted_astype[new_dtype: DType, new_color_space: ColorSpace](self) -> Image[new_dtype, new_color_space]:
-        var result = Image[new_dtype, new_color_space](width=self.width(), height=self.height())
-        self.converted_astype_into(result)
-
-        return result^
-
-    fn converted_astype_into[new_dtype: DType, new_color_space: ColorSpace](self, mut dest: Image[new_dtype, new_color_space]):
-        debug_assert[assert_mode="safe"](
-            dest.width() == self.width() and dest.height() == self.height(),
-            "Invalid destination Image provided to converted_astype_into(), expected: ",
-            self,
-            "received: ",
-            dest,
-        )
-
         @parameter
         if new_color_space == color_space:
-            self._matrix._unsafe_astype_into[new_dtype, new_color_space.channels()](dest._matrix)
+            return Image[new_dtype, new_color_space](self._matrix.rebound_copy[new_dtype, new_color_space.channels()]())
         else:
+            var result = Image[new_dtype, new_color_space](width=self.width(), height=self.height())
 
             @parameter
             fn convert_row(y: Int):
@@ -734,9 +940,9 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
                             # RGB
                             @parameter
                             if new_color_space == ColorSpace.rgb:
-                                dest.strided_store(grey, y=y, x=x, channel=0)
-                                dest.strided_store(grey, y=y, x=x, channel=1)
-                                dest.strided_store(grey, y=y, x=x, channel=2)
+                                result.strided_store(grey, y=y, x=x, channel=0)
+                                result.strided_store(grey, y=y, x=x, channel=1)
+                                result.strided_store(grey, y=y, x=x, channel=2)
 
                         # RGB ->
                         elif color_space == ColorSpace.rgb:
@@ -748,7 +954,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
                             @parameter
                             if new_color_space == ColorSpace.greyscale:
                                 var grey = 0.299 * red.cast[DType.float64]() + 0.587 * green.cast[DType.float64]() + 0.114 * blue.cast[DType.float64]()
-                                dest.strided_store(grey.cast[new_dtype](), y=y, x=x, channel=0)
+                                result.strided_store(grey.cast[new_dtype](), y=y, x=x, channel=0)
                     except error:
                         fatal_error(error)
 
@@ -756,10 +962,12 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
 
             parallelize[convert_row](num_work_items=self.height())
 
+            return result^
+
     #
     # Saving to File
     #
-    fn save[file_type: ImageFile](self, path: String) raises:
+    fn save[file_type: ImageFile](self, path: StringLiteral) raises:
         self.save[file_type](Path(path))
 
     fn save[file_type: ImageFile](self, path: Path) raises:

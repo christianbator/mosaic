@@ -152,7 +152,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         self.strided_store(value, row=row, col=col, component=component)
 
     @always_inline
-    fn load[width: Int](self: Matrix[dtype, 1, complex=complex], row: Int, col: Int) raises -> Number[dtype, width, complex=complex]:
+    fn strided_load[width: Int](self: Matrix[dtype, 1, complex=complex], row: Int, col: Int) raises -> Number[dtype, width, complex=complex]:
         return self.strided_load[width](row=row, col=col, component=0)
 
     @always_inline
@@ -160,7 +160,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         return self._data.strided_load[width](index=self.index(row=row, col=col, component=component), stride=depth)
 
     @always_inline
-    fn store[width: Int, //](mut self: Matrix[dtype, 1, complex=complex], value: Number[dtype, width, complex=complex], row: Int, col: Int) raises:
+    fn strided_store[width: Int, //](mut self: Matrix[dtype, 1, complex=complex], value: Number[dtype, width, complex=complex], row: Int, col: Int) raises:
         self.strided_store(value, row=row, col=col, component=0)
 
     @always_inline
@@ -224,6 +224,41 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         mask: SIMD[DType.bool, width],
     ) raises:
         self.scatter(value, row=row, col=col, component=component, offset=depth * offset, mask=mask)
+
+    fn load_full_depth(self, row: Int, col: Int) raises -> InlineArray[ScalarNumber[dtype, complex=complex], depth]:
+        var result = InlineArray[ScalarNumber[dtype, complex=complex], depth](uninitialized=True)
+
+        @parameter
+        for component in range(depth):
+            result[component] = self.strided_load[1](row=row, col=col, component=component)
+
+        return result
+
+    fn store_full_depth(mut self, value: InlineArray[ScalarNumber[dtype, complex=complex], depth], row: Int, col: Int) raises:
+        @parameter
+        for component in range(depth):
+            self.strided_store(value[component], row=row, col=col, component=component)
+
+    fn create_full_depth_value(self, value: ScalarNumber[dtype, complex=complex]) -> InlineArray[ScalarNumber[dtype, complex=complex], depth]:
+        var result = InlineArray[ScalarNumber[dtype, complex=complex], depth](uninitialized=True)
+
+        @parameter
+        for component in range(depth):
+            result[component] = value
+
+        return result
+
+    fn create_full_depth_value(self, *values: ScalarNumber[dtype, complex=complex]) -> InlineArray[ScalarNumber[dtype, complex=complex], depth]:
+        # TODO: Make this a compile-time check when possible
+        debug_assert(depth == len(values), "mismatch in the number of values in the full depth value variadic constructor")
+
+        var result = InlineArray[ScalarNumber[dtype, complex=complex], depth](uninitialized=True)
+
+        @parameter
+        for component in range(depth):
+            result[component] = values[component]
+
+        return result
 
     #
     # Private Access
@@ -317,8 +352,13 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     @always_inline
     fn component_slice[
         component: Int, mut: Bool, origin: Origin[mut]
-    ](ref [origin]self) raises -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
-        return self.strided_slice[StridedRange(component, component + 1)]()
+    ](ref [origin]self) -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
+        try:
+            return self.strided_slice[StridedRange(component, component + 1)]()
+        except error:
+            fatal_error(error)
+            while True:
+                pass
 
     @always_inline
     fn component_slice[
@@ -366,8 +406,64 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
     # TODO: Make a component-specified-at-runtime version of this
     @always_inline
-    fn extract_component[component: Int](self) raises -> Matrix[dtype, complex=complex]:
+    fn extract_component[component: Int](self) -> Matrix[dtype, complex=complex]:
         return self.component_slice[component]().rebound_copy[depth=1]()
+
+    fn strided_replication[new_depth: Int](self: Matrix[dtype, 1, complex=complex]) -> Matrix[dtype, new_depth, complex=complex]:
+        constrained[new_depth > depth, "Strided replication requires a desired depth > 1"]()
+
+        var result = Matrix[dtype, new_depth, complex=complex](rows=self._rows, cols=self._cols)
+
+        @parameter
+        fn process_row(row: Int):
+            for col in range(self._cols):
+                try:
+                    result.store_full_depth(result.create_full_depth_value(self[row, col]), row=row, col=col)
+                except error:
+                    fatal_error(error)
+
+        parallelize[process_row](self._rows)
+
+        return result^
+
+    @staticmethod
+    fn strided_replication(*, rows: Int, cols: Int, values: List[ScalarNumber[dtype, complex=complex]]) -> Self:
+        debug_assert[assert_mode="safe"](rows * cols == len(values), "Mismatch in list length for Matrix strided replication constructor")
+
+        var result = Self(rows=rows, cols=cols)
+
+        @parameter
+        fn process_row(row: Int):
+            for col in range(cols):
+                try:
+                    result.store_full_depth(result.create_full_depth_value(values[row * cols + col]), row=row, col=col)
+                except error:
+                    fatal_error(error)
+
+        parallelize[process_row](rows)
+
+        return result^
+
+    fn copied_to_component[new_depth: Int](self: Matrix[dtype, 1, complex=complex], component: Int) raises -> Matrix[dtype, new_depth, complex=complex]:
+        if not (0 <= component < new_depth):
+            raise Error("Attempt to copy to out of bounds component: ", component, ", specified depth = ", new_depth)
+
+        var result = Matrix[dtype, new_depth, complex=complex](rows=self._rows, cols=self._cols)
+
+        @parameter
+        fn process_row(row: Int):
+            @parameter
+            fn process_col[width: Int](col: Int):
+                try:
+                    result.strided_store(self.strided_load[width](row=row, col=col), row=row, col=col, component=component)
+                except error:
+                    fatal_error(error)
+
+            vectorize[process_col, Self.optimal_simd_width, unroll_factor=unroll_factor](self._cols)
+
+        parallelize[process_row](self._rows)
+
+        return result^
 
     #
     # ExplicitlyCopyable
@@ -591,42 +687,6 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
         var result = Self(rows=self._rows, cols=rhs._cols)
 
-        self.matmul_into(dest=result, rhs=rhs)
-
-        return result^
-
-    fn __imatmul__(mut self, other: Self):
-        debug_assert[assert_mode="safe"](
-            self._rows == self._cols and self._rows == other._rows and self._cols == other._cols,
-            "Dimension mismatch for in-place matrix multiplication: ",
-            self._rows,
-            "x",
-            self._cols,
-            " @ ",
-            other._rows,
-            "x",
-            other._cols,
-        )
-
-        (self @ other).copy_into(self)
-
-    fn matmul_into(self, mut dest: Self, rhs: Self):
-        debug_assert[assert_mode="safe"](
-            self._cols == rhs._rows and dest._rows == self._rows and dest._cols == rhs._cols,
-            "Dimension mismatch for matrix multiplication: ",
-            self._rows,
-            "x",
-            self._cols,
-            "@",
-            rhs._rows,
-            "x",
-            rhs._cols,
-            "->",
-            dest._rows,
-            "x",
-            dest._cols,
-        )
-
         var shared_dim = self._cols
 
         @parameter
@@ -639,13 +699,13 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
                     @parameter
                     fn dot_product[width: Int](col: Int):
                         try:
-                            dest.strided_store[width](
+                            result.strided_store[width](
                                 row=row,
                                 col=col,
                                 component=component,
                                 value=Number[dtype, width, complex=complex](self[row, k, component]).fma(
                                     rhs.strided_load[width](row=k, col=col, component=component),
-                                    dest.strided_load[width](row=row, col=col, component=component),
+                                    result.strided_load[width](row=row, col=col, component=component),
                                 ),
                             )
                         except error:
@@ -655,9 +715,18 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
                         dot_product,
                         Self.optimal_simd_width,
                         unroll_factor=unroll_factor,
-                    ](dest._cols)
+                    ](result._cols)
 
-            parallelize[calculate_row](dest._rows)
+            parallelize[calculate_row](result._rows)
+
+        return result^
+
+    fn __imatmul__(mut self, other: Self):
+        debug_assert[assert_mode="safe"](
+            self._rows == self._cols and self._rows == other._rows and self._cols == other._cols, "Dimension mismatch for in-place matrix multiplication"
+        )
+
+        (self @ other).copy_into(self)
 
     fn __truediv__(self, rhs: Self) -> Self:
         var result = self.copy()
@@ -854,6 +923,29 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     #
     # Numeric Methods
     #
+    fn log(self) -> Self:
+        var result = self.copy()
+
+        @parameter
+        fn log[width: Int](value: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return value.log()
+
+        result.for_each[log]()
+        return result^
+
+    fn clamp(mut self, lower_bound: ScalarNumber[dtype], upper_bound: ScalarNumber[dtype]):
+        @parameter
+        fn transformer[width: Int](value: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return value.clamp(lower_bound=lower_bound, upper_bound=upper_bound)
+
+        self.for_each[transformer]()
+
+    fn clamped(self, lower_bound: ScalarNumber[dtype], upper_bound: ScalarNumber[dtype]) -> Self:
+        var result = self.copy()
+        result.clamp(lower_bound=lower_bound, upper_bound=upper_bound)
+
+        return result^
+
     fn strided_sum(self, component: Int) -> ScalarNumber[dtype, complex=complex]:
         var result = ScalarNumber[dtype, complex=complex](0)
 
@@ -870,16 +962,10 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
         return result
 
-    fn sum(self: Matrix[dtype, 1, complex=complex]) -> ScalarNumber[dtype, complex=complex]:
-        return self.strided_sum(0)
-
     fn strided_average(self, component: Int) -> ScalarNumber[DType.float64, complex=complex]:
         return self.strided_sum(component).cast[DType.float64]() / self.strided_count()
 
-    fn average(self: Matrix[dtype, 1, complex=complex]) -> ScalarNumber[DType.float64, complex=complex]:
-        return self.strided_average(0)
-
-    fn strided_min(self: Matrix[dtype, depth, complex=False], component: Int) -> Scalar[dtype]:
+    fn strided_min(self: Matrix[dtype, depth], component: Int) -> ScalarNumber[dtype]:
         var result = Scalar[dtype].MAX_FINITE
 
         for row in range(self._rows):
@@ -895,10 +981,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
         return result
 
-    fn min(self: Matrix[dtype, 1, complex=False]) -> Scalar[dtype]:
-        return self.strided_min(0)
-
-    fn strided_max(self: Matrix[dtype, depth, complex=False], component: Int) -> Scalar[dtype]:
+    fn strided_max(self: Matrix[dtype, depth], component: Int) -> ScalarNumber[dtype]:
         var result = Scalar[dtype].MIN_FINITE
 
         for row in range(self._rows):
@@ -914,19 +997,6 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
         return result
 
-    fn max(self: Matrix[dtype, 1, complex=False]) -> Scalar[dtype]:
-        return self.strided_max(0)
-
-    fn log(self) -> Self:
-        var result = self.copy()
-
-        @parameter
-        fn log[width: Int](value: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
-            return value.log()
-
-        result.for_each[log]()
-        return result^
-
     fn strided_normalize(mut self):
         @parameter
         for component in range(depth):
@@ -939,13 +1009,27 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
             self.strided_for_each[normalize](component)
 
-    fn fill(mut self, scalar: ScalarNumber[dtype, complex=complex]):
+    fn strided_fill(mut self, value: ScalarNumber[dtype, complex=complex], component: Int):
+        @parameter
+        fn fill_row(row: Int):
+            @parameter
+            fn fill_cols[width: Int](col: Int):
+                try:
+                    self.strided_store(Number[dtype, width, complex=complex](value), row=row, col=col, component=component)
+                except error:
+                    fatal_error(error)
+
+            vectorize[fill_cols, Self.optimal_simd_width, unroll_factor=unroll_factor](self._cols)
+
+        parallelize[fill_row](self._rows)
+
+    fn fill(mut self, value: ScalarNumber[dtype, complex=complex]):
         @parameter
         fn fill_row(row: Int):
             @parameter
             fn fill_flattened_elements[width: Int](flattened_element: Int):
                 try:
-                    self._store(Number[dtype, width, complex=complex](scalar), index=self.flattened_index(row=row, offset=flattened_element))
+                    self._store(Number[dtype, width, complex=complex](value), index=self.flattened_index(row=row, offset=flattened_element))
                 except error:
                     fatal_error(error)
 
@@ -972,6 +1056,34 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
                 Self.optimal_simd_width,
                 unroll_factor=unroll_factor,
             ](self._cols)
+
+        parallelize[transform_row](self._rows)
+
+    fn strided_for_each_zipped[
+        transformer: fn[width: Int] (value: Number[dtype, width, complex=complex], rhs: Number[dtype, width, complex=complex]) capturing -> Number[
+            dtype, width, complex=complex
+        ]
+    ](mut self, other: Self, component: Int):
+        debug_assert[assert_mode="safe"](self.count() == other.count(), "Cannot perform elementwise transformation on two matrices of different sizes")
+
+        @parameter
+        fn transform_row(row: Int):
+            @parameter
+            fn transform_cols[width: Int](col: Int):
+                try:
+                    self.strided_store(
+                        transformer[width](
+                            value=self.strided_load[width](row=row, col=col, component=component),
+                            rhs=other.strided_load[width](row=row, col=col, component=component),
+                        ),
+                        row=row,
+                        col=col,
+                        component=component,
+                    )
+                except error:
+                    fatal_error(error)
+
+            vectorize[transform_cols, Self.optimal_simd_width, unroll_factor=unroll_factor](self._cols)
 
         parallelize[transform_row](self._rows)
 
@@ -1021,99 +1133,8 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
         parallelize[transform_row](self._rows)
 
-    fn load_full_depth(self, row: Int, col: Int) raises -> InlineArray[ScalarNumber[dtype, complex=complex], depth]:
-        var result = InlineArray[ScalarNumber[dtype, complex=complex], depth](uninitialized=True)
-
-        @parameter
-        for component in range(depth):
-            result[component] = self.strided_load[1](row=row, col=col, component=component)
-
-        return result
-
-    fn store_full_depth(mut self, value: InlineArray[ScalarNumber[dtype, complex=complex], depth], row: Int, col: Int) raises:
-        @parameter
-        for component in range(depth):
-            self.strided_store(value[component], row=row, col=col, component=component)
-
-    fn create_full_depth_value(self, value: ScalarNumber[dtype, complex=complex]) -> InlineArray[ScalarNumber[dtype, complex=complex], depth]:
-        var result = InlineArray[ScalarNumber[dtype, complex=complex], depth](uninitialized=True)
-
-        @parameter
-        for component in range(depth):
-            result[component] = value
-
-        return result
-
-    fn create_full_depth_value(self, *values: ScalarNumber[dtype, complex=complex]) -> InlineArray[ScalarNumber[dtype, complex=complex], depth]:
-        # TODO: Make this a compile-time check when possible
-        debug_assert(depth == len(values), "mismatch in the number of values in the full depth value variadic constructor")
-
-        var result = InlineArray[ScalarNumber[dtype, complex=complex], depth](uninitialized=True)
-
-        @parameter
-        for component in range(depth):
-            result[component] = values[component]
-
-        return result
-
-    fn strided_replication[new_depth: Int](self: Matrix[dtype, 1, complex=complex]) -> Matrix[dtype, new_depth, complex=complex]:
-        constrained[new_depth > depth, "Strided replication requires a desired depth > 1"]()
-
-        var result = Matrix[dtype, new_depth, complex=complex](rows=self._rows, cols=self._cols)
-
-        @parameter
-        fn process_row(row: Int):
-            for col in range(self._cols):
-                try:
-                    result.store_full_depth(result.create_full_depth_value(self[row, col]), row=row, col=col)
-                except error:
-                    fatal_error(error)
-
-        parallelize[process_row](self._rows)
-
-        return result^
-
-    @staticmethod
-    fn strided_replication(*, rows: Int, cols: Int, values: List[ScalarNumber[dtype, complex=complex]]) -> Self:
-        debug_assert[assert_mode="safe"](rows * cols == len(values), "Mismatch in list length for Matrix strided replication constructor")
-
-        var result = Self(rows=rows, cols=cols)
-
-        @parameter
-        fn process_row(row: Int):
-            for col in range(cols):
-                try:
-                    result.store_full_depth(result.create_full_depth_value(values[row * cols + col]), row=row, col=col)
-                except error:
-                    fatal_error(error)
-
-        parallelize[process_row](rows)
-
-        return result^
-
-    fn copied_to_component[new_depth: Int](self: Matrix[dtype, 1, complex=complex], component: Int) raises -> Matrix[dtype, new_depth, complex=complex]:
-        if not (0 <= component < new_depth):
-            raise Error("Attempt to copy to out of bounds component: ", component, ", specified depth = ", new_depth)
-
-        var result = Matrix[dtype, new_depth, complex=complex](rows=self._rows, cols=self._cols)
-
-        @parameter
-        fn process_row(row: Int):
-            @parameter
-            fn process_col[width: Int](col: Int):
-                try:
-                    result.strided_store(self.load[width](row=row, col=col), row=row, col=col, component=component)
-                except error:
-                    fatal_error(error)
-
-            vectorize[process_col, Self.optimal_simd_width, unroll_factor=unroll_factor](self._cols)
-
-        parallelize[process_row](self._rows)
-
-        return result^
-
     #
-    # Geometric Methods
+    # Geometric Transformations
     #
     fn reshape(mut self, rows: Int, cols: Int):
         debug_assert[assert_mode="safe"](
@@ -1334,47 +1355,43 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     #
     fn astype[new_dtype: DType](self) -> Matrix[new_dtype, depth, complex=complex]:
         var result = Matrix[new_dtype, depth, complex=complex](rows=self._rows, cols=self._cols)
-        self.astype_into(result)
+
+        @parameter
+        if new_dtype == dtype:
+            memcpy(
+                dest=result.unsafe_data_ptr(),
+                src=rebind[UnsafePointer[Scalar[new_dtype]]](self.unsafe_data_ptr()),
+                count=self.scalar_count(),
+            )
+        else:
+
+            @parameter
+            fn convert_row(row: Int):
+                @parameter
+                fn convert_flattened_elements[width: Int](flattened_element: Int):
+                    try:
+                        var index = self.flattened_index(row=row, offset=flattened_element)
+                        var value = self._load[width](index).cast[new_dtype]()
+                        result._store(value, index=index)
+                    except error:
+                        fatal_error(error)
+
+                vectorize[convert_flattened_elements, Self.optimal_simd_width, unroll_factor=unroll_factor](self._cols * depth)
+
+            parallelize[convert_row](self._rows)
 
         return result^
 
-    fn astype_into[new_dtype: DType](self, mut dest: Matrix[new_dtype, depth, complex=complex]):
-        debug_assert[assert_mode="safe"](dest.count() == self.count(), "Incorrectly sized matrix provided to astype_into")
-
-        @parameter
-        if new_dtype == dtype:
-            memcpy(
-                dest=dest.unsafe_data_ptr(),
-                src=rebind[UnsafePointer[Scalar[new_dtype]]](self.unsafe_data_ptr()),
-                count=self.scalar_count(),
-            )
-        else:
-
-            @parameter
-            fn convert_row(row: Int):
-                @parameter
-                fn convert_flattened_elements[width: Int](flattened_element: Int):
-                    try:
-                        var index = self.flattened_index(row=row, offset=flattened_element)
-                        var value = self._load[width](index).cast[new_dtype]()
-                        dest._store(value, index=index)
-                    except error:
-                        fatal_error(error)
-
-                vectorize[convert_flattened_elements, Self.optimal_simd_width, unroll_factor=unroll_factor](self._cols * depth)
-
-            parallelize[convert_row](self._rows)
-
-    fn _unsafe_astype_into[new_dtype: DType, new_depth: Int](self, mut dest: Matrix[new_dtype, new_depth, complex=complex]):
+    fn rebound_copy[new_dtype: DType, new_depth: Int](self) -> Matrix[new_dtype, new_depth, complex=complex]:
         constrained[new_depth == depth]()
 
-        debug_assert[assert_mode="safe"](dest.count() == self.count(), "Incorrectly sized matrix provided to _unsafe_astype_into")
+        var result = Matrix[new_dtype, new_depth, complex=complex](rows=self._rows, cols=self._cols)
 
         @parameter
         if new_dtype == dtype:
             memcpy(
-                dest=dest.unsafe_data_ptr(),
-                src=rebind[UnsafePointer[Scalar[new_dtype]]](self.unsafe_data_ptr()),
+                dest=result.unsafe_data_ptr(),
+                src=self.unsafe_data_ptr().bitcast[Scalar[new_dtype]](),
                 count=self.scalar_count(),
             )
         else:
@@ -1386,13 +1403,15 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
                     try:
                         var index = self.flattened_index(row=row, offset=flattened_element)
                         var value = self._load[width](index).cast[new_dtype]()
-                        dest._store(value, index=index)
+                        result._store(value, index=index)
                     except error:
                         fatal_error(error)
 
                 vectorize[convert_flattened_elements, Self.optimal_simd_width, unroll_factor=unroll_factor](self._cols * depth)
 
             parallelize[convert_row](self._rows)
+
+        return result^
 
     #
     # Stringable & Writable

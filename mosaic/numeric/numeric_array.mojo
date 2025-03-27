@@ -315,13 +315,7 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, 
         memcpy(dest=other.unsafe_data_ptr(), src=self.unsafe_data_ptr(), count=self._scalar_count())
 
     #
-    # Unsafe Type Conversion
-    #
-    fn unsafe_bitcast[new_dtype: DType](owned self) -> NumericArray[new_dtype, complex=complex]:
-        return NumericArray[new_dtype, complex=complex](self._data.bitcast[Scalar[new_dtype]](), count=self._count)
-
-    #
-    # Trait Implementations
+    # Sized
     #
     @always_inline
     fn __len__(self) -> Int:

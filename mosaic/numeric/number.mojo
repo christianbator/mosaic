@@ -560,10 +560,10 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
         return self.value.as_bytes()
 
-    fn clamp(self, lower_bound: Self, upper_bound: Self) -> Self:
+    fn clamp(self, lower_bound: Number[dtype, width, complex=False], upper_bound: Number[dtype, width, complex=False]) -> Self:
         constrained[not complex, "clamp() is only available for non-complex numbers"]()
 
-        return Self(self.value.clamp(lower_bound=lower_bound.value, upper_bound=upper_bound.value))
+        return Self(self.value.clamp(lower_bound=rebind[Self.Value](lower_bound.value), upper_bound=rebind[Self.Value](upper_bound.value)))
 
     @always_inline
     fn fma(self, multiplier: Self, accumulator: Self) -> Self:
