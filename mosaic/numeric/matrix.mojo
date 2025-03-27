@@ -408,7 +408,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     # Operators (Scalar)
     #
     fn __neg__(self) -> Self:
-        return -1 * self
+        return self * -1
 
     fn __add__(self, rhs: ScalarNumber[dtype, complex=complex]) -> Self:
         var result = self.copy()
@@ -497,21 +497,92 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
         self.for_each[pow]()
 
+    fn __and__(self, rhs: ScalarNumber[dtype, complex=complex]) -> Self:
+        var result = self.copy()
+        result &= rhs
+        return result^
+
+    fn __iand__(mut self, rhs: ScalarNumber[dtype, complex=complex]):
+        @parameter
+        fn _and[width: Int](value: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return value & rhs
+
+        self.for_each[_and]()
+
+    fn __or__(self, rhs: ScalarNumber[dtype, complex=complex]) -> Self:
+        var result = self.copy()
+        result |= rhs
+        return result^
+
+    fn __ior__(mut self, rhs: ScalarNumber[dtype, complex=complex]):
+        @parameter
+        fn _or[width: Int](value: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return value | rhs
+
+        self.for_each[_or]()
+
+    fn __xor__(self, rhs: ScalarNumber[dtype, complex=complex]) -> Self:
+        var result = self.copy()
+        result ^= rhs
+        return result^
+
+    fn __ixor__(mut self, rhs: ScalarNumber[dtype, complex=complex]):
+        @parameter
+        fn _xor[width: Int](value: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return value ^ rhs
+
+        self.for_each[_xor]()
+
+    fn __lshift__(self, rhs: ScalarNumber[dtype, complex=complex]) -> Self:
+        var result = self.copy()
+        result <<= rhs
+        return result^
+
+    fn __ilshift__(mut self, rhs: ScalarNumber[dtype, complex=complex]):
+        @parameter
+        fn lshift[width: Int](value: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return value << rhs
+
+        self.for_each[lshift]()
+
+    fn __rshift__(self, rhs: ScalarNumber[dtype, complex=complex]) -> Self:
+        var result = self.copy()
+        result >>= rhs
+        return result^
+
+    fn __irshift__(mut self, rhs: ScalarNumber[dtype, complex=complex]):
+        @parameter
+        fn rshift[width: Int](value: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return value >> rhs
+
+        self.for_each[rshift]()
+
     #
     # Operators (Matrix)
     #
-    fn __ceildiv__(self, rhs: Self) -> Self:
+    fn __add__(self, rhs: Self) -> Self:
         var result = self.copy()
-
-        @parameter
-        fn _ceildiv[
-            width: Int
-        ](value: Number[dtype, width, complex=complex], rhs: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
-            return ceildiv(value, rhs)
-
-        result.for_each_zipped[_ceildiv](rhs)
-
+        result += rhs
         return result^
+
+    fn __iadd__(mut self, rhs: Self):
+        @parameter
+        fn add[width: Int](value: Number[dtype, width, complex=complex], rhs: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return value + rhs
+
+        self.for_each_zipped[add](rhs)
+
+    fn __sub__(self, rhs: Self) -> Self:
+        var result = self.copy()
+        result -= rhs
+        return result^
+
+    fn __isub__(mut self, rhs: Self):
+        @parameter
+        fn sub[width: Int](value: Number[dtype, width, complex=complex], rhs: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return value - rhs
+
+        self.for_each_zipped[sub](rhs)
 
     fn __matmul__(self, rhs: Self) -> Self:
         debug_assert[assert_mode="safe"](
@@ -588,6 +659,122 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
             parallelize[calculate_row](dest._rows)
 
+    fn __truediv__(self, rhs: Self) -> Self:
+        var result = self.copy()
+        result /= rhs
+        return result^
+
+    fn __itruediv__(mut self, rhs: Self):
+        @parameter
+        fn truediv[
+            width: Int
+        ](value: Number[dtype, width, complex=complex], rhs: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return value / rhs
+
+        self.for_each_zipped[truediv](rhs)
+
+    fn __floordiv__(self, rhs: Self) -> Self:
+        var result = self.copy()
+        result //= rhs
+        return result^
+
+    fn __ifloordiv__(mut self, rhs: Self):
+        @parameter
+        fn floordiv[
+            width: Int
+        ](value: Number[dtype, width, complex=complex], rhs: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return value // rhs
+
+        self.for_each_zipped[floordiv](rhs)
+
+    fn __mod__(self, rhs: Self) -> Self:
+        var result = self.copy()
+        result %= rhs
+        return result^
+
+    fn __imod__(mut self, rhs: Self):
+        @parameter
+        fn mod[width: Int](value: Number[dtype, width, complex=complex], rhs: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return value % rhs
+
+        self.for_each_zipped[mod](rhs)
+
+    fn __pow__(self, rhs: Self) -> Self:
+        var result = self.copy()
+        result **= rhs
+        return result^
+
+    fn __ipow__(mut self, rhs: Self):
+        @parameter
+        fn pow[width: Int](value: Number[dtype, width, complex=complex], rhs: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return value**rhs
+
+        self.for_each_zipped[pow](rhs)
+
+    fn __and__(self, rhs: Self) -> Self:
+        var result = self.copy()
+        result &= rhs
+        return result^
+
+    fn __iand__(mut self, rhs: Self):
+        @parameter
+        fn _and[width: Int](value: Number[dtype, width, complex=complex], rhs: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return value & rhs
+
+        self.for_each_zipped[_and](rhs)
+
+    fn __or__(self, rhs: Self) -> Self:
+        var result = self.copy()
+        result |= rhs
+        return result^
+
+    fn __ior__(mut self, rhs: Self):
+        @parameter
+        fn _or[width: Int](value: Number[dtype, width, complex=complex], rhs: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return value | rhs
+
+        self.for_each_zipped[_or](rhs)
+
+    fn __xor__(self, rhs: Self) -> Self:
+        var result = self.copy()
+        result ^= rhs
+        return result^
+
+    fn __ixor__(mut self, rhs: Self):
+        @parameter
+        fn _xor[width: Int](value: Number[dtype, width, complex=complex], rhs: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return value ^ rhs
+
+        self.for_each_zipped[_xor](rhs)
+
+    fn __lshift__(self, rhs: Self) -> Self:
+        var result = self.copy()
+        result <<= rhs
+        return result^
+
+    fn __ilshift__(mut self, rhs: Self):
+        @parameter
+        fn lshift[
+            width: Int
+        ](value: Number[dtype, width, complex=complex], rhs: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return value << rhs
+
+        self.for_each_zipped[lshift](rhs)
+
+    fn __rshift__(self, rhs: Self) -> Self:
+        var result = self.copy()
+        result >>= rhs
+        return result^
+
+    fn __irshift__(mut self, rhs: Self):
+        @parameter
+        fn rshift[
+            width: Int
+        ](value: Number[dtype, width, complex=complex], rhs: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return value >> rhs
+
+        self.for_each_zipped[rshift](rhs)
+
     #
     # Numeric Traits
     #
@@ -609,6 +796,19 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
             return ceil(value)
 
         result.for_each[_ceil]()
+        return result^
+
+    fn __ceildiv__(self, rhs: Self) -> Self:
+        var result = self.copy()
+
+        @parameter
+        fn _ceildiv[
+            width: Int
+        ](value: Number[dtype, width, complex=complex], rhs: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return ceildiv(value, rhs)
+
+        result.for_each_zipped[_ceildiv](rhs)
+
         return result^
 
     fn __round__(self) -> Self:
@@ -741,10 +941,17 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
     fn fill(mut self, scalar: ScalarNumber[dtype, complex=complex]):
         @parameter
-        fn fill[width: Int](value: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
-            return scalar
+        fn fill_row(row: Int):
+            @parameter
+            fn fill_flattened_elements[width: Int](flattened_element: Int):
+                try:
+                    self._store(Number[dtype, width, complex=complex](scalar), index=self.flattened_index(row=row, offset=flattened_element))
+                except error:
+                    fatal_error(error)
 
-        self.for_each[fill]()
+            vectorize[fill_flattened_elements, Self.optimal_simd_width, unroll_factor=unroll_factor](self._cols * depth)
+
+        parallelize[fill_row](self._rows)
 
     fn strided_for_each[
         transformer: fn[width: Int] (value: Number[dtype, width, complex=complex]) capturing -> Number[dtype, width, complex=complex]

@@ -243,10 +243,6 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     # Operators
     #
     @always_inline
-    fn __pos__(self) -> Self:
-        return self
-
-    @always_inline
     fn __neg__(self) -> Self:
         return Self(-self.value)
 
