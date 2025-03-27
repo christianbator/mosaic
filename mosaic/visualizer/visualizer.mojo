@@ -53,7 +53,7 @@ struct Visualizer:
             )
         else:
             Self._show(
-                image=image.converted_astype[ColorSpace.rgb, Self.display_dtype](),
+                image=image.converted_astype[Self.display_dtype, ColorSpace.rgb](),
                 window_title=window_title,
             )
 
@@ -87,6 +87,23 @@ struct Visualizer:
                 var frame = video_capture.next_frame()
                 video_capture.did_read_next_frame()
                 Self.show(image=frame[], window_title=window_title)
+
+            if not Self.wait(0.001):
+                break
+
+    @staticmethod
+    fn stream[
+        V: VideoCapturing,
+        out_dtype: DType,
+        out_color_space: ColorSpace, //,
+        frame_processor: fn[V: VideoCapturing] (Pointer[Image[V.dtype, V.color_space]]) capturing [_] -> Image[out_dtype, out_color_space],
+    ](mut video_capture: V, window_title: String):
+        while True:
+            if video_capture.is_next_frame_available():
+                var frame = video_capture.next_frame()
+                video_capture.did_read_next_frame()
+                var processed_frame = frame_processor(frame)
+                Self.show(image=processed_frame, window_title=window_title)
 
             if not Self.wait(0.001):
                 break

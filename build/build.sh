@@ -33,9 +33,11 @@ fi
 #
 lib_dir=$PREFIX/lib
 mojo_package_dir=$lib_dir/mojo
+share_dir=$PREFIX/share/mosaic
 
 mkdir -p $lib_dir
 mkdir -p $mojo_package_dir
+mkdir -p $share_dir
 
 #
 # Check for build sub-commands
@@ -119,4 +121,12 @@ if $build_mosaic; then
     mojo package mosaic -o $mojo_package_dir/mosaic.mojopkg
 fi
 
+#
+# Copy shared assets
+#
+cp assets/icon-$os.png $share_dir
+
+#
+# Notify of success
+#
 echo -e "> Build succeeded ${green}✔${reset}"

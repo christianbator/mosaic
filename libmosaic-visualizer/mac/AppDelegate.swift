@@ -74,8 +74,33 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // MARK: NSApplicationDelegate
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        configureAppStyle()
         application.activate()
         isRunning = true
+    }
+
+    func configureAppStyle() {
+        guard let dylibPath = getDylibPath() else {
+            return
+        }
+
+        let dylibURL = URL(fileURLWithPath: dylibPath)
+        let prefixURL = dylibURL.deletingLastPathComponent().deletingLastPathComponent()
+        let imageURL = prefixURL.appendingPathComponent("share/mosaic/icon-macOS.png")
+
+        if let image = NSImage(contentsOf: imageURL) {
+            application.applicationIconImage = image
+        }
+    }
+
+    func getDylibPath() -> String? {
+        var info = Dl_info()
+
+        if dladdr(#dsohandle, &info) != 0, let dylibPath = info.dli_fname {
+            return String(cString: dylibPath)
+        }
+
+        return nil
     }
     
     func applicationWillTerminate(_ notification: Notification) {

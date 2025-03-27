@@ -11,7 +11,7 @@ from algorithm import vectorize, parallelize
 from collections import Optional
 from math import floor
 
-from mosaic.numeric import Matrix, MatrixSlice, Number, ScalarNumber, StridedRange, SIMDRange
+from mosaic.numeric import Matrix, MatrixSlice, StridedRange, SIMDRange, Number
 from mosaic.utility import optimal_simd_width, unroll_factor, fatal_error
 
 from .image_reader import ImageReader
@@ -245,83 +245,104 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
         return not (self == other)
 
     #
-    # Type Conversion
+    # Operators (Scalar)
     #
-    fn astype[new_dtype: DType](self) -> Image[new_dtype, color_space]:
-        var result = Image[new_dtype, color_space](width=self.width(), height=self.height())
-        self.astype_into(result)
+    fn __mul__(self, rhs: Scalar[dtype]) -> Self:
+        var result = self.copy()
+        result *= rhs
 
         return result^
 
-    fn astype_into[new_dtype: DType](self, mut dest: Image[new_dtype, color_space]):
-        self._matrix.astype_into[new_dtype](dest._matrix)
+    fn __rmul__(self, lhs: Scalar[dtype]) -> Self:
+        return self * lhs
+
+    fn __imul__(mut self, rhs: Scalar[dtype]):
+        @parameter
+        fn transformer[width: Int](value: SIMD[dtype, width]) -> SIMD[dtype, width]:
+            return value * rhs
+
+        self.for_each[transformer]()
 
     #
-    # Color Space Conversion
+    # Operators (Image)
     #
-    fn converted[new_color_space: ColorSpace](self) -> Image[dtype, new_color_space]:
-        return self.converted_astype[new_color_space, dtype]()
-
-    fn converted_into[new_color_space: ColorSpace](self, mut dest: Image[dtype, new_color_space]):
-        self.converted_astype_into(dest)
-
-    fn converted_astype[new_color_space: ColorSpace, new_dtype: DType](self) -> Image[new_dtype, new_color_space]:
-        var result = Image[new_dtype, new_color_space](width=self.width(), height=self.height())
-        self.converted_astype_into(result)
+    fn __add__(self, rhs: Self) -> Self:
+        var result = self.copy()
+        result += rhs
 
         return result^
 
-    fn converted_astype_into[new_color_space: ColorSpace, new_dtype: DType](self, mut dest: Image[new_dtype, new_color_space]):
-        debug_assert[assert_mode="safe"](
-            dest.width() == self.width() and dest.height() == self.height(),
-            "Invalid destination Image provided to converted_astype_into(), expected: ",
-            self,
-            "received: ",
-            dest,
-        )
+    fn __sub__(self, rhs: Self) -> Self:
+        var result = self.copy()
+        result -= rhs
+
+        return result^
+
+    fn __iadd__(mut self, rhs: Self):
+        debug_assert[assert_mode="safe"](self.samples() == rhs.samples(), "Cannot subtract images of different sizes")
 
         @parameter
-        if new_color_space == color_space:
-            self._matrix._unsafe_astype_into[new_dtype, new_color_space.channels()](dest._matrix)
-        else:
+        fn transformer[width: Int](value: SIMD[dtype, width], rhs: SIMD[dtype, width]) -> SIMD[dtype, width]:
+            return value + rhs
 
-            @parameter
-            fn convert_row(y: Int):
-                @parameter
-                fn convert_row_pixels[width: Int](x: Int):
-                    try:
-                        # Greyscale ->
-                        @parameter
-                        if color_space == ColorSpace.greyscale:
-                            var grey = self.strided_load[width](y=y, x=x, channel=0).cast[new_dtype]()
+        self.for_each_zipped[transformer](rhs)
 
-                            # RGB
-                            @parameter
-                            if new_color_space == ColorSpace.rgb:
-                                dest.strided_store(grey, y=y, x=x, channel=0)
-                                dest.strided_store(grey, y=y, x=x, channel=1)
-                                dest.strided_store(grey, y=y, x=x, channel=2)
+    fn __isub__(mut self, rhs: Self):
+        debug_assert[assert_mode="safe"](self.samples() == rhs.samples(), "Cannot subtract images of different sizes")
 
-                        # RGB ->
-                        elif color_space == ColorSpace.rgb:
-                            var red = self.strided_load[width](y=y, x=x, channel=0)
-                            var green = self.strided_load[width](y=y, x=x, channel=1)
-                            var blue = self.strided_load[width](y=y, x=x, channel=2)
+        @parameter
+        fn transformer[width: Int](value: SIMD[dtype, width], rhs: SIMD[dtype, width]) -> SIMD[dtype, width]:
+            return value - rhs
 
-                            # Greyscale
-                            @parameter
-                            if new_color_space == ColorSpace.greyscale:
-                                var grey = 0.299 * red.cast[DType.float64]() + 0.587 * green.cast[DType.float64]() + 0.114 * blue.cast[DType.float64]()
-                                dest.strided_store(grey.cast[new_dtype](), y=y, x=x, channel=0)
-                    except error:
-                        fatal_error(error)
-
-                vectorize[convert_row_pixels, Self.optimal_simd_width, unroll_factor=unroll_factor](self.width())
-
-            parallelize[convert_row](num_work_items=self.height())
+        self.for_each_zipped[transformer](rhs)
 
     #
-    # Geometric Transformations
+    # Numeric Methods
+    #
+    fn invert(mut self):
+        constrained[dtype == DType.uint8, "invert() is only available for UInt8 images, since inversion is ambiguous otherwise"]()
+
+        @parameter
+        fn transformer[width: Int](value: SIMD[dtype, width]) -> SIMD[dtype, width]:
+            return 255 - value
+
+        self.for_each[transformer]()
+
+    fn inverted(self) -> Self:
+        var result = self.copy()
+        result.invert()
+
+        return result^
+
+    fn clamp(mut self, lower_bound: Scalar[dtype], upper_bound: Scalar[dtype]):
+        @parameter
+        fn transformer[width: Int](value: SIMD[dtype, width]) -> SIMD[dtype, width]:
+            return value.clamp(lower_bound=lower_bound, upper_bound=upper_bound)
+
+        self.for_each[transformer]()
+
+    fn clamped(self, lower_bound: Scalar[dtype], upper_bound: Scalar[dtype]) -> Self:
+        var result = self.copy()
+        result.clamp(lower_bound=lower_bound, upper_bound=upper_bound)
+
+        return result^
+
+    fn for_each[transformer: fn[width: Int] (value: SIMD[dtype, width]) capturing -> SIMD[dtype, width]](mut self):
+        @parameter
+        fn number_transformer[width: Int](value: Number[dtype, width]) -> Number[dtype, width]:
+            return Number[dtype, width](transformer(value.value))
+
+        self._matrix.for_each[number_transformer]()
+
+    fn for_each_zipped[transformer: fn[width: Int] (value: SIMD[dtype, width], rhs: SIMD[dtype, width]) capturing -> SIMD[dtype, width]](mut self, other: Self):
+        @parameter
+        fn number_transformer[width: Int](value: Number[dtype, width], rhs: Number[dtype, width]) -> Number[dtype, width]:
+            return Number[dtype, width](transformer(value=value.value, rhs=rhs.value))
+
+        self._matrix.for_each_zipped[number_transformer](other._matrix)
+
+    #
+    # Geometric Methods
     #
     fn flip_horizontally(mut self):
         self._matrix.flip_horizontally()
@@ -347,10 +368,10 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     fn rotated_180(self) -> Self:
         return Self(matrix=self._matrix.rotated_180())
 
-    fn scaled[interpolation: Interpolation](self, factor: Int) -> Self:
+    fn scaled[interpolation: Interpolation = Interpolation.bilinear](self, factor: Int) -> Self:
         return self.resized[interpolation](width=factor * self.width(), height=factor * self.height())
 
-    fn scaled[interpolation: Interpolation, T: Floatable](self, factor: T) -> Self:
+    fn scaled[T: Floatable, //, interpolation: Interpolation = Interpolation.bilinear](self, factor: T) -> Self:
         return self.resized[interpolation](width=Int(factor.__float__() * self.width()), height=Int(factor.__float__() * self.height()))
 
     fn resized[interpolation: Interpolation = Interpolation.bilinear](self, width: Int, height: Int) -> Self:
@@ -457,10 +478,10 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
 
         return result^
 
-    fn padded[border: Border](self, size: Int) -> Self:
+    fn padded[border: Border = Border.zero](self, size: Int) -> Self:
         return self.padded[border](width=size, height=size)
 
-    fn padded[border: Border](self, width: Int, height: Int) -> Self:
+    fn padded[border: Border = Border.zero](self, width: Int, height: Int) -> Self:
         var result = Self(matrix=self._matrix.padded(rows=height, cols=width))
 
         @parameter
@@ -506,7 +527,7 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
     fn gaussian_blur[border: Border](mut self, size: Int, std_dev: Optional[Float64] = None):
         self.filter[border](Filters.gaussian_kernel_2d[dtype, color_space.channels()](size=size, std_dev=std_dev))
 
-    fn gaussian_blurred[border: Border](mut self, size: Int, std_dev: Optional[Float64] = None) -> Self:
+    fn gaussian_blurred[border: Border](self, size: Int, std_dev: Optional[Float64] = None) -> Self:
         return self.filtered[border](Filters.gaussian_kernel_2d[dtype, color_space.channels()](size=size, std_dev=std_dev))
 
     #
@@ -662,6 +683,82 @@ struct Image[dtype: DType, color_space: ColorSpace](Movable, EqualityComparable,
             fatal_error(error)
             while True:
                 pass
+
+    #
+    # Type Conversion
+    #
+    fn astype[new_dtype: DType](self) -> Image[new_dtype, color_space]:
+        var result = Image[new_dtype, color_space](width=self.width(), height=self.height())
+        self.astype_into(result)
+
+        return result^
+
+    fn astype_into[new_dtype: DType](self, mut dest: Image[new_dtype, color_space]):
+        self._matrix.astype_into[new_dtype](dest._matrix)
+
+    #
+    # Color Space Conversion
+    #
+    fn converted[new_color_space: ColorSpace](self) -> Image[dtype, new_color_space]:
+        return self.converted_astype[dtype, new_color_space]()
+
+    fn converted_into[new_color_space: ColorSpace](self, mut dest: Image[dtype, new_color_space]):
+        self.converted_astype_into(dest)
+
+    fn converted_astype[new_dtype: DType, new_color_space: ColorSpace](self) -> Image[new_dtype, new_color_space]:
+        var result = Image[new_dtype, new_color_space](width=self.width(), height=self.height())
+        self.converted_astype_into(result)
+
+        return result^
+
+    fn converted_astype_into[new_dtype: DType, new_color_space: ColorSpace](self, mut dest: Image[new_dtype, new_color_space]):
+        debug_assert[assert_mode="safe"](
+            dest.width() == self.width() and dest.height() == self.height(),
+            "Invalid destination Image provided to converted_astype_into(), expected: ",
+            self,
+            "received: ",
+            dest,
+        )
+
+        @parameter
+        if new_color_space == color_space:
+            self._matrix._unsafe_astype_into[new_dtype, new_color_space.channels()](dest._matrix)
+        else:
+
+            @parameter
+            fn convert_row(y: Int):
+                @parameter
+                fn convert_row_pixels[width: Int](x: Int):
+                    try:
+                        # Greyscale ->
+                        @parameter
+                        if color_space == ColorSpace.greyscale:
+                            var grey = self.strided_load[width](y=y, x=x, channel=0).cast[new_dtype]()
+
+                            # RGB
+                            @parameter
+                            if new_color_space == ColorSpace.rgb:
+                                dest.strided_store(grey, y=y, x=x, channel=0)
+                                dest.strided_store(grey, y=y, x=x, channel=1)
+                                dest.strided_store(grey, y=y, x=x, channel=2)
+
+                        # RGB ->
+                        elif color_space == ColorSpace.rgb:
+                            var red = self.strided_load[width](y=y, x=x, channel=0)
+                            var green = self.strided_load[width](y=y, x=x, channel=1)
+                            var blue = self.strided_load[width](y=y, x=x, channel=2)
+
+                            # Greyscale
+                            @parameter
+                            if new_color_space == ColorSpace.greyscale:
+                                var grey = 0.299 * red.cast[DType.float64]() + 0.587 * green.cast[DType.float64]() + 0.114 * blue.cast[DType.float64]()
+                                dest.strided_store(grey.cast[new_dtype](), y=y, x=x, channel=0)
+                    except error:
+                        fatal_error(error)
+
+                vectorize[convert_row_pixels, Self.optimal_simd_width, unroll_factor=unroll_factor](self.width())
+
+            parallelize[convert_row](num_work_items=self.height())
 
     #
     # Saving to File
