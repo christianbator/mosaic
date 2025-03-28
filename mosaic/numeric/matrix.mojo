@@ -353,12 +353,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     fn component_slice[
         component: Int, mut: Bool, origin: Origin[mut]
     ](ref [origin]self) -> MatrixSlice[StridedRange(component, component + 1), dtype, depth, complex, origin]:
-        try:
-            return self.strided_slice[StridedRange(component, component + 1)]()
-        except error:
-            fatal_error(error)
-            while True:
-                pass
+        return self.strided_slice[StridedRange(component, component + 1)]()
 
     @always_inline
     fn component_slice[
@@ -383,8 +378,13 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     @always_inline
     fn strided_slice[
         component_range: StridedRange, mut: Bool, origin: Origin[mut]
-    ](ref [origin]self) raises -> MatrixSlice[component_range, dtype, depth, complex, origin]:
-        return self.strided_slice[component_range](row_range=StridedRange(self._rows), col_range=StridedRange(self._cols))
+    ](ref [origin]self) -> MatrixSlice[component_range, dtype, depth, complex, origin]:
+        try:
+            return self.strided_slice[component_range](row_range=StridedRange(self._rows), col_range=StridedRange(self._cols))
+        except error:
+            fatal_error(error)
+            while True:
+                pass
 
     @always_inline
     fn strided_slice[
@@ -404,7 +404,6 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     ](ref [origin]self, row_range: StridedRange, col_range: StridedRange) raises -> MatrixSlice[component_range, dtype, depth, complex, origin]:
         return MatrixSlice[component_range, dtype, depth, complex, origin](matrix=self, row_range=row_range, col_range=col_range)
 
-    # TODO: Make a component-specified-at-runtime version of this
     @always_inline
     fn extract_component[component: Int](self) -> Matrix[dtype, complex=complex]:
         return self.component_slice[component]().rebound_copy[depth=1]()
@@ -444,8 +443,8 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
         return result^
 
-    fn copied_to_component[new_depth: Int](self: Matrix[dtype, 1, complex=complex], component: Int) -> Matrix[dtype, new_depth, complex=complex]:
-        debug_assert[assert_mode="safe"](0 <= component < new_depth, "Component must be within range of depth for copied_to_component()")
+    fn copied_to_component[component: Int, new_depth: Int](self: Matrix[dtype, 1, complex=complex]) -> Matrix[dtype, new_depth, complex=complex]:
+        constrained[0 <= component < new_depth, "Component must be within range of depth for copied_to_component()"]()
 
         var result = Matrix[dtype, new_depth, complex=complex](rows=self._rows, cols=self._cols)
 
@@ -1355,7 +1354,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     fn astype[new_dtype: DType](self) -> Matrix[new_dtype, depth, complex=complex]:
         @parameter
         if new_dtype == dtype:
-            return Matrix[new_dtype, depth, complex=complex](rows=self._rows, cols=self._cols, data=self._data.bitcast_copy[new_dtype]())
+            return Matrix[new_dtype, depth, complex=complex](rows=self._rows, cols=self._cols, data=self._data.rebound_copy[new_dtype]())
         else:
             var result = Matrix[new_dtype, depth, complex=complex](rows=self._rows, cols=self._cols)
 
@@ -1379,10 +1378,31 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     #
     # Rebind
     #
-    fn rebound_copy[new_depth: Int](self) -> Matrix[dtype, new_depth, complex=complex]:
+    fn rebound_copy[new_dtype: DType, new_depth: Int](self) -> Matrix[new_dtype, new_depth, complex=complex]:
         constrained[new_depth == depth]()
 
-        return Matrix[dtype, new_depth, complex=complex](rows=self._rows, cols=self._cols, data=self._data.copy())
+        @parameter
+        if new_dtype == dtype:
+            return Matrix[new_dtype, new_depth, complex=complex](rows=self._rows, cols=self._cols, data=self._data.rebound_copy[new_dtype]())
+        else:
+            var result = Matrix[new_dtype, new_depth, complex=complex](rows=self._rows, cols=self._cols)
+
+            @parameter
+            fn convert_row(row: Int):
+                @parameter
+                fn convert_flattened_elements[width: Int](flattened_element: Int):
+                    try:
+                        var index = self.flattened_index(row=row, offset=flattened_element)
+                        var value = self._load[width](index).cast[new_dtype]()
+                        result._store(value, index=index)
+                    except error:
+                        fatal_error(error)
+
+                vectorize[convert_flattened_elements, Self.optimal_simd_width, unroll_factor=unroll_factor](self._cols * depth)
+
+            parallelize[convert_row](self._rows)
+
+            return result^
 
     #
     # Stringable & Writable

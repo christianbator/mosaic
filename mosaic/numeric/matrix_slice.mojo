@@ -365,6 +365,9 @@ struct MatrixSlice[
 
         return result^
 
+    #
+    # Rebind
+    #
     fn rebound_copy[*, depth: Int](self) -> Matrix[dtype, depth, complex=complex]:
         constrained[depth == Self._depth]()
 

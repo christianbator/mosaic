@@ -18,19 +18,19 @@ from mosaic.numeric import Size
 #
 @value
 struct _VideoCaptureDimensions:
-    var width: c_int
     var height: c_int
+    var width: c_int
 
 
 #
 # VideoCapture
 #
-struct VideoCapture(VideoCapturing):
+struct VideoCapture[capture_color_space: ColorSpace](VideoCapturing):
     #
     # Fields
     #
     alias dtype = DType.uint8
-    alias color_space = ColorSpace.rgb
+    alias color_space = capture_color_space
 
     var _video_capture: OpaquePointer
     var _dimensions: Size
@@ -45,7 +45,7 @@ struct VideoCapture(VideoCapturing):
     #
     # Initialization
     #
-    fn __init__(out self) raises:
+    fn __init__(out self, index: Int) raises:
         # Load libvideocapture
         var libvideocapture = DLHandle(dynamic_library_filepath("libmosaic-videocapture"))
 
@@ -54,10 +54,12 @@ struct VideoCapture(VideoCapturing):
         var video_capture = initialize()
 
         # Open system video capture
-        var open = libvideocapture.get_function[fn (video_capture: OpaquePointer, dimensions: UnsafePointer[_VideoCaptureDimensions]) -> Bool]("open")
+        var open = libvideocapture.get_function[
+            fn (video_capture: OpaquePointer, index: c_int, color_space: c_int, dimensions: UnsafePointer[_VideoCaptureDimensions]) -> Bool
+        ]("open")
         var dimensions = _VideoCaptureDimensions(width=0, height=0)
 
-        if not open(video_capture, dimensions=UnsafePointer.address_of(dimensions)):
+        if not open(video_capture, index=c_int(index), color_space=c_int(capture_color_space.raw_value()), dimensions=UnsafePointer.address_of(dimensions)):
             raise ("Failed to open VideoCapture")
 
         # Prepare properties and cache functions

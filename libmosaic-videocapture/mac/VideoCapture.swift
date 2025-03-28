@@ -9,11 +9,27 @@ import AVFoundation
 import Accelerate
 
 
+// MARK: ColorSpace
+
+public enum ColorSpace: CInt {
+    case greyscale
+    case rgb
+    
+    var channels: Int {
+        switch self {
+        case .greyscale:
+            return 1
+        case .rgb:
+            return 3
+        }
+    }
+}
+
 // MARK: VideoCaptureDimensions
 
 struct VideoCaptureDimensions {
-    var width: CInt
     var height: CInt
+    var width: CInt
 }
 
 // MARK: - C Interface
@@ -29,10 +45,10 @@ public func initialize() -> OpaquePointer {
 
 @MainActor
 @_cdecl("open")
-public func open(pointer: OpaquePointer, dimensions: UnsafeMutableRawPointer) -> CBool {
+public func open(pointer: OpaquePointer, index: CInt, colorSpace: CInt, dimensions: UnsafeMutableRawPointer) -> CBool {
     let dimensions = dimensions.assumingMemoryBound(to: VideoCaptureDimensions.self)
     
-    return videoCapture(from: pointer).open(dimensions: dimensions)
+    return videoCapture(from: pointer).open(index: Int(index), colorSpace: ColorSpace(rawValue: colorSpace)!, dimensions: dimensions)
 }
 
 @MainActor
@@ -78,10 +94,13 @@ private func videoCapture(from pointer: OpaquePointer) -> VideoCapture {
 @MainActor
 class VideoCapture: NSObject, @preconcurrency AVCaptureVideoDataOutputSampleBufferDelegate {
     
-    private(set) var isNextFrameAvailable: CBool = false
+    private(set) var isNextFrameAvailable: Bool = false
     
-    private var session: AVCaptureSession?
-    private var destBuffer: vImage_Buffer?
+    private var session: AVCaptureSession!
+    private var colorSpace: ColorSpace!
+    private var height: Int = 0
+    private var width: Int = 0
+    private var destBuffer: vImage_Buffer!
 
     override init() {
         super.init()
@@ -89,25 +108,24 @@ class VideoCapture: NSObject, @preconcurrency AVCaptureVideoDataOutputSampleBuff
         _ = Unmanaged<VideoCapture>.passRetained(self)
     }
     
-    func open(dimensions: UnsafeMutablePointer<VideoCaptureDimensions>) -> CBool {
-        let session = AVCaptureSession()
-        
-        session.beginConfiguration()
-        
-        guard let device = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera, .external], mediaType: .video, position: .unspecified).devices.first else {
-            print("Error initializing capture device: no devices available")
-            return false
-        }
-
-        let activeFormat = device.activeFormat
-        let activeFormatDimensions = CMVideoFormatDescriptionGetDimensions(activeFormat.formatDescription)
-
-        let height = Int(activeFormatDimensions.height)
-        let width = Int(activeFormatDimensions.width)
-        
+    func open(index: Int, colorSpace: ColorSpace, dimensions: UnsafeMutablePointer<VideoCaptureDimensions>) -> Bool {
         do {
-            let input = try AVCaptureDeviceInput(device: device)
+            let session = AVCaptureSession()
+            session.beginConfiguration()
+            
+            let devices = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera, .external], mediaType: .video, position: .unspecified).devices
+            
+            guard devices.indices.contains(index) else {
+                print("Error initializing capture device at index \(index): device not found")
+                return false
+            }
 
+            let device = devices[index]
+            
+            printDeviceInfo(device)
+            
+            let input = try AVCaptureDeviceInput(device: device)
+            
             if session.canAddInput(input) {
                 session.addInput(input)
             }
@@ -118,10 +136,31 @@ class VideoCapture: NSObject, @preconcurrency AVCaptureVideoDataOutputSampleBuff
             
             let output = AVCaptureVideoDataOutput()
 
-            output.videoSettings = [
-                (kCVPixelBufferPixelFormatTypeKey as String): Int(kCVPixelFormatType_32ARGB)
-            ]
-
+            switch colorSpace {
+            case .greyscale:
+                if output.availableVideoPixelFormatTypes.contains(kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange) {
+                    output.videoSettings = [
+                        (kCVPixelBufferPixelFormatTypeKey as String): kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+                    ]
+                }
+                else if output.availableVideoPixelFormatTypes.contains(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange) {
+                    output.videoSettings = [
+                        (kCVPixelBufferPixelFormatTypeKey as String): kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
+                    ]
+                }
+                else {
+                    return false
+                }
+            case .rgb:
+                guard output.availableVideoPixelFormatTypes.contains(kCVPixelFormatType_32ARGB) else {
+                    return false
+                }
+                
+                output.videoSettings = [
+                    (kCVPixelBufferPixelFormatTypeKey as String): kCVPixelFormatType_32ARGB
+                ]
+            }
+            
             output.setSampleBufferDelegate(self, queue: DispatchQueue.main)
 
             if session.canAddOutput(output) {
@@ -133,18 +172,17 @@ class VideoCapture: NSObject, @preconcurrency AVCaptureVideoDataOutputSampleBuff
             }
             
             session.commitConfiguration()
-
+            
             self.session = session
+            self.colorSpace = colorSpace
             
-            destBuffer = vImage_Buffer(
-                data: nil,
-                height: vImagePixelCount(height),
-                width: vImagePixelCount(width),
-                rowBytes: width * 3
-            )
+            let activeFormatDimensions = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
             
-            dimensions.pointee.width = CInt(width)
-            dimensions.pointee.height = CInt(height)
+            self.height = Int(activeFormatDimensions.height)
+            self.width = Int(activeFormatDimensions.width)
+            
+            dimensions.pointee.height = activeFormatDimensions.height
+            dimensions.pointee.width = activeFormatDimensions.width
             
             return true
         }
@@ -155,7 +193,13 @@ class VideoCapture: NSObject, @preconcurrency AVCaptureVideoDataOutputSampleBuff
     }
     
     func start(frameBuffer: UnsafeMutablePointer<UInt8>) {
-        destBuffer?.data = UnsafeMutableRawPointer(frameBuffer)
+        destBuffer = vImage_Buffer(
+            data: UnsafeMutableRawPointer(frameBuffer),
+            height: vImagePixelCount(height),
+            width: vImagePixelCount(width),
+            rowBytes: width * colorSpace.channels
+        )
+        
         isNextFrameAvailable = true
         
         session?.startRunning()
@@ -179,11 +223,6 @@ class VideoCapture: NSObject, @preconcurrency AVCaptureVideoDataOutputSampleBuff
     // MARK: AVCaptureVideoDataOutputSampleBufferDelegate
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        guard var destBuffer = destBuffer, destBuffer.data != nil else {
-            print("Destination buffer not set")
-            return
-        }
-        
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
             print("Failed to get pixel buffer")
             return
@@ -197,24 +236,115 @@ class VideoCapture: NSObject, @preconcurrency AVCaptureVideoDataOutputSampleBuff
             return 
         }
 
-        let width = CVPixelBufferGetWidth(pixelBuffer)
         let height = CVPixelBufferGetHeight(pixelBuffer)
-
-        var sourceBuffer = vImage_Buffer(
-            data: data,
-            height: vImagePixelCount(height),
-            width: vImagePixelCount(width),
-            rowBytes: CVPixelBufferGetBytesPerRow(pixelBuffer)
-        )
-
-        let error = vImageConvert_ARGB8888toRGB888(&sourceBuffer, &destBuffer, vImage_Flags(kvImageNoFlags))
-        CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly)
-
-        if error == kvImageNoError {
+        let width = CVPixelBufferGetWidth(pixelBuffer)
+        
+        switch colorSpace! {
+        case .greyscale:
+            guard let greyscaleData = CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, 0) else {
+                print("Failed to get base address of greyscale plane")
+                CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly)
+                return
+            }
+            
+            memcpy(destBuffer.data, greyscaleData, width * height)
+            CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly)
+            
             isNextFrameAvailable = true
-        }
-        else {
-            print("Error during conversion to RGB: \(error)")
+        case .rgb:
+            var sourceBuffer = vImage_Buffer(
+                data: data,
+                height: vImagePixelCount(height),
+                width: vImagePixelCount(width),
+                rowBytes: CVPixelBufferGetBytesPerRow(pixelBuffer)
+            )
+
+            let error = vImageConvert_ARGB8888toRGB888(&sourceBuffer, &destBuffer, vImage_Flags(kvImageNoFlags))
+            CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly)
+            
+            if error == kvImageNoError {
+                isNextFrameAvailable = true
+            }
+            else {
+                print("Error during conversion to RGB: \(error)")
+            }
         }
     }
 }
+
+// MARK: - Utilities
+                             
+func printDeviceInfo(_ device: AVCaptureDevice) {
+    print("Device: \(device.localizedName) (\(device.uniqueID))")
+    print("Format: \(pixelFormatName(device.activeFormat.formatDescription.mediaSubType))")
+    
+    var frameRates = String()
+    for (index, frameRateRange) in device.activeFormat.videoSupportedFrameRateRanges.enumerated() {
+        frameRates.append(String(format: "%.2f", frameRateRange.maxFrameRate))
+        
+        if index != device.activeFormat.videoSupportedFrameRateRanges.count - 1 {
+            frameRates.append(" ")
+        }
+    }
+    
+    print("Available frame rates: { \(frameRates) fps }")
+}
+
+func pixelFormatName(_ pixelFormat: CMFormatDescription.MediaSubType) -> String {
+    switch pixelFormat.rawValue {
+         case kCVPixelFormatType_1Monochrome:                   return "kCVPixelFormatType_1Monochrome"
+         case kCVPixelFormatType_2Indexed:                      return "kCVPixelFormatType_2Indexed"
+         case kCVPixelFormatType_4Indexed:                      return "kCVPixelFormatType_4Indexed"
+         case kCVPixelFormatType_8Indexed:                      return "kCVPixelFormatType_8Indexed"
+         case kCVPixelFormatType_1IndexedGray_WhiteIsZero:      return "kCVPixelFormatType_1IndexedGray_WhiteIsZero"
+         case kCVPixelFormatType_2IndexedGray_WhiteIsZero:      return "kCVPixelFormatType_2IndexedGray_WhiteIsZero"
+         case kCVPixelFormatType_4IndexedGray_WhiteIsZero:      return "kCVPixelFormatType_4IndexedGray_WhiteIsZero"
+         case kCVPixelFormatType_8IndexedGray_WhiteIsZero:      return "kCVPixelFormatType_8IndexedGray_WhiteIsZero"
+         case kCVPixelFormatType_16BE555:                       return "kCVPixelFormatType_16BE555"
+         case kCVPixelFormatType_16LE555:                       return "kCVPixelFormatType_16LE555"
+         case kCVPixelFormatType_16LE5551:                      return "kCVPixelFormatType_16LE5551"
+         case kCVPixelFormatType_16BE565:                       return "kCVPixelFormatType_16BE565"
+         case kCVPixelFormatType_16LE565:                       return "kCVPixelFormatType_16LE565"
+         case kCVPixelFormatType_24RGB:                         return "kCVPixelFormatType_24RGB"
+         case kCVPixelFormatType_24BGR:                         return "kCVPixelFormatType_24BGR"
+         case kCVPixelFormatType_32ARGB:                        return "kCVPixelFormatType_32ARGB"
+         case kCVPixelFormatType_32BGRA:                        return "kCVPixelFormatType_32BGRA"
+         case kCVPixelFormatType_32ABGR:                        return "kCVPixelFormatType_32ABGR"
+         case kCVPixelFormatType_32RGBA:                        return "kCVPixelFormatType_32RGBA"
+         case kCVPixelFormatType_64ARGB:                        return "kCVPixelFormatType_64ARGB"
+         case kCVPixelFormatType_48RGB:                         return "kCVPixelFormatType_48RGB"
+         case kCVPixelFormatType_32AlphaGray:                   return "kCVPixelFormatType_32AlphaGray"
+         case kCVPixelFormatType_16Gray:                        return "kCVPixelFormatType_16Gray"
+         case kCVPixelFormatType_30RGB:                         return "kCVPixelFormatType_30RGB"
+         case kCVPixelFormatType_422YpCbCr8:                    return "kCVPixelFormatType_422YpCbCr8"
+         case kCVPixelFormatType_4444YpCbCrA8:                  return "kCVPixelFormatType_4444YpCbCrA8"
+         case kCVPixelFormatType_4444YpCbCrA8R:                 return "kCVPixelFormatType_4444YpCbCrA8R"
+         case kCVPixelFormatType_4444AYpCbCr8:                  return "kCVPixelFormatType_4444AYpCbCr8"
+         case kCVPixelFormatType_4444AYpCbCr16:                 return "kCVPixelFormatType_4444AYpCbCr16"
+         case kCVPixelFormatType_444YpCbCr8:                    return "kCVPixelFormatType_444YpCbCr8"
+         case kCVPixelFormatType_422YpCbCr16:                   return "kCVPixelFormatType_422YpCbCr16"
+         case kCVPixelFormatType_422YpCbCr10:                   return "kCVPixelFormatType_422YpCbCr10"
+         case kCVPixelFormatType_444YpCbCr10:                   return "kCVPixelFormatType_444YpCbCr10"
+         case kCVPixelFormatType_420YpCbCr8Planar:              return "kCVPixelFormatType_420YpCbCr8Planar"
+         case kCVPixelFormatType_420YpCbCr8PlanarFullRange:     return "kCVPixelFormatType_420YpCbCr8PlanarFullRange"
+         case kCVPixelFormatType_422YpCbCr_4A_8BiPlanar:        return "kCVPixelFormatType_422YpCbCr_4A_8BiPlanar"
+         case kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange:  return "kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange"
+         case kCVPixelFormatType_420YpCbCr8BiPlanarFullRange:   return "kCVPixelFormatType_420YpCbCr8BiPlanarFullRange"
+         case kCVPixelFormatType_422YpCbCr8_yuvs:               return "kCVPixelFormatType_422YpCbCr8_yuvs"
+         case kCVPixelFormatType_422YpCbCr8FullRange:           return "kCVPixelFormatType_422YpCbCr8FullRange"
+         case kCVPixelFormatType_OneComponent8:                 return "kCVPixelFormatType_OneComponent8"
+         case kCVPixelFormatType_TwoComponent8:                 return "kCVPixelFormatType_TwoComponent8"
+         case kCVPixelFormatType_30RGBLEPackedWideGamut:        return "kCVPixelFormatType_30RGBLEPackedWideGamut"
+         case kCVPixelFormatType_OneComponent16Half:            return "kCVPixelFormatType_OneComponent16Half"
+         case kCVPixelFormatType_OneComponent32Float:           return "kCVPixelFormatType_OneComponent32Float"
+         case kCVPixelFormatType_TwoComponent16Half:            return "kCVPixelFormatType_TwoComponent16Half"
+         case kCVPixelFormatType_TwoComponent32Float:           return "kCVPixelFormatType_TwoComponent32Float"
+         case kCVPixelFormatType_64RGBAHalf:                    return "kCVPixelFormatType_64RGBAHalf"
+         case kCVPixelFormatType_128RGBAFloat:                  return "kCVPixelFormatType_128RGBAFloat"
+         case kCVPixelFormatType_14Bayer_GRBG:                  return "kCVPixelFormatType_14Bayer_GRBG"
+         case kCVPixelFormatType_14Bayer_RGGB:                  return "kCVPixelFormatType_14Bayer_RGGB"
+         case kCVPixelFormatType_14Bayer_BGGR:                  return "kCVPixelFormatType_14Bayer_BGGR"
+         case kCVPixelFormatType_14Bayer_GBRG:                  return "kCVPixelFormatType_14Bayer_GBRG"
+         default:                                               return "UNKNOWN"
+     }
+ }
