@@ -20,14 +20,6 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, 
     var _data: UnsafePointer[Scalar[dtype]]
     var _count: Int
 
-    @always_inline
-    fn _scalar_count(self) -> Int:
-        @parameter
-        if complex:
-            return 2 * self._count
-        else:
-            return self._count
-
     #
     # Initialization
     #
@@ -100,6 +92,17 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, 
         rand(result.unsafe_data_ptr(), result._scalar_count(), min=min.cast[DType.float64](), max=max.cast[DType.float64]())
 
         return result^
+
+    #
+    # Properties
+    #
+    @always_inline
+    fn _scalar_count(self) -> Int:
+        @parameter
+        if complex:
+            return 2 * self._count
+        else:
+            return self._count
 
     #
     # Access

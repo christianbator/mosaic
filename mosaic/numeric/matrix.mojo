@@ -118,7 +118,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         return self._rows * self._cols
 
     @always_inline
-    fn scalar_count(self) -> Int:
+    fn _scalar_count(self) -> Int:
         @parameter
         if complex:
             return 2 * self.count()
@@ -126,7 +126,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
             return self.count()
 
     @parameter
-    fn scalar_depth(self) -> Int:
+    fn _scalar_depth(self) -> Int:
         if complex:
             return 2 * depth
         else:
@@ -1298,10 +1298,10 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         var new_cols = self._cols + 2 * cols
 
         var result = Self(rows=new_rows, cols=new_cols)
-        var result_base_data_ptr = result.unsafe_data_ptr().offset((rows * new_cols + cols) * self.scalar_depth())
+        var result_base_data_ptr = result.unsafe_data_ptr().offset((rows * new_cols + cols) * self._scalar_depth())
 
-        var row_offset = self._cols * self.scalar_depth()
-        var new_row_offset = new_cols * self.scalar_depth()
+        var row_offset = self._cols * self._scalar_depth()
+        var new_row_offset = new_cols * self._scalar_depth()
 
         @parameter
         fn copy_row(row: Int):
@@ -1316,9 +1316,9 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
         var result = Self(rows=self._rows, cols=self._cols + other._cols)
 
-        var scalar_row_offset = self._cols * self.scalar_depth()
-        var other_scalar_row_offset = other._cols * other.scalar_depth()
-        var result_scalar_row_offset = result._cols * result.scalar_depth()
+        var scalar_row_offset = self._cols * self._scalar_depth()
+        var other_scalar_row_offset = other._cols * other._scalar_depth()
+        var result_scalar_row_offset = result._cols * result._scalar_depth()
         var right_side_base_data_ptr = result.unsafe_data_ptr().offset(scalar_row_offset)
 
         @parameter
@@ -1343,8 +1343,8 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         debug_assert[assert_mode="safe"](self._cols == other._cols, "Matrices must have same number of cols to stack vertically")
 
         var result = Self(rows=self._rows + other._rows, cols=self._cols)
-        memcpy(dest=result.unsafe_data_ptr(), src=self.unsafe_data_ptr(), count=self.scalar_count())
-        memcpy(dest=result.unsafe_data_ptr().offset(self.scalar_count()), src=other.unsafe_data_ptr(), count=other.scalar_count())
+        memcpy(dest=result.unsafe_data_ptr(), src=self.unsafe_data_ptr(), count=self._scalar_count())
+        memcpy(dest=result.unsafe_data_ptr().offset(self._scalar_count()), src=other.unsafe_data_ptr(), count=other._scalar_count())
 
         return result^
 
