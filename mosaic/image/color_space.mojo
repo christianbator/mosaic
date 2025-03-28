@@ -20,7 +20,6 @@ struct ColorSpace(EqualityComparable, Stringable, Writable):
     #
     alias greyscale = Self(0)
     alias rgb = Self(1)
-    alias yuv = Self(2)
 
     #
     # Fields
@@ -33,7 +32,7 @@ struct ColorSpace(EqualityComparable, Stringable, Writable):
     fn __init__(out self, raw_value: Int):
         self._raw_value = raw_value
 
-        if raw_value not in [0, 1, 2]:
+        if raw_value not in [0, 1]:
             fatal_error("Unsupported color space raw value: ", raw_value)
 
     #
@@ -46,8 +45,6 @@ struct ColorSpace(EqualityComparable, Stringable, Writable):
         if self == Self.greyscale:
             return 1
         elif self == Self.rgb:
-            return 3
-        elif self == Self.yuv:
             return 3
         else:
             fatal_error("Unimplemented channels() for color space: ", self)
@@ -79,8 +76,6 @@ struct ColorSpace(EqualityComparable, Stringable, Writable):
             writer.write("greyscale")
         elif self == Self.rgb:
             writer.write("rgb")
-        elif self == Self.yuv:
-            writer.write("yuv")
         else:
             fatal_error("Unimplemented write_to() for color space with raw value: ", self._raw_value)
 

@@ -944,9 +944,6 @@ struct Image[dtype: DType, color_space: ColorSpace](
                                 result.strided_store(grey, y=y, x=x, channel=0)
                                 result.strided_store(grey, y=y, x=x, channel=1)
                                 result.strided_store(grey, y=y, x=x, channel=2)
-                            # YUV
-                            elif new_color_space == ColorSpace.yuv:
-                                result.strided_store(grey, y=y, x=x, channel=0)
 
                         # RGB ->
                         elif color_space == ColorSpace.rgb:
@@ -959,36 +956,6 @@ struct Image[dtype: DType, color_space: ColorSpace](
                             if new_color_space == ColorSpace.greyscale:
                                 var grey = 0.299 * red + 0.587 * green + 0.114 * blue
                                 result.strided_store(grey.cast[new_dtype](), y=y, x=x, channel=0)
-                            # YUV
-                            elif new_color_space == ColorSpace.yuv:
-                                var y_lum = 0.299 * red + 0.587 * green + 0.114 * blue
-                                var u = 128 - 0.168736 * red - 0.331264 * green + 0.5 * blue
-                                var v = 128 + 0.5 * red - 0.418688 * green - 0.081312 * blue
-
-                                result.strided_store(y_lum.cast[new_dtype](), y=y, x=x, channel=0)
-                                result.strided_store(u.cast[new_dtype](), y=y, x=x, channel=1)
-                                result.strided_store(v.cast[new_dtype](), y=y, x=x, channel=2)
-
-                        # YUV ->
-                        elif color_space == ColorSpace.yuv:
-                            # Greyscale
-                            @parameter
-                            if new_color_space == ColorSpace.greyscale:
-                                var y_lum = self.strided_load[width](y=y, x=x, channel=0).cast[new_dtype]()
-                                result.strided_store(y_lum, y=y, x=x, channel=0)
-                            # RGB
-                            elif new_color_space == ColorSpace.rgb:
-                                var y_lum = self.strided_load[width](y=y, x=x, channel=0).cast[DType.float64]()
-                                var u = self.strided_load[width](y=y, x=x, channel=1).cast[DType.float64]()
-                                var v = self.strided_load[width](y=y, x=x, channel=2).cast[DType.float64]()
-
-                                var red = y_lum + 1.402 * (v - 128)
-                                var green = y_lum - 0.344136 * (u - 128) - 0.714136 * (v - 128)
-                                var blue = y_lum + 1.772 * (u - 128)
-
-                                result.strided_store(red.cast[new_dtype](), y=y, x=x, channel=0)
-                                result.strided_store(green.cast[new_dtype](), y=y, x=x, channel=1)
-                                result.strided_store(blue.cast[new_dtype](), y=y, x=x, channel=2)
 
                     except error:
                         fatal_error(error)
