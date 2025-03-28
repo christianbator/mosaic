@@ -96,7 +96,7 @@ struct Visualizer:
         V: VideoCapturing,
         out_dtype: DType,
         out_color_space: ColorSpace, //,
-        frame_processor: fn[V: VideoCapturing] (Pointer[Image[V.dtype, V.color_space]]) capturing [_] -> Image[out_dtype, out_color_space],
+        frame_processor: fn[V: VideoCapturing] (Pointer[Image[DType.uint8, V.color_space]]) capturing [_] -> Image[out_dtype, out_color_space],
     ](mut video_capture: V, window_title: String):
         while True:
             if video_capture.is_next_frame_available():

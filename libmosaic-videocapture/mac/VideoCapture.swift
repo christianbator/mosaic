@@ -9,7 +9,12 @@ import AVFoundation
 import Accelerate
 
 
-// MARK: ColorSpace
+// MARK: - C Interface
+
+enum DeviceQuery {
+    case index(Int)
+    case name(String)
+}
 
 public enum ColorSpace: CInt {
     case greyscale
@@ -25,19 +30,24 @@ public enum ColorSpace: CInt {
     }
 }
 
-// MARK: VideoCaptureDimensions
-
 struct VideoCaptureDimensions {
     var height: CInt
     var width: CInt
 }
 
-// MARK: - C Interface
+@MainActor
+@_cdecl("initialize_with_index")
+public func initialize(index: CInt) -> OpaquePointer {
+    let videoCapture = VideoCapture(deviceQuery: .index(Int(index)))
+    let rawPointer = Unmanaged<VideoCapture>.passUnretained(videoCapture).toOpaque()
+
+    return OpaquePointer(rawPointer)
+}
 
 @MainActor
-@_cdecl("initialize")
-public func initialize() -> OpaquePointer {
-    let videoCapture = VideoCapture()
+@_cdecl("initialize_with_name")
+public func initialize(name: UnsafePointer<CChar>) -> OpaquePointer {
+    let videoCapture = VideoCapture(deviceQuery: .name(String(cString: name)))
     let rawPointer = Unmanaged<VideoCapture>.passUnretained(videoCapture).toOpaque()
 
     return OpaquePointer(rawPointer)
@@ -45,10 +55,10 @@ public func initialize() -> OpaquePointer {
 
 @MainActor
 @_cdecl("open")
-public func open(pointer: OpaquePointer, index: CInt, colorSpace: CInt, dimensions: UnsafeMutableRawPointer) -> CBool {
+public func open(pointer: OpaquePointer, colorSpace: CInt, dimensions: UnsafeMutableRawPointer) -> CBool {
     let dimensions = dimensions.assumingMemoryBound(to: VideoCaptureDimensions.self)
     
-    return videoCapture(from: pointer).open(index: Int(index), colorSpace: ColorSpace(rawValue: colorSpace)!, dimensions: dimensions)
+    return videoCapture(from: pointer).open(colorSpace: ColorSpace(rawValue: colorSpace)!, dimensions: dimensions)
 }
 
 @MainActor
@@ -96,33 +106,49 @@ class VideoCapture: NSObject, @preconcurrency AVCaptureVideoDataOutputSampleBuff
     
     private(set) var isNextFrameAvailable: Bool = false
     
+    private let deviceQuery: DeviceQuery
     private var session: AVCaptureSession!
     private var colorSpace: ColorSpace!
     private var height: Int = 0
     private var width: Int = 0
     private var destBuffer: vImage_Buffer!
 
-    override init() {
+    init(deviceQuery: DeviceQuery) {
+        self.deviceQuery = deviceQuery
         super.init()
         
         _ = Unmanaged<VideoCapture>.passRetained(self)
     }
     
-    func open(index: Int, colorSpace: ColorSpace, dimensions: UnsafeMutablePointer<VideoCaptureDimensions>) -> Bool {
+    func open(colorSpace: ColorSpace, dimensions: UnsafeMutablePointer<VideoCaptureDimensions>) -> Bool {
         do {
             let session = AVCaptureSession()
             session.beginConfiguration()
             
             let devices = AVCaptureDevice.DiscoverySession(deviceTypes: [.builtInWideAngleCamera, .external], mediaType: .video, position: .unspecified).devices
             
-            guard devices.indices.contains(index) else {
-                print("Error initializing capture device at index \(index): device not found")
+            guard let device: AVCaptureDevice = {
+                switch deviceQuery {
+                case .index(let index):
+                    let sortedDevices = devices.sorted { $0.localizedName < $1.localizedName }
+                    
+                    guard sortedDevices.indices.contains(index) else {
+                        print("Error initializing capture device at index \(index): device not found")
+                        return nil
+                    }
+                    
+                    return sortedDevices[index]
+                case .name(let name):
+                    guard let device = devices.first(where: { $0.localizedName == name }) else {
+                        print("Error initializing capture device with name '\(name)': device not found")
+                        return nil
+                    }
+                    
+                    return device
+                }
+            }() else {
                 return false
             }
-
-            let device = devices[index]
-            
-            printDeviceInfo(device)
             
             let input = try AVCaptureDeviceInput(device: device)
             
