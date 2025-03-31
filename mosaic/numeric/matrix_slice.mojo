@@ -18,7 +18,7 @@ from mosaic.utility import unroll_factor, fatal_error
 @value
 struct MatrixSlice[
     mut: Bool, //,
-    component_range: StridedRange,
+    raw_component_range: StridedRange,
     dtype: DType,
     depth: Int,
     complex: Bool,
@@ -27,12 +27,13 @@ struct MatrixSlice[
     #
     # Fields
     #
-    alias _depth = ceildiv(component_range.end - component_range.start, component_range.step)
+    alias _component_range = raw_component_range.unsafe_normalized_in_positive_range(depth)
+    alias _depth = ceildiv(Self._component_range.end - Self._component_range.start, Self._component_range.step)
 
     var _matrix: Pointer[Matrix[dtype, depth, complex=complex], origin]
     var _row_range: StridedRange
     var _col_range: StridedRange
-    var _component_range: StridedRange
+
     var _rows: Int
     var _cols: Int
 
@@ -46,15 +47,14 @@ struct MatrixSlice[
         col_range: StridedRange,
     ) raises:
         constrained[
-            component_range.can_normalize_in_positive_range(depth),
-            "Invalid component range for matrix with depth = " + String(depth) + ", " + String(component_range),
+            raw_component_range.can_normalize_in_positive_range(depth),
+            "Invalid component range for matrix with depth = " + String(depth) + ", " + String(raw_component_range),
         ]()
 
         self._matrix = Pointer.address_of(matrix)
 
         self._row_range = row_range.normalized_in_positive_range(matrix.rows())
         self._col_range = col_range.normalized_in_positive_range(matrix.cols())
-        self._component_range = component_range.normalized_in_positive_range(depth)
 
         self._rows = ceildiv(row_range.end - row_range.start, row_range.step)
         self._cols = ceildiv(col_range.end - col_range.start, col_range.step)
@@ -63,8 +63,8 @@ struct MatrixSlice[
         other_component_range: StridedRange
     ](out self, other: MatrixSlice[other_component_range, dtype, depth, complex, origin], row_range: StridedRange, col_range: StridedRange) raises:
         constrained[
-            component_range.can_normalize_in_positive_range(depth),
-            "Invalid component range for matrix with depth = " + String(depth) + ", " + String(component_range),
+            raw_component_range.can_normalize_in_positive_range(depth),
+            "Invalid component range for matrix with depth = " + String(depth) + ", " + String(raw_component_range),
         ]()
 
         self._matrix = other._matrix
@@ -80,8 +80,6 @@ struct MatrixSlice[
             other._col_range.start + col_range.end,
             other._col_range.step * col_range.step,
         ).normalized_in_positive_range(other._cols)
-
-        self._component_range = component_range.normalized_in_positive_range(depth)
 
         self._rows = ceildiv(row_range.end - row_range.start, row_range.step)
         self._cols = ceildiv(col_range.end - col_range.start, col_range.step)
@@ -100,6 +98,18 @@ struct MatrixSlice[
     @parameter
     fn components(self) -> Int:
         return Self._depth
+
+    @always_inline
+    fn row_range(self) -> StridedRange:
+        return self._row_range
+
+    @always_inline
+    fn col_range(self) -> StridedRange:
+        return self._col_range
+
+    @parameter
+    fn component_range(self) -> StridedRange:
+        return self._component_range
 
     #
     # Access
@@ -139,7 +149,7 @@ struct MatrixSlice[
         return self._matrix[].strided_load[width](
             row=self._row_range.start + row * self._row_range.step,
             col=self._col_range.start + col * self._col_range.step,
-            component=component_range.start + component * component_range.step,
+            component=Self._component_range.start + component * Self._component_range.step,
         )
 
     @always_inline
@@ -158,7 +168,7 @@ struct MatrixSlice[
             value,
             row=self._row_range.start + row * self._row_range.step,
             col=self._col_range.start + col * self._col_range.step,
-            component=component_range.start + component * component_range.step,
+            component=Self._component_range.start + component * Self._component_range.step,
         )
 
     #
@@ -198,9 +208,9 @@ struct MatrixSlice[
         component: Int
     ](self) raises -> MatrixSlice[
         StridedRange(
-            component_range.start + StridedRange(component, component + 1).start,
-            component_range.start + StridedRange(component, component + 1).end,
-            component_range.step * StridedRange(component, component + 1).step,
+            Self._component_range.start + StridedRange(component, component + 1).start,
+            Self._component_range.start + StridedRange(component, component + 1).end,
+            Self._component_range.step * StridedRange(component, component + 1).step,
         ),
         dtype,
         depth,
@@ -214,9 +224,9 @@ struct MatrixSlice[
         component: Int
     ](self, row_range: StridedRange) raises -> MatrixSlice[
         StridedRange(
-            component_range.start + StridedRange(component, component + 1).start,
-            component_range.start + StridedRange(component, component + 1).end,
-            component_range.step * StridedRange(component, component + 1).step,
+            Self._component_range.start + StridedRange(component, component + 1).start,
+            Self._component_range.start + StridedRange(component, component + 1).end,
+            Self._component_range.step * StridedRange(component, component + 1).step,
         ),
         dtype,
         depth,
@@ -230,9 +240,9 @@ struct MatrixSlice[
         component: Int
     ](self, *, col_range: StridedRange) raises -> MatrixSlice[
         StridedRange(
-            component_range.start + StridedRange(component, component + 1).start,
-            component_range.start + StridedRange(component, component + 1).end,
-            component_range.step * StridedRange(component, component + 1).step,
+            Self._component_range.start + StridedRange(component, component + 1).start,
+            Self._component_range.start + StridedRange(component, component + 1).end,
+            Self._component_range.step * StridedRange(component, component + 1).step,
         ),
         dtype,
         depth,
@@ -246,9 +256,9 @@ struct MatrixSlice[
         component: Int
     ](self, row_range: StridedRange, col_range: StridedRange) raises -> MatrixSlice[
         StridedRange(
-            component_range.start + StridedRange(component, component + 1).start,
-            component_range.start + StridedRange(component, component + 1).end,
-            component_range.step * StridedRange(component, component + 1).step,
+            Self._component_range.start + StridedRange(component, component + 1).start,
+            Self._component_range.start + StridedRange(component, component + 1).end,
+            Self._component_range.step * StridedRange(component, component + 1).step,
         ),
         dtype,
         depth,
@@ -262,9 +272,9 @@ struct MatrixSlice[
         new_component_range: StridedRange,
     ](self) raises -> MatrixSlice[
         StridedRange(
-            component_range.start + new_component_range.start,
-            component_range.start + new_component_range.end,
-            component_range.step * new_component_range.step,
+            Self._component_range.start + new_component_range.start,
+            Self._component_range.start + new_component_range.end,
+            Self._component_range.step * new_component_range.step,
         ),
         dtype,
         depth,
@@ -278,9 +288,9 @@ struct MatrixSlice[
         new_component_range: StridedRange,
     ](self, row_range: StridedRange) raises -> MatrixSlice[
         StridedRange(
-            component_range.start + new_component_range.start,
-            component_range.start + new_component_range.end,
-            component_range.step * new_component_range.step,
+            Self._component_range.start + new_component_range.start,
+            Self._component_range.start + new_component_range.end,
+            Self._component_range.step * new_component_range.step,
         ),
         dtype,
         depth,
@@ -294,9 +304,9 @@ struct MatrixSlice[
         new_component_range: StridedRange,
     ](self, *, col_range: StridedRange) raises -> MatrixSlice[
         StridedRange(
-            component_range.start + new_component_range.start,
-            component_range.start + new_component_range.end,
-            component_range.step * new_component_range.step,
+            Self._component_range.start + new_component_range.start,
+            Self._component_range.start + new_component_range.end,
+            Self._component_range.step * new_component_range.step,
         ),
         dtype,
         depth,
@@ -310,9 +320,9 @@ struct MatrixSlice[
         new_component_range: StridedRange,
     ](self, row_range: StridedRange, col_range: StridedRange) raises -> MatrixSlice[
         StridedRange(
-            component_range.start + new_component_range.start,
-            component_range.start + new_component_range.end,
-            component_range.step * new_component_range.step,
+            Self._component_range.start + new_component_range.start,
+            Self._component_range.start + new_component_range.end,
+            Self._component_range.step * new_component_range.step,
         ),
         dtype,
         depth,
@@ -321,9 +331,9 @@ struct MatrixSlice[
     ]:
         return MatrixSlice[
             StridedRange(
-                component_range.start + new_component_range.start,
-                component_range.start + new_component_range.end,
-                component_range.step * new_component_range.step,
+                Self._component_range.start + new_component_range.start,
+                Self._component_range.start + new_component_range.end,
+                Self._component_range.step * new_component_range.step,
             ),
             dtype,
             depth,
@@ -339,7 +349,7 @@ struct MatrixSlice[
 
         @parameter
         for slice_component in range(Self._depth):
-            var component = component_range.start + slice_component * component_range.step
+            var component = Self._component_range.start + slice_component * Self._component_range.step
 
             @parameter
             fn process_row(range_row: Int):
@@ -375,7 +385,7 @@ struct MatrixSlice[
 
         @parameter
         for slice_component in range(depth):
-            var component = component_range.start + slice_component * component_range.step
+            var component = Self._component_range.start + slice_component * Self._component_range.step
 
             @parameter
             fn process_row(range_row: Int):

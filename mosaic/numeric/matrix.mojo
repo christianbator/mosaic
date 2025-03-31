@@ -7,8 +7,9 @@
 
 from memory import UnsafePointer, memset_zero, memcpy
 from algorithm import vectorize, parallelize
-from math import floor, ceil, trunc, ceildiv, isclose, Ceilable, CeilDivable, Floorable, Truncable
+from math import cos, sin, pi, floor, ceil, trunc, ceildiv, isclose, Ceilable, CeilDivable, Floorable, Truncable
 from collections import InlineArray
+from bit import bit_width, is_power_of_two, next_power_of_two
 
 from mosaic.utility import optimal_simd_width, unroll_factor, fatal_error
 
@@ -47,14 +48,6 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         self._cols = cols
         self._data = NumericArray[dtype, complex=complex](count=rows * cols * depth)
         self.fill(value)
-
-    fn __init__(out self, rows: Int, cols: Int, *values: ScalarNumber[dtype, complex=complex]):
-        constrained[depth > 0]()
-        debug_assert[assert_mode="safe"](rows * cols * depth == len(values), "Mismatch in variadic argument length for Matrix constructor")
-
-        self._rows = rows
-        self._cols = cols
-        self._data = NumericArray[dtype, complex=complex](values)
 
     fn __init__(out self, *, rows: Int, cols: Int, owned values: List[ScalarNumber[dtype, complex=complex]]):
         constrained[depth > 0]()
@@ -315,6 +308,18 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     @always_inline
     fn __getitem__[
         mut: Bool, origin: Origin[mut], //
+    ](ref [origin]self, row: Int, col_slice: Slice) raises -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
+        return self[row : row + 1, col_slice]
+
+    @always_inline
+    fn __getitem__[
+        mut: Bool, origin: Origin[mut], //
+    ](ref [origin]self, row_slice: Slice, col: Int) raises -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
+        return self[row_slice, col : col + 1]
+
+    @always_inline
+    fn __getitem__[
+        mut: Bool, origin: Origin[mut], //
     ](ref [origin]self, row_slice: Slice, col_slice: Slice) raises -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
         return self.slice(
             row_range=StridedRange(
@@ -407,6 +412,31 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     @always_inline
     fn extract_component[component: Int](self) -> Matrix[dtype, complex=complex]:
         return self.component_slice[component]().rebound_copy[depth=1]()
+
+    fn store_sub_matrix(mut self, value: Self, row: Int, col: Int) raises:
+        self.store_sub_matrix(value[:, :], row=row, col=col)
+
+    fn store_sub_matrix(mut self, value: MatrixSlice[dtype=dtype, depth=depth, complex=complex], row: Int, col: Int) raises:
+        if (value.component_range().end > depth) or (value.row_range().end > self._rows) or (value.col_range().end > self._cols):
+            raise Error("Attempt to store sub-matrix out of bounds")
+
+        @parameter
+        for component in range(depth):
+
+            @parameter
+            fn store_row(sub_row: Int):
+                @parameter
+                fn store_cols[width: Int](sub_col: Int):
+                    try:
+                        self.strided_store(
+                            value.strided_load[width](row=sub_row, col=sub_col, component=component), row=row + sub_row, col=col + sub_col, component=component
+                        )
+                    except error:
+                        fatal_error(error)
+
+                vectorize[store_cols, Self.optimal_simd_width, unroll_factor=unroll_factor](value.cols())
+
+            parallelize[store_row](value.rows())
 
     fn strided_replication[new_depth: Int](self: Matrix[dtype, 1, complex=complex]) -> Matrix[dtype, new_depth, complex=complex]:
         constrained[new_depth > depth, "Strided replication requires a desired depth > 1"]()
@@ -918,6 +948,30 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         result.for_each[_abs]()
         return result^
 
+    fn norm(self: Matrix[dtype, depth, complex=True]) -> Matrix[dtype, depth, complex=False]:
+        var result = Matrix[dtype, depth, complex=False](rows=self._rows, cols=self._cols)
+
+        @parameter
+        fn transform_row(row: Int):
+            @parameter
+            fn transform_flattened_elements[width: Int](flattened_element: Int):
+                var index = self.flattened_index(row=row, offset=flattened_element)
+
+                try:
+                    result._store(self._load[width](index).norm(), index=index)
+                except error:
+                    fatal_error(error)
+
+            vectorize[
+                transform_flattened_elements,
+                Self.optimal_simd_width,
+                unroll_factor=unroll_factor,
+            ](self._cols * depth)
+
+        parallelize[transform_row](self._rows)
+
+        return result^
+
     #
     # Numeric Methods
     #
@@ -1131,6 +1185,136 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
         parallelize[transform_row](self._rows)
 
+    fn map_to_range(mut self: Matrix[dtype, depth, complex=False], min: ScalarNumber[dtype], max: ScalarNumber[dtype]):
+        @parameter
+        for component in range(depth):
+            var current_min = self.strided_min(component)
+            var current_max = self.strided_max(component)
+            var interpolation_factor = (max - min) / (current_max - current_min)
+
+            @parameter
+            @__copy_capture(current_min, interpolation_factor)
+            fn map[width: Int](value: Number[dtype, width, complex=False]) -> Number[dtype, width, complex=False]:
+                return min + interpolation_factor * (value - current_min)
+
+            self.strided_for_each[map](component)
+
+    fn mapped_to_range(self: Matrix[dtype, depth, complex=False], min: ScalarNumber[dtype], max: ScalarNumber[dtype]) -> Matrix[dtype, depth, complex=False]:
+        var result = self.copy()
+        result.map_to_range(min, max)
+
+        return result^
+
+    fn fourier_transform(self: Matrix[dtype, depth, complex=False]) -> Matrix[DType.float64, depth, complex=True]:
+        try:
+            # Pad to next power of 2
+            var N_rows = next_power_of_two(self._rows)
+            var N_cols = next_power_of_two(self._cols)
+
+            if N_rows != self._rows or N_cols != self._cols:
+                var padded = self.padded_trailing(rows=N_rows - self._rows, cols=N_cols - self._cols)
+                var padded_result_slice = padded.fourier_transform()[0 : self._rows, 0 : self._cols]
+                return padded_result_slice.rebound_copy[depth=depth]()
+
+            # Initialize result
+            var result = Matrix[DType.float64, depth, complex=True](rows=N_rows, cols=N_cols)
+
+            @parameter
+            for component in range(depth):
+                #
+                # Row-wise Cooley-Tukey Radix-2 FFT
+                #
+                var col_order = self._bit_reversed_range(N_cols)
+                var col_twiddle_factors = self._twiddle_factors(N_cols)
+
+                @parameter
+                fn process_row(row: Int):
+                    try:
+                        for col in range(N_cols):
+                            result[row, col, component] = ScalarNumber[DType.float64, complex=True](
+                                real=self[row, col_order[col], component].value.cast[DType.float64](), imaginary=0
+                            )
+
+                        var step_size = 1
+                        while step_size < N_cols:
+                            for i in range(0, N_cols, 2 * step_size):
+                                for j in range(step_size):
+                                    var k = i + j
+                                    var t = col_twiddle_factors[N_cols // (2 * step_size) * j] * result[row, k + step_size, component]
+                                    result[row, k + step_size, component] = result[row, k, component] - t
+                                    result[row, k, component] = result[row, k, component] + t
+
+                            step_size *= 2
+                    except error:
+                        fatal_error(error)
+
+                parallelize[process_row](self._rows)
+
+                #
+                # Col-wise Cooley-Tukey Radix-2 FFT
+                #
+                var row_order = self._bit_reversed_range(N_rows)
+                var row_twiddle_factors = self._twiddle_factors(N_rows)
+
+                @parameter
+                fn process_col(col: Int):
+                    try:
+                        var col_copy = result.component_slice[component](col_range=(col, col + 1)).rebound_copy[depth=1]()
+
+                        for row in range(N_rows):
+                            result[row, col, component] = col_copy[row_order[row], 0]
+
+                        var step_size = 1
+                        while step_size < N_rows:
+                            for i in range(0, N_rows, 2 * step_size):
+                                for j in range(step_size):
+                                    var k = i + j
+                                    var t = row_twiddle_factors[N_rows // (2 * step_size) * j] * result[k + step_size, col, component]
+                                    result[k + step_size, col, component] = result[k, col, component] - t
+                                    result[k, col, component] = result[k, col, component] + t
+
+                            step_size *= 2
+                    except error:
+                        fatal_error(error)
+
+                parallelize[process_col](self._cols)
+
+            return result^
+
+        except error:
+            fatal_error(error)
+            while True:
+                pass
+
+    fn _bit_reversed_range(self, N: Int) -> List[Int]:
+        var result = List[Int](capacity=N)
+
+        var bits = bit_width(N) - 1
+        for i in range(N):
+            var reversed_i = 0
+            for j in range(bits):
+                reversed_i = (reversed_i << 1) | ((i >> j) & 1)
+
+            result.append(reversed_i)
+
+        return result
+
+    # Initializes Twiddle factors (complex roots of unity)
+    fn _twiddle_factors(self, N: Int) -> NumericArray[DType.float64, complex=True]:
+        var factors = NumericArray[DType.float64, complex=True](count=N)
+
+        try:
+            for k in range(N // 2):
+                var factor = ScalarNumber[DType.float64, complex=True](real=cos(-2 * pi * k / N), imaginary=sin(-2 * pi * k / N))
+
+                factors[k] = factor
+                factors[k + N // 2] = -factor
+
+        except error:
+            fatal_error(error)
+
+        return factors^
+
     #
     # Geometric Transformations
     #
@@ -1288,11 +1472,30 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
         return result^
 
+    fn shift_origin_to_center(mut self):
+        try:
+            var top_left = self[0 : self._rows // 2, 0 : self._cols // 2].rebound_copy[depth=depth]()
+            var bottom_right = self[self._rows // 2 : self._rows, self._cols // 2 : self._cols].rebound_copy[depth=depth]()
+
+            self.store_sub_matrix(bottom_right, row=0, col=0)
+            self.store_sub_matrix(top_left, row=self._rows // 2, col=self._cols // 2)
+
+            var bottom_left = self[self._rows // 2 : self._rows, 0 : self._cols // 2].rebound_copy[depth=depth]()
+            var top_right = self[0 : self._rows // 2, self._cols // 2 : self._cols].rebound_copy[depth=depth]()
+
+            self.store_sub_matrix(top_right, row=self._rows // 2, col=0)
+            self.store_sub_matrix(bottom_left, row=0, col=self._cols // 2)
+
+        except error:
+            fatal_error(error)
+
     fn padded(self, size: Int) -> Self:
         return self.padded(rows=size, cols=size)
 
     fn padded(self, rows: Int, cols: Int) -> Self:
         debug_assert[assert_mode="safe"](rows >= 0 and cols >= 0, "Must specify rows >= 0 and cols >= 0 for Matrix.padded()")
+
+        var src_data_ptr = self.unsafe_data_ptr()
 
         var new_rows = self._rows + 2 * rows
         var new_cols = self._cols + 2 * cols
@@ -1305,7 +1508,29 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
         @parameter
         fn copy_row(row: Int):
-            memcpy(dest=result_base_data_ptr.offset(row * new_row_offset), src=self.unsafe_data_ptr().offset(row * row_offset), count=row_offset)
+            memcpy(dest=result_base_data_ptr.offset(row * new_row_offset), src=src_data_ptr.offset(row * row_offset), count=row_offset)
+
+        parallelize[copy_row](self._rows)
+
+        return result^
+
+    fn padded_trailing(self, rows: Int, cols: Int) -> Self:
+        debug_assert[assert_mode="safe"](rows >= 0 and cols >= 0, "Must specify rows >= 0 and cols >= 0 for Matrix.trailing_padded()")
+
+        var src_data_ptr = self.unsafe_data_ptr()
+
+        var new_rows = self._rows + rows
+        var new_cols = self._cols + cols
+
+        var result = Self(rows=new_rows, cols=new_cols)
+        var result_data_ptr = result.unsafe_data_ptr()
+
+        var row_offset = self._cols * self._scalar_depth()
+        var new_row_offset = new_cols * self._scalar_depth()
+
+        @parameter
+        fn copy_row(row: Int):
+            memcpy(dest=result_data_ptr.offset(row * new_row_offset), src=src_data_ptr.offset(row * row_offset), count=row_offset)
 
         parallelize[copy_row](self._rows)
 

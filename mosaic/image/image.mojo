@@ -10,6 +10,7 @@ from memory import UnsafePointer
 from algorithm import vectorize, parallelize
 from collections import Optional
 from math import floor, ceil, ceildiv, trunc, Ceilable, CeilDivable, Floorable, Truncable
+from bit import next_power_of_two
 
 from mosaic.numeric import Matrix, MatrixSlice, StridedRange, SIMDRange, Number
 from mosaic.utility import optimal_simd_width, unroll_factor, fatal_error
@@ -151,6 +152,14 @@ struct Image[dtype: DType, color_space: ColorSpace](
     # Slicing
     #
     @always_inline
+    fn __getitem__[mut: Bool, origin: Origin[mut], //](ref [origin]self, y: Int, x_slice: Slice) raises -> ImageSlice[dtype, color_space, origin]:
+        return self[y : y + 1, x_slice]
+
+    @always_inline
+    fn __getitem__[mut: Bool, origin: Origin[mut], //](ref [origin]self, y_slice: Slice, x: Int) raises -> ImageSlice[dtype, color_space, origin]:
+        return self[y_slice, x : x + 1]
+
+    @always_inline
     fn __getitem__[mut: Bool, origin: Origin[mut], //](ref [origin]self, y_slice: Slice, x_slice: Slice) raises -> ImageSlice[dtype, color_space, origin]:
         return self.slice(
             y_range=StridedRange(
@@ -234,6 +243,35 @@ struct Image[dtype: DType, color_space: ColorSpace](
     @always_inline
     fn extract_channel[channel: Int](self) -> Matrix[dtype]:
         return self._matrix.extract_component[channel]()
+
+    fn store_sub_image(mut self, value: Self, y: Int, x: Int) raises:
+        self.store_sub_image(value[:, :], y=y, x=x)
+
+    fn store_sub_image(mut self, value: ImageSlice[dtype=dtype, color_space=color_space], y: Int, x: Int) raises:
+        if (value.y_range().end > self.height()) or (value.x_range().end > self.width()):
+            raise Error("Attempt to store sub-image out of bounds")
+
+        @parameter
+        for channel in range(color_space.channels()):
+
+            @parameter
+            fn store_row(sub_y: Int):
+                @parameter
+                fn store_cols[width: Int](sub_x: Int):
+                    try:
+                        self.strided_store(value.strided_load[width](y=sub_y, x=sub_x, channel=channel), y=y + sub_y, x=x + sub_x, channel=channel)
+                    except error:
+                        fatal_error(error)
+
+                vectorize[store_cols, Self.optimal_simd_width, unroll_factor=unroll_factor](value.width())
+
+            parallelize[store_row](value.height())
+
+    fn store_sub_matrix(mut self, value: Matrix[dtype, color_space.channels()], y: Int, x: Int) raises:
+        self._matrix.store_sub_matrix(value, row=y, col=x)
+
+    fn store_sub_matrix(mut self, value: MatrixSlice[dtype=dtype, depth = color_space.channels(), complex=False], y: Int, x: Int) raises:
+        self._matrix.store_sub_matrix(value, row=y, col=x)
 
     #
     # ExplicitlyCopyable
@@ -559,9 +597,6 @@ struct Image[dtype: DType, color_space: ColorSpace](
 
         self._matrix.for_each_zipped[number_transformer](other._matrix)
 
-    #
-    # Numeric Transformations
-    #
     fn invert(mut self):
         constrained[dtype == DType.uint8, "invert() is only available for UInt8 images, since inversion is ambiguous otherwise"]()
 
@@ -576,6 +611,34 @@ struct Image[dtype: DType, color_space: ColorSpace](
         result.invert()
 
         return result^
+
+    fn blah(self) -> Self:
+        var N_rows = next_power_of_two(self.height())
+        var N_cols = next_power_of_two(self.width())
+
+        return self.padded_trailing[Border.reflect](height=N_rows - self.height(), width=N_cols - self.width())
+
+    fn spectrum(self) -> Matrix[DType.float64, color_space.channels(), complex=True]:
+        # TODO: Allow border handling specification if padding image to optimal FFT size
+        try:
+            var N_rows = next_power_of_two(self.height())
+            var N_cols = next_power_of_two(self.width())
+
+            if N_rows != self.height() or N_cols != self.width():
+                var padded = self.padded_trailing[Border.reflect](height=N_rows - self.height(), width=N_cols - self.width())
+                var padded_result_slice = padded._matrix.fourier_transform()[0 : self.height(), 0 : self.width()]
+                var result = padded_result_slice.rebound_copy[depth = color_space.channels()]()
+                result.shift_origin_to_center()
+                return result^
+
+            var result = self._matrix.fourier_transform()
+            result.shift_origin_to_center()
+
+            return result^
+        except error:
+            fatal_error(error)
+            while True:
+                pass
 
     #
     # Geometric Transformations
@@ -740,6 +803,28 @@ struct Image[dtype: DType, color_space: ColorSpace](
                     for y in range(height + self.height(), result.height()):
                         for x in range(result.width()):
                             result[y, x, channel] = self._bordered_load[border](y=y - height, x=x - width, channel=channel)
+            except error:
+                fatal_error(error)
+
+        return result^
+
+    fn padded_trailing[border: Border = Border.zero](self, width: Int, height: Int) -> Self:
+        var result = Self(self._matrix.padded_trailing(rows=height, cols=width))
+
+        @parameter
+        if border != Border.zero:
+            try:
+
+                @parameter
+                for channel in range(color_space.channels()):
+                    for y in range(self.height()):
+                        for x in range(self.width(), result.width()):
+                            result[y, x, channel] = self._bordered_load[border](y=y, x=x, channel=channel)
+
+                    for y in range(self.height(), result.height()):
+                        for x in range(result.width()):
+                            result[y, x, channel] = self._bordered_load[border](y=y, x=x, channel=channel)
+
             except error:
                 fatal_error(error)
 

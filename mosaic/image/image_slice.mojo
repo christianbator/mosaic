@@ -77,6 +77,14 @@ struct ImageSlice[mut: Bool, //, dtype: DType, color_space: ColorSpace, origin: 
     fn channels(self) -> Int:
         return color_space.channels()
 
+    @always_inline
+    fn y_range(self) -> StridedRange:
+        return self._y_range
+
+    @always_inline
+    fn x_range(self) -> StridedRange:
+        return self._x_range
+
     #
     # Access
     #

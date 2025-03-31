@@ -79,12 +79,20 @@ struct StridedRange(Stringable, Writable):
         else:
             raise Error("Unable to normalize ", self, " in positive range: [0, ", end_of_range, ")")
 
-    # TODO: Remove this when calling raising function at compile-time works
+    # TODO: Remove these two methods when calling raising function at compile-time works
+    fn unsafe_normalized_in_positive_range(self, end_of_range: Int) -> Self:
+        var start = self.start + end_of_range if self.start < 0 else self.start
+        var end = self.end + end_of_range if self.end < 0 else self.end
+
+        return Self(start, end, self.step)
+
     fn can_normalize_in_positive_range(self, end_of_range: Int) -> Bool:
-        try:
-            _ = self.normalized_in_positive_range(end_of_range)
+        var start = self.start + end_of_range if self.start < 0 else self.start
+        var end = self.end + end_of_range if self.end < 0 else self.end
+
+        if (0 <= start < end <= end_of_range) and (self.step > 0):
             return True
-        except error:
+        else:
             return False
 
     #
