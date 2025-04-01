@@ -16,7 +16,7 @@ package:
 
 source:
   - git: https://github.com/christianbator/mosaic
-    rev: development
+    rev: main
 
 build:
   number: 0

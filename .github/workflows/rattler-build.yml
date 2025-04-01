@@ -24,8 +24,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: 'development'
       - name: Build package
         uses: prefix-dev/rattler-build-action@v0.2.33
         with:
