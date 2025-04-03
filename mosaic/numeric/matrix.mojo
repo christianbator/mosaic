@@ -13,6 +13,8 @@ from bit import bit_width, is_power_of_two, next_power_of_two
 
 from mosaic.utility import optimal_simd_width, unroll_factor, fatal_error
 
+from .fft import fft
+
 
 #
 # Matrix
@@ -252,6 +254,28 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
             result[component] = values[component]
 
         return result
+
+    fn strided_iterate[handler: fn[width: Int] (value: Number[dtype, width, complex=complex], row: Int, col: Int, component: Int) capturing -> None](self):
+        @parameter
+        for component in range(depth):
+
+            @parameter
+            fn visit_row(row: Int):
+                @parameter
+                fn visit_col[width: Int](col: Int):
+                    try:
+                        handler[width](value=self.strided_load[width](row=row, col=col, component=component), row=row, col=col, component=component)
+
+                    except error:
+                        fatal_error(error)
+
+                vectorize[
+                    visit_col,
+                    Self.optimal_simd_width,
+                    unroll_factor=unroll_factor,
+                ](self._cols)
+
+            parallelize[visit_row](self._rows)
 
     #
     # Private Access
@@ -1206,114 +1230,86 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         return result^
 
     fn fourier_transform(self: Matrix[dtype, depth, complex=False]) -> Matrix[DType.float64, depth, complex=True]:
-        try:
-            # Pad to next power of 2
-            var N_rows = next_power_of_two(self._rows)
-            var N_cols = next_power_of_two(self._cols)
+        return fft(self)
+        # try:
+        #     # Pad to optimal fft size
+        #     var N_rows = _optimal_fft_size(self._rows)
+        #     var N_cols = _optimal_fft_size(self._cols)
 
-            if N_rows != self._rows or N_cols != self._cols:
-                var padded = self.padded_trailing(rows=N_rows - self._rows, cols=N_cols - self._cols)
-                var padded_result_slice = padded.fourier_transform()[0 : self._rows, 0 : self._cols]
-                return padded_result_slice.rebound_copy[depth=depth]()
+        #     if N_rows != self._rows or N_cols != self._cols:
+        #         var padded = self.padded_trailing(rows=N_rows - self._rows, cols=N_cols - self._cols)
+        #         var padded_result_slice = padded.fourier_transform()[0 : self._rows, 0 : self._cols]
+        #         return padded_result_slice.rebound_copy[depth=depth]()
 
-            # Initialize result
-            var result = Matrix[DType.float64, depth, complex=True](rows=N_rows, cols=N_cols)
+        #     # Initialize result
+        #     var result = Matrix[DType.float64, depth, complex=True](rows=N_rows, cols=N_cols)
 
-            @parameter
-            for component in range(depth):
-                #
-                # Row-wise Cooley-Tukey Radix-2 FFT
-                #
-                var col_order = self._bit_reversed_range(N_cols)
-                var col_twiddle_factors = self._twiddle_factors(N_cols)
+        #     @parameter
+        #     for component in range(depth):
+        #         #
+        #         # Row-wise Cooley-Tukey Radix-2 FFT
+        #         #
+        #         var col_order = self._bit_reversed_range(N_cols)
+        #         var col_twiddle_factors = self._twiddle_factors(N_cols)
 
-                @parameter
-                fn process_row(row: Int):
-                    try:
-                        for col in range(N_cols):
-                            result[row, col, component] = ScalarNumber[DType.float64, complex=True](
-                                real=self[row, col_order[col], component].value.cast[DType.float64](), imaginary=0
-                            )
+        #         @parameter
+        #         fn process_row(row: Int):
+        #             try:
+        #                 for col in range(N_cols):
+        #                     result[row, col, component] = ScalarNumber[DType.float64, complex=True](
+        #                         real=self[row, col_order[col], component].value.cast[DType.float64](), imaginary=0
+        #                     )
 
-                        var step_size = 1
-                        while step_size < N_cols:
-                            for i in range(0, N_cols, 2 * step_size):
-                                for j in range(step_size):
-                                    var k = i + j
-                                    var t = col_twiddle_factors[N_cols // (2 * step_size) * j] * result[row, k + step_size, component]
-                                    result[row, k + step_size, component] = result[row, k, component] - t
-                                    result[row, k, component] = result[row, k, component] + t
+        #                 var step_size = 1
+        #                 while step_size < N_cols:
+        #                     for i in range(0, N_cols, 2 * step_size):
+        #                         for j in range(step_size):
+        #                             var k = i + j
+        #                             var t = col_twiddle_factors[N_cols // (2 * step_size) * j] * result[row, k + step_size, component]
+        #                             result[row, k + step_size, component] = result[row, k, component] - t
+        #                             result[row, k, component] = result[row, k, component] + t
 
-                            step_size *= 2
-                    except error:
-                        fatal_error(error)
+        #                     step_size *= 2
+        #             except error:
+        #                 fatal_error(error)
 
-                parallelize[process_row](self._rows)
+        #         parallelize[process_row](self._rows)
 
-                #
-                # Col-wise Cooley-Tukey Radix-2 FFT
-                #
-                var row_order = self._bit_reversed_range(N_rows)
-                var row_twiddle_factors = self._twiddle_factors(N_rows)
+        #         #
+        #         # Col-wise Cooley-Tukey Radix-2 FFT
+        #         #
+        #         var row_order = self._bit_reversed_range(N_rows)
+        #         var row_twiddle_factors = self._twiddle_factors(N_rows)
 
-                @parameter
-                fn process_col(col: Int):
-                    try:
-                        var col_copy = result.component_slice[component](col_range=(col, col + 1)).rebound_copy[depth=1]()
+        #         @parameter
+        #         fn process_col(col: Int):
+        #             try:
+        #                 var col_copy = result.component_slice[component](col_range=(col, col + 1)).rebound_copy[depth=1]()
 
-                        for row in range(N_rows):
-                            result[row, col, component] = col_copy[row_order[row], 0]
+        #                 for row in range(N_rows):
+        #                     result[row, col, component] = col_copy[row_order[row], 0]
 
-                        var step_size = 1
-                        while step_size < N_rows:
-                            for i in range(0, N_rows, 2 * step_size):
-                                for j in range(step_size):
-                                    var k = i + j
-                                    var t = row_twiddle_factors[N_rows // (2 * step_size) * j] * result[k + step_size, col, component]
-                                    result[k + step_size, col, component] = result[k, col, component] - t
-                                    result[k, col, component] = result[k, col, component] + t
+        #                 var step_size = 1
+        #                 while step_size < N_rows:
+        #                     for i in range(0, N_rows, 2 * step_size):
+        #                         for j in range(step_size):
+        #                             var k = i + j
+        #                             var t = row_twiddle_factors[N_rows // (2 * step_size) * j] * result[k + step_size, col, component]
+        #                             result[k + step_size, col, component] = result[k, col, component] - t
+        #                             result[k, col, component] = result[k, col, component] + t
 
-                            step_size *= 2
-                    except error:
-                        fatal_error(error)
+        #                     step_size *= 2
+        #             except error:
+        #                 fatal_error(error)
 
-                parallelize[process_col](self._cols)
+        #         parallelize[process_col](self._cols)
 
-            return result^
+        #     return result^
 
-        except error:
-            fatal_error(error)
-            while True:
-                pass
-
-    fn _bit_reversed_range(self, N: Int) -> List[Int]:
-        var result = List[Int](capacity=N)
-
-        var bits = bit_width(N) - 1
-        for i in range(N):
-            var reversed_i = 0
-            for j in range(bits):
-                reversed_i = (reversed_i << 1) | ((i >> j) & 1)
-
-            result.append(reversed_i)
-
-        return result
-
-    # Initializes Twiddle factors (complex roots of unity)
-    fn _twiddle_factors(self, N: Int) -> NumericArray[DType.float64, complex=True]:
-        var factors = NumericArray[DType.float64, complex=True](count=N)
-
-        try:
-            for k in range(N // 2):
-                var factor = ScalarNumber[DType.float64, complex=True](real=cos(-2 * pi * k / N), imaginary=sin(-2 * pi * k / N))
-
-                factors[k] = factor
-                factors[k + N // 2] = -factor
-
-        except error:
-            fatal_error(error)
-
-        return factors^
+        # except error:
+        #     fatal_error(error)
+        #     while True:
+        #         pass
 
     #
     # Geometric Transformations

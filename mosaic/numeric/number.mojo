@@ -86,6 +86,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
             self.value = value
 
     @always_inline
+    @implicit
     fn __init__[T: Floatable](out self: ScalarNumber[DType.float64, complex=complex], value: T):
         @parameter
         if complex:
@@ -94,6 +95,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
             self.value = value.__float__()
 
     @always_inline
+    @implicit
     fn __init__[T: FloatableRaising](out self: ScalarNumber[DType.float64, complex=complex], value: T) raises:
         @parameter
         if complex:
@@ -158,6 +160,13 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
         constrained[complex, "__init__(real, imaginary) is only available for complex numbers"]()
 
         self.value = rebind[Self.Value](real.interleave(imaginary))
+
+    @always_inline
+    @implicit
+    fn __init__(out self, tuple: (SIMD[dtype, width], SIMD[dtype, width])):
+        constrained[complex, "__init__(real, imaginary) is only available for complex numbers"]()
+
+        self = Self(real=tuple[0], imaginary=tuple[1])
 
     @staticmethod
     fn from_bits[int_type: DType, //](value: SIMD[int_type, Self.Value.size]) -> Number[dtype, width, complex=complex]:
@@ -804,6 +813,14 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     fn cast[new_dtype: DType](self) -> Number[new_dtype, width, complex=complex]:
         return Number[new_dtype, width, complex=complex](self.value.cast[new_dtype]())
 
+    @always_inline
+    fn as_complex(self: Number[dtype, width, complex=False]) -> Number[dtype, width, complex=True]:
+        return Number[dtype, width, complex=True](real=self.value, imaginary=0)
+
+    @always_inline
+    fn as_complex[new_dtype: DType](self: Number[dtype, width, complex=False]) -> Number[new_dtype, width, complex=True]:
+        return Number[new_dtype, width, complex=True](real=self.value.cast[new_dtype](), imaginary=0)
+
     #
     # Stringable & Writable
     #
@@ -828,10 +845,16 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
                 if i > 0:
                     writer.write(", ")
 
-                writer.write("(", real[i], ", ", imaginary[i], "i)")
+                writer.write("(", round(real[i], ndigits=print_precision), ", ", round(imaginary[i], ndigits=print_precision), "i)")
 
             @parameter
             if width > 1:
                 writer.write("]")
         else:
             writer.write(self.value)
+
+
+#
+# Print Precision
+#
+var print_precision = 6
