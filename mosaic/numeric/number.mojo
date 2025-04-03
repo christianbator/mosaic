@@ -86,7 +86,6 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
             self.value = value
 
     @always_inline
-    @implicit
     fn __init__[T: Floatable](out self: ScalarNumber[DType.float64, complex=complex], value: T):
         @parameter
         if complex:
@@ -95,7 +94,6 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
             self.value = value.__float__()
 
     @always_inline
-    @implicit
     fn __init__[T: FloatableRaising](out self: ScalarNumber[DType.float64, complex=complex], value: T) raises:
         @parameter
         if complex:
@@ -814,12 +812,20 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
         return Number[new_dtype, width, complex=complex](self.value.cast[new_dtype]())
 
     @always_inline
-    fn as_complex(self: Number[dtype, width, complex=False]) -> Number[dtype, width, complex=True]:
-        return Number[dtype, width, complex=True](real=self.value, imaginary=0)
+    fn as_complex(self) -> Number[dtype, width, complex=True]:
+        @parameter
+        if complex:
+            return rebind[Number[dtype, width, complex=True]](self)
+        else:
+            return Number[dtype, width, complex=True](real=rebind[Number[dtype, width, complex=False].Value](self.value), imaginary=0)
 
     @always_inline
-    fn as_complex[new_dtype: DType](self: Number[dtype, width, complex=False]) -> Number[new_dtype, width, complex=True]:
-        return Number[new_dtype, width, complex=True](real=self.value.cast[new_dtype](), imaginary=0)
+    fn as_complex[new_dtype: DType](self) -> Number[new_dtype, width, complex=True]:
+        @parameter
+        if complex:
+            return rebind[Number[new_dtype, width, complex=True]](self.cast[new_dtype]())
+        else:
+            return Number[new_dtype, width, complex=True](real=rebind[Number[new_dtype, width, complex=False].Value](self.value.cast[new_dtype]()), imaginary=0)
 
     #
     # Stringable & Writable

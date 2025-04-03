@@ -8,6 +8,7 @@
 from math import pi, cos, sin, sqrt
 from bit import is_power_of_two, bit_width
 from memory import memset_zero
+from algorithm import parallelize
 
 from mosaic.utility import fatal_error, print_list
 
@@ -15,42 +16,69 @@ from mosaic.utility import fatal_error, print_list
 #
 # FFT
 #
-fn fft[dtype: DType, depth: Int, //](matrix: Matrix[dtype, depth, complex=False]) -> Matrix[DType.float64, depth, complex=True]:
+fn fft[dtype: DType, depth: Int, complex: Bool, //](matrix: Matrix[dtype, depth, complex=complex]) -> Matrix[DType.float64, depth, complex=True]:
+    """ """
     var result = Matrix[DType.float64, depth, complex=True](rows=matrix.rows(), cols=matrix.cols())
 
-    # Rows
-    _mixed_radix_fft(matrix, result)
+    #
+    # Row-wise mixed-radix FFT
+    #
+    print("\n--- Rows ---")
+    var row_plan = _FactorPlan(matrix.cols())
+    print("\nActual:  ", end="")
+    print_list(row_plan.actual)
+    print("Sofar:   ", end="")
+    print_list(row_plan.sofar)
+    print("Remain:  ", end="")
+    print_list(row_plan.remain)
+    print()
 
-    # Cols
-    # result.transpose()
-    # _mixed_radix_fft(result)
-    # result.transpose()
+    _permute(matrix, row_plan, result)
+
+    @parameter
+    for component in range(depth):
+
+        @parameter
+        fn process_row_wise(row: Int):
+            _dispatch[twiddle=False](row_plan.actual[1], row_plan.sofar[1], row_plan.remain[1], row, component, result)
+
+            for i in range(2, len(row_plan.actual)):
+                _dispatch[twiddle=True](row_plan.actual[i], row_plan.sofar[i], row_plan.remain[i], row, component, result)
+
+        parallelize[process_row_wise](result.rows())
+
+    #
+    # Col-wise mixed-radix FFT
+    #
+    print("--- Cols ---")
+    result.transpose()
+
+    var col_plan = _FactorPlan(result.cols())
+    print("\nActual:  ", end="")
+    print_list(col_plan.actual)
+    print("Sofar:   ", end="")
+    print_list(col_plan.sofar)
+    print("Remain:  ", end="")
+    print_list(col_plan.remain)
+    print()
+
+    _permute(result.copy(), col_plan, result)
+
+    @parameter
+    for component in range(depth):
+
+        @parameter
+        fn process_col_wise(row: Int):
+            _dispatch[twiddle=False](col_plan.actual[1], col_plan.sofar[1], col_plan.remain[1], row, component, result)
+
+            for i in range(2, len(col_plan.actual)):
+                _dispatch[twiddle=True](col_plan.actual[i], col_plan.sofar[i], col_plan.remain[i], row, component, result)
+
+        parallelize[process_col_wise](result.rows())
+
+    result.transpose()
 
     return result^
-
-
-#
-# Mixed-Radix FFT
-#
-fn _mixed_radix_fft[dtype: DType, depth: Int, //](matrix: Matrix[dtype, depth], mut result: Matrix[DType.float64, depth, complex=True]):
-    var plan = _FactorPlan(matrix.cols())
-    print("\nActual:  ", end="")
-    print_list(plan.actual)
-    print("Sofar:   ", end="")
-    print_list(plan.sofar)
-    print("Remain:  ", end="")
-    print_list(plan.remain)
-    print()
-
-    _permute(matrix, plan, result)
-    print("Reordered: ", end="")
-    # print(result)
-    print()
-
-    _dispatch[twiddle=False](plan.actual[1], plan.sofar[1], plan.remain[1], result)
-
-    for i in range(2, len(plan.actual)):
-        _dispatch[twiddle=True](plan.actual[i], plan.sofar[i], plan.remain[i], result)
 
 
 #
@@ -78,7 +106,7 @@ struct _FactorPlan:
             factors.append(1)
             return factors
 
-        alias radices = InlineArray[Int, 7](2, 3, 4, 5, 7, 8, 10)
+        alias radices = InlineArray[Int, 5](2, 3, 4, 5, 7)
 
         var i = len(radices) - 1
 
@@ -89,16 +117,6 @@ struct _FactorPlan:
                 factors.append(radices[i])
             else:
                 i -= 1
-
-        # Substitute factors 2 * 8 with 4 * 4
-        if factors[-1] == 2:
-            i = len(factors) - 1
-            while (i >= 0) and (factors[i] != 8):
-                i -= 1
-
-            if i >= 0:
-                factors[-1] = 4
-                factors[i] = 4
 
         # Try ascending odd factors
         for k in range(3, sqrt(N) + 1, 2):
@@ -117,16 +135,16 @@ struct _FactorPlan:
 # Permute
 #
 fn _permute[
-    dtype: DType, depth: Int, //
-](matrix: Matrix[dtype, depth, complex=False], plan: _FactorPlan, mut result: Matrix[DType.float64, depth, complex=True]):
+    dtype: DType, depth: Int, complex: Bool, //
+](matrix: Matrix[dtype, depth, complex=complex], plan: _FactorPlan, mut result: Matrix[DType.float64, depth, complex=True]):
     try:
         var N = matrix.cols()
-
+        var indices = List[Int](capacity=N)
         var count = NumericArray[DType.index](count=len(plan.actual))
 
         var k = 0
-        for i in range(N - 1):
-            result[0, i, 0] = matrix[0, k, 0].as_complex[DType.float64]()
+        for _ in range(N - 1):
+            indices.append(k)
 
             var j = 1
             k += plan.remain[j]
@@ -137,7 +155,20 @@ fn _permute[
                 j += 1
                 count[j] += 1
 
-        result[0, N - 1, 0] = matrix[0, N - 1, 0].as_complex[DType.float64]()
+        indices.append(N - 1)
+
+        @parameter
+        for component in range(depth):
+
+            @parameter
+            fn move_elements(row: Int):
+                try:
+                    for i in range(len(indices)):
+                        result[row, i, component] = matrix[row, indices[i], component].as_complex[DType.float64]()
+                except error:
+                    fatal_error(error)
+
+            parallelize[move_elements](matrix.rows())
 
     except error:
         fatal_error(error)
@@ -146,7 +177,9 @@ fn _permute[
 #
 # Dispatch
 #
-fn _dispatch[depth: Int, //, *, twiddle: Bool](radix: Int, sofar_radix: Int, remain_radix: Int, mut result: Matrix[DType.float64, depth, complex=True]):
+fn _dispatch[
+    depth: Int, //, *, twiddle: Bool
+](radix: Int, sofar_radix: Int, remain_radix: Int, row: Int, component: Int, mut result: Matrix[DType.float64, depth, complex=True]):
     try:
         # Radix-specific method dispatch
         var twiddle_factors = NumericArray[DType.float64, complex=True](count=radix)
@@ -167,21 +200,17 @@ fn _dispatch[depth: Int, //, *, twiddle: Bool](radix: Int, sofar_radix: Int, rem
                 twiddle_factor *= base_twiddle_factor
 
             if radix == 2:
-                _radix_2_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, result)
+                _radix_2_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, row, component, result)
             elif radix == 3:
-                _radix_3_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, result)
+                _radix_3_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, row, component, result)
             elif radix == 4:
-                _radix_4_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, result)
+                _radix_4_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, row, component, result)
             elif radix == 5:
-                _radix_5_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, result)
+                _radix_5_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, row, component, result)
             elif radix == 7:
-                _radix_7_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, result)
-            elif radix == 8:
-                _radix_8_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, result)
-            elif radix == 10:
-                _radix_10_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, result)
+                _radix_7_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, row, component, result)
             else:
-                _radix_prime_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, result)
+                _radix_prime_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, row, component, result)
 
     except error:
         fatal_error(error)
@@ -196,12 +225,15 @@ fn _radix_2_fft[
     radix: Int,
     sofar_radix: Int,
     remain_radix: Int,
-    owned group_offset: Int,
+    group_offset: Int,
     twiddle_factors: NumericArray[DType.float64, complex=True],
+    row: Int,
+    component: Int,
     mut result: Matrix[DType.float64, depth, complex=True],
 ):
     try:
-        var offset = group_offset
+        var group_offset_copy = group_offset
+        var offset = group_offset_copy
         var indices = InlineArray[Int, 2](fill=0)
 
         for _ in range(remain_radix):
@@ -209,18 +241,18 @@ fn _radix_2_fft[
                 indices[block] = offset
                 offset += sofar_radix
 
-            var value_0 = result[0, indices[0], 0]
-            var value_1 = result[0, indices[1], 0]
+            var value_0 = result[row, indices[0], component]
+            var value_1 = result[row, indices[1], component]
 
             @parameter
             if twiddle:
                 value_1 *= twiddle_factors[1]
 
-            result[0, indices[0], 0] = value_0 + value_1
-            result[0, indices[1], 0] = value_0 - value_1
+            result[row, indices[0], component] = value_0 + value_1
+            result[row, indices[1], component] = value_0 - value_1
 
-            group_offset = group_offset + sofar_radix * radix
-            offset = group_offset
+            group_offset_copy = group_offset_copy + sofar_radix * radix
+            offset = group_offset_copy
 
     except error:
         fatal_error(error)
@@ -235,8 +267,10 @@ fn _radix_3_fft[
     radix: Int,
     sofar_radix: Int,
     remain_radix: Int,
-    owned group_offset: Int,
+    group_offset: Int,
     twiddle_factors: NumericArray[DType.float64, complex=True],
+    row: Int,
+    component: Int,
     mut result: Matrix[DType.float64, depth, complex=True],
 ):
     try:
@@ -244,7 +278,8 @@ fn _radix_3_fft[
         var c3_1 = cos(theta) - 1
         var c3_2 = sin(theta)
 
-        var offset = group_offset
+        var group_offset_copy = group_offset
+        var offset = group_offset_copy
         var indices = InlineArray[Int, 3](fill=0)
 
         for _ in range(remain_radix):
@@ -252,9 +287,9 @@ fn _radix_3_fft[
                 indices[block] = offset
                 offset += sofar_radix
 
-            var value_0 = result[0, indices[0], 0]
-            var value_1 = result[0, indices[1], 0]
-            var value_2 = result[0, indices[2], 0]
+            var value_0 = result[row, indices[0], component]
+            var value_1 = result[row, indices[1], component]
+            var value_2 = result[row, indices[2], component]
 
             @parameter
             if twiddle:
@@ -267,12 +302,12 @@ fn _radix_3_fft[
             var m2 = (c3_2 * (value_1.imaginary() - value_2.imaginary()), c3_2 * (value_2.real() - value_1.real()))
             var s1 = z0 + m1
 
-            result[0, indices[0], 0] = z0
-            result[0, indices[1], 0] = s1 + m2
-            result[0, indices[2], 0] = s1 - m2
+            result[row, indices[0], component] = z0
+            result[row, indices[1], component] = s1 + m2
+            result[row, indices[2], component] = s1 - m2
 
-            group_offset = group_offset + sofar_radix * radix
-            offset = group_offset
+            group_offset_copy = group_offset_copy + sofar_radix * radix
+            offset = group_offset_copy
 
     except error:
         fatal_error(error)
@@ -287,12 +322,15 @@ fn _radix_4_fft[
     radix: Int,
     sofar_radix: Int,
     remain_radix: Int,
-    owned group_offset: Int,
+    group_offset: Int,
     twiddle_factors: NumericArray[DType.float64, complex=True],
+    row: Int,
+    component: Int,
     mut result: Matrix[DType.float64, depth, complex=True],
 ):
     try:
-        var offset = group_offset
+        var group_offset_copy = group_offset
+        var offset = group_offset_copy
         var indices = InlineArray[Int, 4](fill=0)
 
         for _ in range(remain_radix):
@@ -300,10 +338,10 @@ fn _radix_4_fft[
                 indices[block] = offset
                 offset += sofar_radix
 
-            var value_0 = result[0, indices[0], 0]
-            var value_1 = result[0, indices[1], 0]
-            var value_2 = result[0, indices[2], 0]
-            var value_3 = result[0, indices[3], 0]
+            var value_0 = result[row, indices[0], component]
+            var value_1 = result[row, indices[1], component]
+            var value_2 = result[row, indices[2], component]
+            var value_3 = result[row, indices[3], component]
 
             @parameter
             if twiddle:
@@ -316,13 +354,13 @@ fn _radix_4_fft[
             var t2 = value_1 + value_3
             var m3 = (value_1.imaginary() - value_3.imaginary(), value_3.real() - value_1.real())
 
-            result[0, indices[0], 0] = t1 + t2
-            result[0, indices[1], 0] = m2 + m3
-            result[0, indices[2], 0] = t1 - t2
-            result[0, indices[3], 0] = m2 - m3
+            result[row, indices[0], component] = t1 + t2
+            result[row, indices[1], component] = m2 + m3
+            result[row, indices[2], component] = t1 - t2
+            result[row, indices[3], component] = m2 - m3
 
-            group_offset = group_offset + sofar_radix * radix
-            offset = group_offset
+            group_offset_copy = group_offset_copy + sofar_radix * radix
+            offset = group_offset_copy
 
     except error:
         fatal_error(error)
@@ -337,8 +375,10 @@ fn _radix_5_fft[
     radix: Int,
     sofar_radix: Int,
     remain_radix: Int,
-    owned group_offset: Int,
+    group_offset: Int,
     twiddle_factors: NumericArray[DType.float64, complex=True],
+    row: Int,
+    component: Int,
     mut result: Matrix[DType.float64, depth, complex=True],
 ):
     try:
@@ -349,7 +389,8 @@ fn _radix_5_fft[
         var c5_4 = -(sin(theta) + sin(2 * theta))
         var c5_5 = sin(theta) - sin(2 * theta)
 
-        var offset = group_offset
+        var group_offset_copy = group_offset
+        var offset = group_offset_copy
         var indices = InlineArray[Int, 5](fill=0)
 
         for _ in range(remain_radix):
@@ -357,11 +398,11 @@ fn _radix_5_fft[
                 indices[block] = offset
                 offset += sofar_radix
 
-            var value_0 = result[0, indices[0], 0]
-            var value_1 = result[0, indices[1], 0]
-            var value_2 = result[0, indices[2], 0]
-            var value_3 = result[0, indices[3], 0]
-            var value_4 = result[0, indices[4], 0]
+            var value_0 = result[row, indices[0], component]
+            var value_1 = result[row, indices[1], component]
+            var value_2 = result[row, indices[2], component]
+            var value_3 = result[row, indices[3], component]
+            var value_4 = result[row, indices[4], component]
 
             @parameter
             if twiddle:
@@ -389,14 +430,14 @@ fn _radix_5_fft[
             var s3 = m3 - m4
             var s5 = m3 + m5
 
-            result[0, indices[0], 0] = value_0
-            result[0, indices[1], 0] = s2 + s3
-            result[0, indices[2], 0] = s4 + s5
-            result[0, indices[3], 0] = s4 - s5
-            result[0, indices[4], 0] = s2 - s3
+            result[row, indices[0], component] = value_0
+            result[row, indices[1], component] = s2 + s3
+            result[row, indices[2], component] = s4 + s5
+            result[row, indices[3], component] = s4 - s5
+            result[row, indices[4], component] = s2 - s3
 
-            group_offset = group_offset + sofar_radix * radix
-            offset = group_offset
+            group_offset_copy = group_offset_copy + sofar_radix * radix
+            offset = group_offset_copy
 
     except error:
         fatal_error(error)
@@ -411,8 +452,10 @@ fn _radix_7_fft[
     radix: Int,
     sofar_radix: Int,
     remain_radix: Int,
-    owned group_offset: Int,
+    group_offset: Int,
     twiddle_factors: NumericArray[DType.float64, complex=True],
+    row: Int,
+    component: Int,
     mut result: Matrix[DType.float64, depth, complex=True],
 ):
     try:
@@ -424,7 +467,8 @@ fn _radix_7_fft[
         var c7_5 = 0.781831482468029808708444526674057750232334519  # sin(theta)
         var c7_6 = 0.974927912181823607018131682993931217232785801
 
-        var offset = group_offset
+        var group_offset_copy = group_offset
+        var offset = group_offset_copy
         var indices = InlineArray[Int, 7](fill=0)
 
         for _ in range(remain_radix):
@@ -432,13 +476,13 @@ fn _radix_7_fft[
                 indices[block] = offset
                 offset += sofar_radix
 
-            var value_0 = result[0, indices[0], 0]
-            var value_1 = result[0, indices[1], 0]
-            var value_2 = result[0, indices[2], 0]
-            var value_3 = result[0, indices[3], 0]
-            var value_4 = result[0, indices[4], 0]
-            var value_5 = result[0, indices[5], 0]
-            var value_6 = result[0, indices[6], 0]
+            var value_0 = result[row, indices[0], component]
+            var value_1 = result[row, indices[1], component]
+            var value_2 = result[row, indices[2], component]
+            var value_3 = result[row, indices[3], component]
+            var value_4 = result[row, indices[4], component]
+            var value_5 = result[row, indices[5], component]
+            var value_6 = result[row, indices[6], component]
 
             @parameter
             if twiddle:
@@ -482,51 +526,19 @@ fn _radix_7_fft[
             var im_34_result_x = c7_4 * re_61_sub + c7_6 * re_43_sub - c7_5 * re_52_sub
             var im_34_result_y = c7_3 * im_25_add - c7_1 * im_34_add - c7_2 * im_16_add + value_0.imaginary()
 
-            result[0, indices[0], 0] = value_0 + com_16_add + com_25_add + com_34_add
-            result[0, indices[1], 0] = (re_16_result_x + re_16_result_y, im_16_result_x + im_16_result_y)
-            result[0, indices[2], 0] = (re_25_result_x + re_25_result_y, im_25_result_x + im_25_result_y)
-            result[0, indices[3], 0] = (re_34_result_x + re_34_result_y, im_34_result_x + im_34_result_y)
-            result[0, indices[4], 0] = (re_34_result_y - re_34_result_x, im_34_result_y - im_34_result_x)
-            result[0, indices[5], 0] = (re_25_result_y - re_25_result_x, im_25_result_y - im_25_result_x)
-            result[0, indices[6], 0] = (re_16_result_y - re_16_result_x, im_16_result_y - im_16_result_x)
+            result[row, indices[0], component] = value_0 + com_16_add + com_25_add + com_34_add
+            result[row, indices[1], component] = (re_16_result_x + re_16_result_y, im_16_result_x + im_16_result_y)
+            result[row, indices[2], component] = (re_25_result_x + re_25_result_y, im_25_result_x + im_25_result_y)
+            result[row, indices[3], component] = (re_34_result_x + re_34_result_y, im_34_result_x + im_34_result_y)
+            result[row, indices[4], component] = (re_34_result_y - re_34_result_x, im_34_result_y - im_34_result_x)
+            result[row, indices[5], component] = (re_25_result_y - re_25_result_x, im_25_result_y - im_25_result_x)
+            result[row, indices[6], component] = (re_16_result_y - re_16_result_x, im_16_result_y - im_16_result_x)
 
-            group_offset = group_offset + sofar_radix * radix
-            offset = group_offset
+            group_offset_copy = group_offset_copy + sofar_radix * radix
+            offset = group_offset_copy
 
     except error:
         fatal_error(error)
-
-
-#
-# Radix-8
-#
-fn _radix_8_fft[
-    depth: Int, //, twiddle: Bool
-](
-    radix: Int,
-    sofar_radix: Int,
-    remain_radix: Int,
-    owned group_offset: Int,
-    twiddle_factors: NumericArray[DType.float64, complex=True],
-    mut result: Matrix[DType.float64, depth, complex=True],
-):
-    pass
-
-
-#
-# Radix-10
-#
-fn _radix_10_fft[
-    depth: Int, //, twiddle: Bool
-](
-    radix: Int,
-    sofar_radix: Int,
-    remain_radix: Int,
-    owned group_offset: Int,
-    twiddle_factors: NumericArray[DType.float64, complex=True],
-    mut result: Matrix[DType.float64, depth, complex=True],
-):
-    pass
 
 
 #
@@ -538,8 +550,10 @@ fn _radix_prime_fft[
     radix: Int,
     sofar_radix: Int,
     remain_radix: Int,
-    owned group_offset: Int,
+    group_offset: Int,
     twiddle_factors: NumericArray[DType.float64, complex=True],
+    row: Int,
+    component: Int,
     mut result: Matrix[DType.float64, depth, complex=True],
 ):
     pass
