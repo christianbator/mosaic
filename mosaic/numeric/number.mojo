@@ -5,7 +5,7 @@
 # Created by Christian Bator on 03/04/2025
 #
 
-from math import sqrt, log, atan2, Ceilable, CeilDivable, Floorable, Truncable
+from math import sqrt, log, atan2, Ceilable, CeilDivable, Floorable, Truncable, isclose
 from complex import ComplexSIMD
 from builtin.dtype import _integral_type_of
 from sys import is_big_endian
@@ -845,7 +845,12 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
                 if i > 0:
                     writer.write(", ")
 
-                writer.write("(", round(real[i], ndigits=print_precision), ", ", round(imaginary[i], ndigits=print_precision), "i)")
+                var real = round(real[i], ndigits=print_precision)
+                var imaginary = round(imaginary[i], ndigits=print_precision)
+                real = abs(real) if isclose(real, 0, atol=10**-print_precision) else real
+                imaginary = abs(imaginary) if isclose(imaginary, 0, atol=10**-print_precision) else imaginary
+
+                writer.write("(", real, ", ", imaginary, "i)")
 
             @parameter
             if width > 1:

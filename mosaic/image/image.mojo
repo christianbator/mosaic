@@ -619,26 +619,10 @@ struct Image[dtype: DType, color_space: ColorSpace](
         return self.padded_trailing[Border.reflect](height=N_rows - self.height(), width=N_cols - self.width())
 
     fn spectrum(self) -> Matrix[DType.float64, color_space.channels(), complex=True]:
-        # TODO: Allow border handling specification if padding image to optimal FFT size
-        try:
-            var N_rows = next_power_of_two(self.height())
-            var N_cols = next_power_of_two(self.width())
+        var result = self._matrix.fourier_transform()
+        result.shift_origin_to_center()
 
-            if N_rows != self.height() or N_cols != self.width():
-                var padded = self.padded_trailing[Border.reflect](height=N_rows - self.height(), width=N_cols - self.width())
-                var padded_result_slice = padded._matrix.fourier_transform()[0 : self.height(), 0 : self.width()]
-                var result = padded_result_slice.rebound_copy[depth = color_space.channels()]()
-                result.shift_origin_to_center()
-                return result^
-
-            var result = self._matrix.fourier_transform()
-            result.shift_origin_to_center()
-
-            return result^
-        except error:
-            fatal_error(error)
-            while True:
-                pass
+        return result^
 
     #
     # Geometric Transformations
