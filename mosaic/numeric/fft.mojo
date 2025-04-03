@@ -449,11 +449,46 @@ fn _radix_7_fft[
                 value_5 *= twiddle_factors[5]
                 value_6 *= twiddle_factors[6]
 
-            # result[0, indices[0], 0] =
-            # result[0, indices[1], 0] =
-            # result[0, indices[2], 0] =
-            # result[0, indices[3], 0] =
-            # result[0, indices[4], 0] =
+            var com_16_add = value_1 + value_6
+            var re_16_add = com_16_add.real()
+            var im_16_add = com_16_add.imaginary()
+            var re_61_sub = value_6.real() - value_1.real()
+            var im_16_sub = value_1.imaginary() - value_6.imaginary()
+
+            var com_25_add = value_2 + value_5
+            var re_25_add = com_25_add.real()
+            var im_25_add = com_25_add.imaginary()
+            var re_52_sub = value_5.real() - value_2.real()
+            var im_25_sub = value_2.imaginary() - value_5.imaginary()
+
+            var com_34_add = value_3 + value_4
+            var re_34_add = com_34_add.real()
+            var im_34_add = com_34_add.imaginary()
+            var re_43_sub = value_4.real() - value_3.real()
+            var im_34_sub = value_3.imaginary() - value_4.imaginary()
+
+            var re_16_result_x = c7_5 * im_16_sub + c7_6 * im_25_sub + c7_4 * im_34_sub
+            var re_16_result_y = c7_3 * re_16_add - c7_1 * re_25_add - c7_2 * re_34_add + value_0.real()
+            var im_16_result_x = c7_5 * re_61_sub + c7_6 * re_52_sub + c7_4 * re_43_sub
+            var im_16_result_y = c7_3 * im_16_add - c7_1 * im_25_add - c7_2 * im_34_add + value_0.imaginary()
+
+            var re_25_result_x = c7_6 * im_16_sub - c7_5 * im_34_sub - c7_4 * im_25_sub
+            var re_25_result_y = c7_3 * re_34_add - c7_2 * re_25_add - c7_1 * re_16_add + value_0.real()
+            var im_25_result_x = c7_6 * re_61_sub - c7_5 * re_43_sub - c7_4 * re_52_sub
+            var im_25_result_y = c7_3 * im_34_add - c7_2 * im_25_add - c7_1 * im_16_add + value_0.imaginary()
+
+            var re_34_result_x = c7_4 * im_16_sub + c7_6 * im_34_sub - c7_5 * im_25_sub
+            var re_34_result_y = c7_3 * re_25_add - c7_1 * re_34_add - c7_2 * re_16_add + value_0.real()
+            var im_34_result_x = c7_4 * re_61_sub + c7_6 * re_43_sub - c7_5 * re_52_sub
+            var im_34_result_y = c7_3 * im_25_add - c7_1 * im_34_add - c7_2 * im_16_add + value_0.imaginary()
+
+            result[0, indices[0], 0] = value_0 + com_16_add + com_25_add + com_34_add
+            result[0, indices[1], 0] = (re_16_result_x + re_16_result_y, im_16_result_x + im_16_result_y)
+            result[0, indices[2], 0] = (re_25_result_x + re_25_result_y, im_25_result_x + im_25_result_y)
+            result[0, indices[3], 0] = (re_34_result_x + re_34_result_y, im_34_result_x + im_34_result_y)
+            result[0, indices[4], 0] = (re_34_result_y - re_34_result_x, im_34_result_y - im_34_result_x)
+            result[0, indices[5], 0] = (re_25_result_y - re_25_result_x, im_25_result_y - im_25_result_x)
+            result[0, indices[6], 0] = (re_16_result_y - re_16_result_x, im_16_result_y - im_16_result_x)
 
             group_offset = group_offset + sofar_radix * radix
             offset = group_offset
