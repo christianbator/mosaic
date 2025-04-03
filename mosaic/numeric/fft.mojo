@@ -5,12 +5,11 @@
 # Created by Christian Bator on 04/01/2025
 #
 
-from math import pi, cos, sin, sqrt
-from bit import is_power_of_two, bit_width
+from math import pi, cos, sin, sqrt, ceildiv
 from memory import memset_zero
 from algorithm import parallelize
 
-from mosaic.utility import fatal_error, print_list
+from mosaic.utility import fatal_error
 
 
 #
@@ -23,60 +22,44 @@ fn fft[dtype: DType, depth: Int, complex: Bool, //](matrix: Matrix[dtype, depth,
     #
     # Row-wise mixed-radix FFT
     #
-    print("\n--- Rows ---")
-    var row_plan = _FactorPlan(matrix.cols())
-    print("\nActual:  ", end="")
-    print_list(row_plan.actual)
-    print("Sofar:   ", end="")
-    print_list(row_plan.sofar)
-    print("Remain:  ", end="")
-    print_list(row_plan.remain)
-    print()
-
-    _permute(matrix, row_plan, result)
-
-    @parameter
-    for component in range(depth):
+    if result.cols() > 1:
+        var row_plan = _FactorPlan(result.cols())
+        _permute(matrix, row_plan, result)
 
         @parameter
-        fn process_row_wise(row: Int):
-            _dispatch[twiddle=False](row_plan.actual[1], row_plan.sofar[1], row_plan.remain[1], row, component, result)
+        for component in range(depth):
 
-            for i in range(2, len(row_plan.actual)):
-                _dispatch[twiddle=True](row_plan.actual[i], row_plan.sofar[i], row_plan.remain[i], row, component, result)
+            @parameter
+            fn process_row_wise(row: Int):
+                _dispatch[twiddle=False](row_plan.actual[1], row_plan.sofar[1], row_plan.remain[1], row, component, result)
 
-        parallelize[process_row_wise](result.rows())
+                for i in range(2, len(row_plan.actual)):
+                    _dispatch[twiddle=True](row_plan.actual[i], row_plan.sofar[i], row_plan.remain[i], row, component, result)
+
+            parallelize[process_row_wise](result.rows())
 
     #
     # Col-wise mixed-radix FFT
     #
-    print("--- Cols ---")
-    result.transpose()
+    if result.rows() > 1:
+        result.transpose()
 
-    var col_plan = _FactorPlan(result.cols())
-    print("\nActual:  ", end="")
-    print_list(col_plan.actual)
-    print("Sofar:   ", end="")
-    print_list(col_plan.sofar)
-    print("Remain:  ", end="")
-    print_list(col_plan.remain)
-    print()
-
-    _permute(result.copy(), col_plan, result)
-
-    @parameter
-    for component in range(depth):
+        var col_plan = _FactorPlan(result.cols())
+        _permute(result.copy(), col_plan, result)
 
         @parameter
-        fn process_col_wise(row: Int):
-            _dispatch[twiddle=False](col_plan.actual[1], col_plan.sofar[1], col_plan.remain[1], row, component, result)
+        for component in range(depth):
 
-            for i in range(2, len(col_plan.actual)):
-                _dispatch[twiddle=True](col_plan.actual[i], col_plan.sofar[i], col_plan.remain[i], row, component, result)
+            @parameter
+            fn process_col_wise(row: Int):
+                _dispatch[twiddle=False](col_plan.actual[1], col_plan.sofar[1], col_plan.remain[1], row, component, result)
 
-        parallelize[process_col_wise](result.rows())
+                for i in range(2, len(col_plan.actual)):
+                    _dispatch[twiddle=True](col_plan.actual[i], col_plan.sofar[i], col_plan.remain[i], row, component, result)
 
-    result.transpose()
+            parallelize[process_col_wise](result.rows())
+
+        result.transpose()
 
     return result^
 
@@ -556,4 +539,75 @@ fn _radix_prime_fft[
     component: Int,
     mut result: Matrix[DType.float64, depth, complex=True],
 ):
-    pass
+    try:
+        var group_offset_copy = group_offset
+        var offset = group_offset_copy
+        var indices = NumericArray[DType.index](count=radix)
+
+        # TODO: Make this better, prepare factors in advance?
+        var values = NumericArray[DType.float64, complex=True](count=radix)
+        var v_values = NumericArray[DType.float64, complex=True](count=ceildiv(radix, 2))
+        var w_values = NumericArray[DType.float64, complex=True](count=ceildiv(radix, 2))
+        var trig = NumericArray[DType.float64, complex=True](count=radix)
+        var theta = 2 * pi / radix
+        var factor = (cos(theta), -sin(theta))
+
+        trig[0] = (1.0, 0.0)
+        trig[1] = factor
+
+        for i in range(2, radix):
+            trig[i] = factor * trig[i - 1]
+        ##
+
+        for _ in range(remain_radix):
+            for block in range(radix):
+                indices[block] = offset
+                offset += sofar_radix
+
+            values[0] = result[row, Int(indices[0]), component]
+
+            for block in range(1, radix):
+
+                @parameter
+                if twiddle:
+                    values[block] = twiddle_factors[block] * result[row, Int(indices[block]), component]
+                else:
+                    values[block] = result[row, Int(indices[block]), component]
+
+            var value_0 = values[0]
+
+            var n = radix
+            var half_n = ceildiv(n, 2)
+            for j in range(1, half_n):
+                v_values[j] = (values[j].real() + values[n - j].real(), values[j].imaginary() - values[n - j].imaginary())
+                w_values[j] = (values[j].real() - values[n - j].real(), values[j].imaginary() + values[n - j].imaginary())
+
+            for j in range(1, half_n):
+                values[j] = value_0
+                values[n - j] = value_0
+
+                var k = j
+                for i in range(1, half_n):
+                    var rere = trig[k].real() * v_values[i].real()
+                    var imim = trig[k].imaginary() * v_values[i].imaginary()
+                    var reim = trig[k].real() * w_values[i].imaginary()
+                    var imre = trig[k].imaginary() * w_values[i].real()
+
+                    values[j] += (rere - imim, reim + imre)
+                    values[n - j] += (rere + imim, reim - imre)
+
+                    k += j
+                    if k >= n:
+                        k -= n
+
+            for j in range(1, half_n):
+                values[0] = (values[0].real() + v_values[j].real(), values[0].imaginary() + w_values[j].imaginary())
+
+            for j in range(radix):
+                result[row, Int(indices[j]), component] = values[j]
+
+            group_offset_copy = group_offset_copy + sofar_radix * radix
+            offset = group_offset_copy
+
+    except error:
+        fatal_error(error)
