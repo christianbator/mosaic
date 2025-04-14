@@ -92,7 +92,7 @@ if $build_libmosaic_videocapture; then
 
     if [ $os == "macOS" ]; then
         swift_source_files=$(find libmosaic-videocapture/mac -name "*.swift")
-        swiftc -emit-library -o $lib_dir/libmosaic-videocapture$dynamic_lib_extension $swift_source_files
+        swiftc -warnings-as-errors -emit-library -o $lib_dir/libmosaic-videocapture$dynamic_lib_extension $swift_source_files
     else
         echo -e "  > ${bright_red}[Warning]${reset} Unsupported os for libmosaic-videocapture: $os, skipping ..."
     fi
@@ -106,7 +106,7 @@ if $build_libmosaic_visualizer; then
 
     if [ $os == "macOS" ]; then
         swift_source_files=$(find libmosaic-visualizer/mac -name "*.swift")
-        swiftc -emit-library -o $lib_dir/libmosaic-visualizer$dynamic_lib_extension $swift_source_files
+        swiftc -warnings-as-errors -emit-library -o $lib_dir/libmosaic-visualizer$dynamic_lib_extension $swift_source_files
     else
         echo -e "  > ${bright_red}[Warning]${reset} Unsupported os for libmosaic-visualizer: $os, skipping ..."
     fi

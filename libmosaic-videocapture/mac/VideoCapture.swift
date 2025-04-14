@@ -35,7 +35,6 @@ struct VideoCaptureDimensions {
     var width: CInt
 }
 
-@MainActor
 @_cdecl("initialize_with_index")
 public func initialize(index: CInt) -> OpaquePointer {
     let videoCapture = VideoCapture(deviceQuery: .index(Int(index)))
@@ -44,7 +43,6 @@ public func initialize(index: CInt) -> OpaquePointer {
     return OpaquePointer(rawPointer)
 }
 
-@MainActor
 @_cdecl("initialize_with_name")
 public func initialize(name: UnsafePointer<CChar>) -> OpaquePointer {
     let videoCapture = VideoCapture(deviceQuery: .name(String(cString: name)))
@@ -53,7 +51,6 @@ public func initialize(name: UnsafePointer<CChar>) -> OpaquePointer {
     return OpaquePointer(rawPointer)
 }
 
-@MainActor
 @_cdecl("open")
 public func open(pointer: OpaquePointer, colorSpace: CInt, dimensions: UnsafeMutableRawPointer) -> CBool {
     let dimensions = dimensions.assumingMemoryBound(to: VideoCaptureDimensions.self)
@@ -61,31 +58,26 @@ public func open(pointer: OpaquePointer, colorSpace: CInt, dimensions: UnsafeMut
     return videoCapture(from: pointer).open(colorSpace: ColorSpace(rawValue: colorSpace)!, dimensions: dimensions)
 }
 
-@MainActor
 @_cdecl("start")
 public func start(pointer: OpaquePointer, frameBuffer: UnsafeMutablePointer<UInt8>) {
     videoCapture(from: pointer).start(frameBuffer: frameBuffer)
 }
 
-@MainActor
 @_cdecl("is_next_frame_available")
 public func isNextFrameAvailable(pointer: OpaquePointer) -> CBool {
     return videoCapture(from: pointer).isNextFrameAvailable
 }
 
-@MainActor
 @_cdecl("did_read_next_frame")
 public func didReadNextFrame(pointer: OpaquePointer) {
     return videoCapture(from: pointer).didReadNextFrame()
 }
 
-@MainActor
 @_cdecl("stop")
 public func stop(pointer: OpaquePointer) {
     videoCapture(from: pointer).stop()
 }
 
-@MainActor
 @_cdecl("deinitialize")
 public func deinitialize(pointer: OpaquePointer) {
     videoCapture(from: pointer).release()
@@ -93,16 +85,15 @@ public func deinitialize(pointer: OpaquePointer) {
 
 // MARK: Pointer Conversion
 
-@MainActor
 private func videoCapture(from pointer: OpaquePointer) -> VideoCapture {
     let rawPointer = UnsafeRawPointer(pointer)
     return Unmanaged<VideoCapture>.fromOpaque(rawPointer).takeUnretainedValue()
 }
 
+
 // MARK: - VideoCapture
 
-@MainActor
-class VideoCapture: NSObject, @preconcurrency AVCaptureVideoDataOutputSampleBufferDelegate {
+class VideoCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     
     private(set) var isNextFrameAvailable: Bool = false
     
