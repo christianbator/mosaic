@@ -124,7 +124,9 @@ fi
 #
 # Copy shared assets
 #
-cp assets/icon-$os.png $share_dir
+if [ -f "assets/icon-$os.png" ]; then
+    cp assets/icon-$os.png $share_dir
+fi
 
 #
 # Notify of success
