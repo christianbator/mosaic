@@ -1391,17 +1391,19 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
     fn shift_origin_to_center(mut self):
         try:
-            var top_left = self[0 : self._rows // 2, 0 : self._cols // 2].rebound_copy[depth=depth]()
-            var bottom_right = self[self._rows // 2 : self._rows, self._cols // 2 : self._cols].rebound_copy[depth=depth]()
+            var ceil_half_rows = ceildiv(self._rows, 2)
+            var ceil_half_cols = ceildiv(self._cols, 2)
+            var top_left = self[0:ceil_half_rows, 0:ceil_half_cols].rebound_copy[depth=depth]()
+            var top_right = self[0:ceil_half_rows, ceil_half_cols : self._cols].rebound_copy[depth=depth]()
+            var bottom_left = self[ceil_half_rows : self._rows, 0:ceil_half_cols].rebound_copy[depth=depth]()
+            var bottom_right = self[ceil_half_rows : self._rows, ceil_half_cols : self._cols].rebound_copy[depth=depth]()
 
+            var half_rows = self._rows // 2
+            var half_cols = self._cols // 2
+            self.store_sub_matrix(top_left, row=half_rows, col=half_cols)
+            self.store_sub_matrix(top_right, row=half_rows, col=0)
+            self.store_sub_matrix(bottom_left, row=0, col=half_cols)
             self.store_sub_matrix(bottom_right, row=0, col=0)
-            self.store_sub_matrix(top_left, row=self._rows // 2, col=self._cols // 2)
-
-            var bottom_left = self[self._rows // 2 : self._rows, 0 : self._cols // 2].rebound_copy[depth=depth]()
-            var top_right = self[0 : self._rows // 2, self._cols // 2 : self._cols].rebound_copy[depth=depth]()
-
-            self.store_sub_matrix(top_right, row=self._rows // 2, col=0)
-            self.store_sub_matrix(bottom_left, row=0, col=self._cols // 2)
 
         except error:
             fatal_error(error)
