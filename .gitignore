@@ -22,3 +22,5 @@ rattler-build/output
 main.mojo
 /*.png
 /*.jpeg
+examples/*.png
+examples/*.jpeg

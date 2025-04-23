@@ -11,14 +11,14 @@ from mosaic.visualizer import Visualizer
 
 fn main():
     try:
-        # Step 1: Load the image from a path and convert it to float64 for processing
+        # Step 1: Load an image from a filepath as float64 for processing
         var image = Image[DType.float64, ColorSpace.rgb]("data/mandrill.png")
 
-        # Step 2: Blur the image with zero-padded border handling and a box filter of size 9
-        image.box_blur[Border.zero](size=9)
+        # Step 2: Blur the image with reflected border handling and a gaussian filter of size 9
+        image.gaussian_blur[Border.reflect](size=9)
 
-        # Step 3: Request the Visualizer to show the image in a window titled "Image"
-        Visualizer.show(image, window_title="Image")
+        # Step 3: Request the Visualizer to show the image in a window titled "Blurred"
+        Visualizer.show(image, window_title="Blurred")
 
         # Step 4: Wait for user interaction (CMD+W closes the window)
         Visualizer.wait()
