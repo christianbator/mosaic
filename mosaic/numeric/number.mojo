@@ -162,7 +162,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     @always_inline
     @implicit
     fn __init__(out self, tuple: (SIMD[dtype, width], SIMD[dtype, width])):
-        constrained[complex, "__init__(real, imaginary) is only available for complex numbers"]()
+        constrained[complex, "__init__(tuple) is only available for complex numbers"]()
 
         self = Self(real=tuple[0], imaginary=tuple[1])
 
@@ -862,7 +862,12 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
             if width > 1:
                 writer.write("]")
         else:
-            writer.write(self.value)
+            var rounded = round(self.value, ndigits=print_precision)
+
+            if isclose(rounded, 0, atol=10**-print_precision):
+                writer.write(abs(rounded))
+            else:
+                writer.write(rounded)
 
 
 #

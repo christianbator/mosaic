@@ -15,7 +15,9 @@ from mosaic.utility import fatal_error
 #
 # FFT
 #
-fn fft[dtype: DType, depth: Int, complex: Bool, //](matrix: Matrix[dtype, depth, complex=complex]) -> Matrix[DType.float64, depth, complex=True]:
+fn fft[
+    dtype: DType, depth: Int, complex: Bool, //, *, inverse: Bool = False
+](matrix: Matrix[dtype, depth, complex=complex]) -> Matrix[DType.float64, depth, complex=True]:
     """ """
     var result = Matrix[DType.float64, depth, complex=True](rows=matrix.rows(), cols=matrix.cols())
 
@@ -24,7 +26,7 @@ fn fft[dtype: DType, depth: Int, complex: Bool, //](matrix: Matrix[dtype, depth,
     #
     if result.cols() > 1:
         var row_plan = _FactorPlan(result.cols())
-        _permute(matrix, row_plan, result)
+        _permute[flip_imaginary_sign=inverse](matrix, row_plan, result)
 
         @parameter
         for component in range(depth):
@@ -60,6 +62,15 @@ fn fft[dtype: DType, depth: Int, complex: Bool, //](matrix: Matrix[dtype, depth,
             parallelize[process_col_wise](result.rows())
 
         result.transpose()
+
+    @parameter
+    if inverse:
+
+        @parameter
+        fn scale[width: Int](value: Number[DType.float64, width, complex=True]) -> Number[DType.float64, width, complex=True]:
+            return Number[DType.float64, width, complex=True](real=value.real() / result.strided_count(), imaginary=-value.imaginary() / result.strided_count())
+
+        result.for_each[scale]()
 
     return result^
 
@@ -118,7 +129,7 @@ struct _FactorPlan:
 # Permute
 #
 fn _permute[
-    dtype: DType, depth: Int, complex: Bool, //
+    dtype: DType, depth: Int, complex: Bool, //, *, flip_imaginary_sign: Bool = False
 ](matrix: Matrix[dtype, depth, complex=complex], plan: _FactorPlan, mut result: Matrix[DType.float64, depth, complex=True]):
     try:
         var N = matrix.cols()
@@ -147,7 +158,14 @@ fn _permute[
             fn move_elements(row: Int):
                 try:
                     for i in range(len(indices)):
-                        result[row, i, component] = matrix[row, indices[i], component].as_complex[DType.float64]()
+                        var value = matrix[row, indices[i], component].as_complex[DType.float64]()
+
+                        @parameter
+                        if flip_imaginary_sign:
+                            result[row, i, component] = ScalarNumber[DType.float64, complex=True](real=value.real(), imaginary=-value.imaginary())
+                        else:
+                            result[row, i, component] = value
+
                 except error:
                     fatal_error(error)
 

@@ -277,6 +277,20 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
             parallelize[visit_row](self._rows)
 
+    fn real[new_dtype: DType = dtype](self: Matrix[dtype, depth, complex=True]) -> Matrix[new_dtype, depth, complex=False]:
+        var result = Matrix[new_dtype, depth, complex=False](rows=self._rows, cols=self._cols)
+
+        @parameter
+        fn take_real_value[width: Int](value: Number[dtype, width, complex=True], row: Int, col: Int, component: Int):
+            try:
+                result.strided_store(Number[new_dtype, width, complex=False](value.real().cast[new_dtype]()), row=row, col=col, component=component)
+            except error:
+                fatal_error(error)
+
+        self.strided_iterate[take_real_value]()
+
+        return result^
+
     #
     # Private Access
     #
@@ -1229,8 +1243,8 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
         return result^
 
-    fn fourier_transform(self: Matrix[dtype, depth, complex=False]) -> Matrix[DType.float64, depth, complex=True]:
-        return fft(self)
+    fn fourier_transform[inverse: Bool = False](self) -> Matrix[DType.float64, depth, complex=True]:
+        return fft[inverse=inverse](self)
 
     #
     # Geometric Transformations

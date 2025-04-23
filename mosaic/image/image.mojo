@@ -59,6 +59,10 @@ struct Image[dtype: DType, color_space: ColorSpace](
     fn with_single_channel_data[channel: Int](single_channel_matrix: Matrix[dtype]) -> Self:
         return Self(single_channel_matrix.copied_to_component[channel, color_space.channels()]())
 
+    @staticmethod
+    fn from_spectrum[spectrum_dtype: DType, //](spectrum: Matrix[spectrum_dtype, color_space.channels(), complex=True]) -> Self:
+        return Self(spectrum.fourier_transform[inverse=True]().real[dtype]())
+
     #
     # Properties
     #
@@ -612,17 +616,8 @@ struct Image[dtype: DType, color_space: ColorSpace](
 
         return result^
 
-    fn blah(self) -> Self:
-        var N_rows = next_power_of_two(self.height())
-        var N_cols = next_power_of_two(self.width())
-
-        return self.padded_trailing[Border.reflect](height=N_rows - self.height(), width=N_cols - self.width())
-
     fn spectrum(self) -> Matrix[DType.float64, color_space.channels(), complex=True]:
-        var result = self._matrix.fourier_transform()
-        result.shift_origin_to_center()
-
-        return result^
+        return self._matrix.fourier_transform()
 
     #
     # Geometric Transformations
