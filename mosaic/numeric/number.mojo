@@ -873,4 +873,4 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 #
 # Print Precision
 #
-var print_precision = 6
+var print_precision = 3

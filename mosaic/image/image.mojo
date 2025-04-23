@@ -818,50 +818,53 @@ struct Image[dtype: DType, color_space: ColorSpace](
     #
     # Common Filters
     #
-    fn box_blur[border: Border](mut self, size: Int):
+    fn box_blur[border: Border](mut self, size: Int) raises:
         self.filter[border](Filters.box_kernel_2d[dtype, color_space.channels()](size))
 
-    fn box_blurred[border: Border](self, size: Int) -> Self:
+    fn box_blurred[border: Border](self, size: Int) raises -> Self:
         return self.filtered[border](Filters.box_kernel_2d[dtype, color_space.channels()](size))
 
-    fn gaussian_blur[border: Border](mut self, size: Int, std_dev: Optional[Float64] = None):
+    fn gaussian_blur[border: Border](mut self, size: Int, std_dev: Optional[Float64] = None) raises:
         self.filter[border](Filters.gaussian_kernel_2d[dtype, color_space.channels()](size=size, std_dev=std_dev))
 
-    fn gaussian_blurred[border: Border](self, size: Int, std_dev: Optional[Float64] = None) -> Self:
+    fn gaussian_blurred[border: Border](self, size: Int, std_dev: Optional[Float64] = None) raises -> Self:
         return self.filtered[border](Filters.gaussian_kernel_2d[dtype, color_space.channels()](size=size, std_dev=std_dev))
 
     #
     # Filtering
     #
-    fn filter[border: Border](mut self, kernel: Matrix[dtype, color_space.channels()]):
+    fn filter[border: Border](mut self, kernel: Matrix[dtype, color_space.channels()]) raises:
         self.filtered[border](kernel).copy_into(self)
 
-    fn filtered[border: Border](self, kernel: Matrix[dtype, color_space.channels()]) -> Self:
-        var result = Self(width=self.width(), height=self.height())
+    fn filtered[border: Border](self, kernel: Matrix[dtype, color_space.channels()]) raises -> Self:
+        if kernel.rows() > self.height() or kernel.cols() > self.width():
+            raise Error("Kernel must not be larger than the image along any dimension")
+
         var count = kernel.strided_count()
+        var flipped_kernel = kernel.rotated_180()
 
         if count == 1:
-            self._direct_convolution[border, 1](dest=result, kernel=kernel.rotated_180())
+            return self._direct_convolution[border, 1](flipped_kernel)
         elif count == 2:
-            self._direct_convolution[border, 2](dest=result, kernel=kernel.rotated_180())
+            return self._direct_convolution[border, 2](flipped_kernel)
         elif count <= 4:
-            self._direct_convolution[border, 4](dest=result, kernel=kernel.rotated_180())
+            return self._direct_convolution[border, 4](flipped_kernel)
         elif count <= 8:
-            self._direct_convolution[border, 8](dest=result, kernel=kernel.rotated_180())
+            return self._direct_convolution[border, 8](flipped_kernel)
         elif count <= 16:
-            self._direct_convolution[border, 16](dest=result, kernel=kernel.rotated_180())
+            return self._direct_convolution[border, 16](flipped_kernel)
         elif count <= 32:
-            self._direct_convolution[border, 32](dest=result, kernel=kernel.rotated_180())
+            return self._direct_convolution[border, 32](flipped_kernel)
         elif count <= 64:
-            self._direct_convolution[border, 64](dest=result, kernel=kernel.rotated_180())
+            return self._direct_convolution[border, 64](flipped_kernel)
         elif count <= 128:
-            self._direct_convolution[border, 128](dest=result, kernel=kernel.rotated_180())
+            return self._direct_convolution[border, 128](flipped_kernel)
         else:
-            fatal_error("Direct convolution for kernels with strided counts greater than 128 is not supported yet")
+            return self._fourier_convolution[border](flipped_kernel)
 
-        return result^
+    fn _direct_convolution[border: Border, width: Int](self, kernel: Matrix[dtype, color_space.channels()]) -> Self:
+        var result = Self(width=self.width(), height=self.height())
 
-    fn _direct_convolution[border: Border, width: Int](self, mut dest: Self, kernel: Matrix[dtype, color_space.channels()]):
         var half_kernel_width = kernel.cols() // 2
         var half_kernel_height = kernel.rows() // 2
 
@@ -895,9 +898,9 @@ struct Image[dtype: DType, color_space: ColorSpace](
                 var max_patch_y = y + half_kernel_height
 
                 try:
-                    for x in range(dest.width()):
+                    for x in range(result.width()):
                         if max_patch_y < self.height() and min_patch_y >= 0 and (x + half_kernel_width) < self.width() and (x - half_kernel_width) >= 0:
-                            dest[y, x, channel] = (
+                            result[y, x, channel] = (
                                 self._matrix.gather(
                                     row=y,
                                     col=x,
@@ -922,16 +925,44 @@ struct Image[dtype: DType, color_space: ColorSpace](
                                         pixel_sum,
                                     )
 
-                            dest[y, x, channel] = pixel_sum
+                            result[y, x, channel] = pixel_sum
                 except error:
                     fatal_error(error)
 
-            parallelize[process_row](dest.height())
+            parallelize[process_row](result.height())
 
-    fn _discrete_fourier_transform_convolution[
-        border: Border, new_dtype: DType
-    ](self, mut dest: Image[new_dtype, color_space], flipped_kernel: Matrix[dtype, color_space.channels()],):
-        pass
+        return result^
+
+    fn _fourier_convolution[border: Border](self, kernel: Matrix[dtype, color_space.channels()]) -> Self:
+        try:
+            var half_kernel_rows = kernel.rows() // 2
+            var half_kernel_cols = kernel.cols() // 2
+
+            var padded_self = self.padded[border](width=half_kernel_cols, height=half_kernel_rows)
+            var padded_kernel = Matrix[dtype, color_space.channels()](rows=padded_self.height(), cols=padded_self.width())
+
+            @parameter
+            for component in range(kernel.depth):
+                for row in range(kernel.rows()):
+                    for col in range(kernel.cols()):
+                        var shifted_row = (row - half_kernel_rows) % padded_self.height()
+                        var shifted_col = (col - half_kernel_cols) % padded_self.width()
+                        padded_kernel[shifted_row, shifted_col, component] = kernel[row, col, component]
+
+            var spectral_multiplication = padded_self.spectrum() * padded_kernel.fourier_transform()
+
+            var padded_result = spectral_multiplication.fourier_transform[inverse=True]().real[dtype]()
+
+            var result = padded_result[half_kernel_rows : half_kernel_rows + self.height(), half_kernel_cols : half_kernel_cols + self.width()].rebound_copy[
+                depth = color_space.channels()
+            ]()
+
+            return Self(result^)
+
+        except error:
+            fatal_error(error)
+            while True:
+                pass
 
     @always_inline
     fn _bordered_load[border: Border](self, y: Int, x: Int, channel: Int) -> Scalar[dtype]:

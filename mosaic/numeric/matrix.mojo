@@ -760,6 +760,18 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
         self.for_each_zipped[sub](rhs)
 
+    fn __mul__(self, rhs: Self) -> Self:
+        var result = self.copy()
+        result *= rhs
+        return result^
+
+    fn __imul__(mut self, rhs: Self):
+        @parameter
+        fn mul[width: Int](value: Number[dtype, width, complex=complex], rhs: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+            return value * rhs
+
+        self.for_each_zipped[mul](rhs)
+
     fn __matmul__(self, rhs: Self) -> Self:
         debug_assert[assert_mode="safe"](
             self._cols == rhs._rows, "Dimension mismatch for matrix multiplication: ", self._rows, "x", self._cols, " @ ", rhs._rows, "x", rhs._cols
@@ -1168,7 +1180,9 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
             dtype, width, complex=complex
         ]
     ](mut self, other: Self, component: Int):
-        debug_assert[assert_mode="safe"](self.count() == other.count(), "Cannot perform elementwise transformation on two matrices of different sizes")
+        debug_assert[assert_mode="safe"](
+            self._rows == other._rows and self._cols == other._cols, "Cannot perform elementwise transformation on two matrices of different sizes"
+        )
 
         @parameter
         fn transform_row(row: Int):
@@ -1216,7 +1230,9 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
             dtype, width, complex=complex
         ]
     ](mut self, other: Self):
-        debug_assert[assert_mode="safe"](self.count() == other.count(), "Cannot perform elementwise transformation on two matrices of different sizes")
+        debug_assert[assert_mode="safe"](
+            self._rows == other._rows and self._cols == other._cols, "Cannot perform elementwise transformation on two matrices of different sizes"
+        )
 
         @parameter
         fn transform_row(row: Int):
@@ -1419,18 +1435,39 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
     fn shift_origin_to_center(mut self):
         try:
+            var half_rows = self._rows // 2
+            var half_cols = self._cols // 2
             var ceil_half_rows = ceildiv(self._rows, 2)
             var ceil_half_cols = ceildiv(self._cols, 2)
+
             var top_left = self[0:ceil_half_rows, 0:ceil_half_cols].rebound_copy[depth=depth]()
             var top_right = self[0:ceil_half_rows, ceil_half_cols : self._cols].rebound_copy[depth=depth]()
             var bottom_left = self[ceil_half_rows : self._rows, 0:ceil_half_cols].rebound_copy[depth=depth]()
             var bottom_right = self[ceil_half_rows : self._rows, ceil_half_cols : self._cols].rebound_copy[depth=depth]()
 
-            var half_rows = self._rows // 2
-            var half_cols = self._cols // 2
             self.store_sub_matrix(top_left, row=half_rows, col=half_cols)
             self.store_sub_matrix(top_right, row=half_rows, col=0)
             self.store_sub_matrix(bottom_left, row=0, col=half_cols)
+            self.store_sub_matrix(bottom_right, row=0, col=0)
+
+        except error:
+            fatal_error(error)
+
+    fn shift_center_to_origin(mut self):
+        try:
+            var half_rows = self._rows // 2
+            var half_cols = self._cols // 2
+            var ceil_half_rows = ceildiv(self._rows, 2)
+            var ceil_half_cols = ceildiv(self._cols, 2)
+
+            var top_left = self[0:half_rows, 0:half_cols].rebound_copy[depth=depth]()
+            var top_right = self[0:half_rows, half_cols : self._cols].rebound_copy[depth=depth]()
+            var bottom_left = self[half_rows : self._rows, 0:half_cols].rebound_copy[depth=depth]()
+            var bottom_right = self[half_rows : self._rows, half_cols : self._cols].rebound_copy[depth=depth]()
+
+            self.store_sub_matrix(top_left, row=ceil_half_rows, col=ceil_half_cols)
+            self.store_sub_matrix(top_right, row=ceil_half_rows, col=0)
+            self.store_sub_matrix(bottom_left, row=0, col=ceil_half_cols)
             self.store_sub_matrix(bottom_right, row=0, col=0)
 
         except error:
