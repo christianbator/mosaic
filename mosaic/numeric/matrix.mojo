@@ -291,6 +291,20 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
         return result^
 
+    fn imaginary[new_dtype: DType = dtype](self: Matrix[dtype, depth, complex=True]) -> Matrix[new_dtype, depth, complex=False]:
+        var result = Matrix[new_dtype, depth, complex=False](rows=self._rows, cols=self._cols)
+
+        @parameter
+        fn take_imaginary_value[width: Int](value: Number[dtype, width, complex=True], row: Int, col: Int, component: Int):
+            try:
+                result.strided_store(Number[new_dtype, width, complex=False](value.imaginary().cast[new_dtype]()), row=row, col=col, component=component)
+            except error:
+                fatal_error(error)
+
+        self.strided_iterate[take_imaginary_value]()
+
+        return result^
+
     #
     # Private Access
     #
