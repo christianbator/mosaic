@@ -375,16 +375,14 @@ struct MatrixSlice[
 
         return result^
 
-    #
-    # Rebind
-    #
     fn rebound_copy[*, depth: Int](self) -> Matrix[dtype, depth, complex=complex]:
-        constrained[depth == Self._depth]()
+        alias new_depth = depth
+        constrained[new_depth == Self._depth]()
 
-        var result = Matrix[dtype, depth, complex=complex](rows=self._rows, cols=self._cols)
+        var result = Matrix[dtype, new_depth, complex=complex](rows=self._rows, cols=self._cols)
 
         @parameter
-        for slice_component in range(depth):
+        for slice_component in range(new_depth):
             var component = Self._component_range.start + slice_component * Self._component_range.step
 
             @parameter
@@ -402,11 +400,31 @@ struct MatrixSlice[
                     except error:
                         fatal_error(error)
 
-                vectorize[process_col, Matrix[dtype, depth, complex=complex].optimal_simd_width, unroll_factor=unroll_factor](self._cols)
+                vectorize[process_col, Matrix[dtype, new_depth, complex=complex].optimal_simd_width, unroll_factor=unroll_factor](self._cols)
 
             parallelize[process_row](self._rows)
 
         return result^
+
+    #
+    # Numeric Methods
+    #
+    fn fill[origin: MutableOrigin, //](mut self: MatrixSlice[_, dtype, _, complex, origin], value: ScalarNumber[dtype, complex=complex]):
+        @parameter
+        for component in range(Self._depth):
+
+            @parameter
+            fn fill_row(row: Int):
+                @parameter
+                fn fill_cols[width: Int](col: Int):
+                    try:
+                        self.strided_store(Number[dtype, width, complex=complex](value), row=row, col=col, component=component)
+                    except error:
+                        fatal_error(error)
+
+                vectorize[fill_cols, Matrix[dtype, depth, complex=complex].optimal_simd_width, unroll_factor=unroll_factor](self._cols)
+
+            parallelize[fill_row](self._rows)
 
     #
     # Stringable & Writable

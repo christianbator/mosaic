@@ -277,13 +277,13 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
             parallelize[visit_row](self._rows)
 
-    fn real[new_dtype: DType = dtype](self: Matrix[dtype, depth, complex=True]) -> Matrix[new_dtype, depth, complex=False]:
-        var result = Matrix[new_dtype, depth, complex=False](rows=self._rows, cols=self._cols)
+    fn real(self: Matrix[dtype, depth, complex=True]) -> Matrix[dtype, depth, complex=False]:
+        var result = Matrix[dtype, depth, complex=False](rows=self._rows, cols=self._cols)
 
         @parameter
         fn take_real_value[width: Int](value: Number[dtype, width, complex=True], row: Int, col: Int, component: Int):
             try:
-                result.strided_store(Number[new_dtype, width, complex=False](value.real().cast[new_dtype]()), row=row, col=col, component=component)
+                result.strided_store(Number[dtype, width, complex=False](value.real()), row=row, col=col, component=component)
             except error:
                 fatal_error(error)
 
@@ -291,13 +291,13 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
         return result^
 
-    fn imaginary[new_dtype: DType = dtype](self: Matrix[dtype, depth, complex=True]) -> Matrix[new_dtype, depth, complex=False]:
-        var result = Matrix[new_dtype, depth, complex=False](rows=self._rows, cols=self._cols)
+    fn imaginary(self: Matrix[dtype, depth, complex=True]) -> Matrix[dtype, depth, complex=False]:
+        var result = Matrix[dtype, depth, complex=False](rows=self._rows, cols=self._cols)
 
         @parameter
         fn take_imaginary_value[width: Int](value: Number[dtype, width, complex=True], row: Int, col: Int, component: Int):
             try:
-                result.strided_store(Number[new_dtype, width, complex=False](value.imaginary().cast[new_dtype]()), row=row, col=col, component=component)
+                result.strided_store(Number[dtype, width, complex=False](value.imaginary()), row=row, col=col, component=component)
             except error:
                 fatal_error(error)
 
@@ -1453,6 +1453,12 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         except error:
             fatal_error(error)
 
+    fn shifted_origin_to_center(self) -> Self:
+        var result = self.copy()
+        result.shift_origin_to_center()
+
+        return result^
+
     fn shift_center_to_origin(mut self):
         try:
             var half_rows = self._rows // 2
@@ -1472,6 +1478,12 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
         except error:
             fatal_error(error)
+
+    fn shifted_center_to_origin(self) -> Self:
+        var result = self.copy()
+        result.shift_center_to_origin()
+
+        return result^
 
     fn padded(self, size: Int) -> Self:
         return self.padded(rows=size, cols=size)

@@ -60,8 +60,13 @@ struct Image[dtype: DType, color_space: ColorSpace](
         return Self(single_channel_matrix.copied_to_component[channel, color_space.channels()]())
 
     @staticmethod
-    fn from_spectrum[spectrum_dtype: DType, //](spectrum: Matrix[spectrum_dtype, color_space.channels(), complex=True]) -> Self:
-        return Self(spectrum.fourier_transform[inverse=True]().real[dtype]())
+    fn from_spectrum[
+        spectrum_dtype: DType, //
+    ](spectrum: Matrix[spectrum_dtype, color_space.channels(), complex=True], lower_bound: Float64, upper_bound: Float64) -> Self:
+        var real = spectrum.fourier_transform[inverse=True]().real()
+        real.map_to_range(lower_bound, upper_bound)
+
+        return Self(real.astype[dtype]())
 
     #
     # Properties
@@ -951,13 +956,13 @@ struct Image[dtype: DType, color_space: ColorSpace](
 
             var spectral_multiplication = padded_self.spectrum() * padded_kernel.fourier_transform()
 
-            var padded_result = spectral_multiplication.fourier_transform[inverse=True]().real[dtype]()
+            var padded_result = spectral_multiplication.fourier_transform[inverse=True]().real()
 
             var result = padded_result[half_kernel_rows : half_kernel_rows + self.height(), half_kernel_cols : half_kernel_cols + self.width()].rebound_copy[
                 depth = color_space.channels()
             ]()
 
-            return Self(result^)
+            return Self(result.astype[dtype]())
 
         except error:
             fatal_error(error)
