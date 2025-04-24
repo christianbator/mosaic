@@ -38,7 +38,7 @@ It unifies the computer vision workflow into one language that runs on any hardw
   - Geometric transforms
   - Fourier transforms
 - Video capture (currently only macOS)
-  - Stream connected cameras and visualize frames
+  - Stream connected cameras
 - Video processing (currently only macOS)
   - Filter live video using custom processors
 - Visualization (currently only macOS)
@@ -79,7 +79,7 @@ magic run build
 Run an example file from the `examples/` directory like so:
 ```zsh
 cd examples
-magic run mojo show_image.mojo
+magic run mojo load_image.mojo
 ```
 
 #### Load image
@@ -107,7 +107,7 @@ magic run mojo show_image.mojo
   <img src="assets/examples/resize-image.png" width="512" height="256">
 </div>
 
-#### Slice (crop) image
+#### Slice image
 - Slices the top half of an image
 - Image slices are mutable views into the underlying image data
 - Source: [examples/slice_image.mojo](examples/slice_image.mojo)
@@ -130,7 +130,7 @@ magic run mojo show_image.mojo
 </div>
 
 #### Pad image
-- Pads an image with 0s
+- Pads an image with zeros
 - Source: [examples/pad_image.mojo](examples/pad_image.mojo)
 <div align="center">
   <img src="assets/examples/pad-image.png" width="300" height="300">
@@ -169,7 +169,7 @@ magic run mojo show_image.mojo
 - Applies unsharp masking and image stacking to visualize the results
 - Source: [examples/unsharp_mask.mojo](examples/unsharp_mask.mojo)
 <div align="center">
-  <img src="assets/examples/unsharp-mask.png" width="256" height="256">
+  <img src="assets/examples/unsharp-mask.png" width="512" height="256">
 </div>
 
 #### Picture in picture
@@ -190,19 +190,19 @@ magic run mojo show_image.mojo
 - Calculates the spectrum of an image using the Fourier transform
 - Source: [examples/fourier_transform.mojo](examples/fourier_transform.mojo)
 <div align="center">
-  <img src="assets/examples/fourier-transform.png" width="1070" height="426">
+  <img src="assets/examples/fourier-transform.png" width="535" height="213">
 </div>
 
 #### Inverse Fourier transform
 - Recreates an image from a previously calculated spectrum
 - Source: [examples/inverse_fourier_transform.mojo](examples/inverse_fourier_transform.mojo)
 <div align="center">
-  <img src="assets/examples/inverse-fourier-transform.png" width="1070" height="426">
+  <img src="assets/examples/inverse-fourier-transform.png" width="535" height="213">
 </div>
 
 #### High-pass filter
 - Applies a high-pass filter by discarding low frequencies in the spectrum
 - Source: [examples/high_pass_filter.mojo](examples/high_pass_filter.mojo)
 <div align="center">
-  <img src="assets/examples/high-pass-filter.png" width="1605" height="426">
+  <img src="assets/examples/high-pass-filter.png" width="535" height="142">
 </div>
