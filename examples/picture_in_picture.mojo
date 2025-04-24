@@ -17,7 +17,10 @@ fn main():
         # Step 2: Extract a sub-rect from the image using slice notation
         alias squirrel_head_size = 150
 
-        var squirrel_head = image[120 : 120 + squirrel_head_size, 240 : 240 + squirrel_head_size]
+        var squirrel_head = image[
+            120 : 120 + squirrel_head_size,
+            240 : 240 + squirrel_head_size
+        ]
 
         # Step 3: Materialize the slice into an Image with `copy()` and add a black border
         var padded_squirrel_head = squirrel_head.copy().padded(2)

@@ -5,7 +5,7 @@
 # Created by Christian Bator on 04/23/2025
 #
 
-from mosaic.image import Image, ImageFile, ColorSpace
+from mosaic.image import Image, ColorSpace, ImageFile
 
 
 fn main():

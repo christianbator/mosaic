@@ -37,10 +37,10 @@ It unifies the computer vision workflow into one language that runs on any hardw
   - Filtering
   - Geometric transforms
   - Fourier transforms
-- Video capture
-  - Coming soon...
-- Video processing
-  - Coming soon...
+- Video capture (currently only macOS)
+  - Stream connected cameras and visualize frames
+- Video processing (currently only macOS)
+  - Filter live video using custom processors
 - Visualization (currently only macOS)
   - Native image and video rendering
 - Hardware acceleration
@@ -82,23 +82,127 @@ cd examples
 magic run mojo show_image.mojo
 ```
 
-#### Show image
-- Reads an image file and displays it in the visualizer
-- Source: [examples/show_image.mojo](examples/show_image.mojo)
+#### Load image
+- Loads an image file and displays it in the visualizer
+- Source: [examples/load_image.mojo](examples/load_image.mojo)
 <div align="center">
-  <img src="assets/mandrill.png" alt="Mandrill" width="256" height="256">
+  <img src="assets/examples/load-image.png" width="256" height="256">
 </div>
 
-#### Blur image
-- Reads an image file, converts it to a `float64` representation, and applies a box filter to blur the image
-- Source: [examples/blur_image.mojo](examples/blur_image.mojo)
+#### Save image
+- Saves an image to a file
+- Source: [examples/save_image.mojo](examples/save_image.mojo)
+
+#### Scale image
+- Scales an image to half size using bilinear interpolation
+- Source: [examples/scale_image.mojo](examples/scale_image.mojo)
 <div align="center">
-  <img src="assets/mandrill-blurred.png" alt="Mandrill blurred" width="256" height="256">
+  <img src="assets/examples/scale-image.png" width="128" height="128">
 </div>
 
-#### Slice image
-- Reads an image file, creates an image slice of the top half, and displays it in the visualizer
+#### Resize image
+- Resizes an image to double its width, stretching it in the process
+- Source: [examples/resize_image.mojo](examples/resize_image.mojo)
+<div align="center">
+  <img src="assets/examples/resize-image.png" width="512" height="256">
+</div>
+
+#### Slice (crop) image
+- Slices the top half of an image
+- Image slices are mutable views into the underlying image data
 - Source: [examples/slice_image.mojo](examples/slice_image.mojo)
 <div align="center">
-  <img src="assets/mandrill-top-half.png" alt="Mandrill top half" width="256" height="128">
+  <img src="assets/examples/slice-image.png" width="256" height="128">
+</div>
+
+#### Rotate image
+- Rotates an image by 90° clockwise
+- Source: [examples/rotate_image.mojo](examples/rotate_image.mojo)
+<div align="center">
+  <img src="assets/examples/rotate-image.png" width="256" height="256">
+</div>
+
+#### Flip image
+- Flips an image vertically
+- Source: [examples/flip_image.mojo](examples/flip_image.mojo)
+<div align="center">
+  <img src="assets/examples/flip-image.png" width="256" height="256">
+</div>
+
+#### Pad image
+- Pads an image with 0s
+- Source: [examples/pad_image.mojo](examples/pad_image.mojo)
+<div align="center">
+  <img src="assets/examples/pad-image.png" width="300" height="300">
+</div>
+
+#### Convert type
+- Starting with a `uint8` image, explicitly converts it to `float64`
+- Source: [examples/convert_type.mojo](examples/convert_type.mojo)
+
+#### Convert color space
+- Converts an RGB image to greyscale
+- Source: [examples/convert_color_space.mojo](examples/convert_color_space.mojo)
+<div align="center">
+  <img src="assets/examples/convert-color-space.png" width="256" height="256">
+</div>
+
+#### Convert color space as type
+- Converts a `float64` RGB image to `uint8` greyscale in one method
+- Source: [examples/convert_astype.mojo](examples/convert_astype.mojo)
+
+#### Blur image
+- Blurs an image using the built-in Gaussian kernel and reflected border handling
+- Source: [examples/blur_image.mojo](examples/blur_image.mojo)
+<div align="center">
+  <img src="assets/examples/blur-image.png" width="256" height="256">
+</div>
+
+#### Detect edges
+- Detects edges in an image by smoothing and applying a custom Laplacian kernel
+- Source: [examples/detect_edges.mojo](examples/detect_edges.mojo)
+<div align="center">
+  <img src="assets/examples/detect-edges.png" width="256" height="256">
+</div>
+
+#### Unsharp mask
+- Applies unsharp masking and image stacking to visualize the results
+- Source: [examples/unsharp_mask.mojo](examples/unsharp_mask.mojo)
+<div align="center">
+  <img src="assets/examples/unsharp-mask.png" width="256" height="256">
+</div>
+
+#### Picture in picture
+- Captures a sub-rect of an image and copies it to the top left corner
+- Source: [examples/picture_in_picture.mojo](examples/picture_in_picture.mojo)
+<div align="center">
+  <img src="assets/examples/picture-in-picture.png" width="535" height="426">
+</div>
+
+#### Extract channel
+- Extracts the green channel of an RGB image
+- Source: [examples/extract_channel.mojo](examples/extract_channel.mojo)
+<div align="center">
+  <img src="assets/examples/extract-channel.png" width="535" height="426">
+</div>
+
+#### Fourier transform
+- Calculates the spectrum of an image using the Fourier transform
+- Source: [examples/fourier_transform.mojo](examples/fourier_transform.mojo)
+<div align="center">
+  <img src="assets/examples/fourier-transform.png" width="1070" height="426">
+</div>
+
+#### Inverse Fourier transform
+- Recreates an image from a previously calculated spectrum
+- Source: [examples/inverse_fourier_transform.mojo](examples/inverse_fourier_transform.mojo)
+<div align="center">
+  <img src="assets/examples/inverse-fourier-transform.png" width="1070" height="426">
+</div>
+
+#### High-pass filter
+- Applies a high-pass filter by discarding low frequencies in the spectrum
+- Source: [examples/high_pass_filter.mojo](examples/high_pass_filter.mojo)
+<div align="center">
+  <img src="assets/examples/high-pass-filter.png" width="1605" height="426">
 </div>

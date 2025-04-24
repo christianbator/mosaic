@@ -5,7 +5,6 @@
 # Created by Christian Bator on 04/24/2025
 #
 
-
 from mosaic.image import Image, ColorSpace
 from mosaic.visualizer import Visualizer
 
@@ -27,12 +26,17 @@ fn main():
         var start_row = (spectrum.rows() - filter_size) // 2
         var start_col = (spectrum.cols() - filter_size) // 2
 
-        var low_frequency_slice = high_pass_spectrum[start_row : start_row + filter_size, start_col : start_col + filter_size]
+        var low_frequency_slice = high_pass_spectrum[
+            start_row : start_row + filter_size,
+            start_col : start_col + filter_size
+        ]
 
         low_frequency_slice.fill(0)
 
         # Step 5: Create a high pass spectral image for visualization
-        var high_pass_spectral_image = Image[DType.uint8, ColorSpace.rgb]((high_pass_spectrum.norm() + 1).log().mapped_to_range(0, 255).astype[DType.uint8]())
+        var high_pass_spectral_image = Image[DType.uint8, ColorSpace.rgb](
+            (high_pass_spectrum.norm() + 1).log().mapped_to_range(0, 255).astype[DType.uint8]()
+        )
 
         # Step 6: Create the high pass filtered image from the filtered spectrum, mapping it to the uint8 range
         var high_pass_filtered_image = Image[DType.uint8, ColorSpace.rgb].from_spectrum(

@@ -39,5 +39,5 @@ linux = "6.8"
 [tasks]
 build = { cmd = "build/build.sh", env = { PREFIX = "$CONDA_PREFIX" } }
 test = { cmd = "mojo test", depends-on = ["build"], cwd = "test" }
-format = { cmd = "mojo format --line-length 160 mosaic test examples" }
+format = { cmd = "mojo format --line-length 160 mosaic test" }
 dev = { cmd = "mojo main.mojo", depends-on = ["build"] }

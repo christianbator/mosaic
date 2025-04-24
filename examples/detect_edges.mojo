@@ -22,7 +22,13 @@ fn main():
         #         For multi-channel color spaces like RGB, filters are applied to each channel separately
         #         (see `Matrix.strided_replication()` to duplicate a filter kernel across channels).
         var kernel = Matrix[DType.float64, ColorSpace.greyscale.channels()](
-            rows=3, cols=3, values=List[ScalarNumber[DType.float64]](0, 1, 0, 1, -4, 1, 0, 1, 0)
+            rows=3,
+            cols=3,
+            values=List[ScalarNumber[DType.float64]](
+                0,  1, 0,
+                1, -4, 1,
+                0,  1, 0
+            )
         )
 
         # Step 4: Filter the image with reflected border handling and the custom kernel
