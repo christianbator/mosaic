@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/logo.png" alt="Mosaic Logo" width="280" height="100">
+  <img src="assets/logo.png" alt="Mosaic Logo" width="280">
   <p>
     An open source computer vision library in Mojo
     
@@ -86,7 +86,7 @@ magic run mojo load_image.mojo
 - Loads an image file and displays it in the visualizer
 - Source: [examples/load_image.mojo](examples/load_image.mojo)
 <div align="center">
-  <img src="assets/examples/load-image.png" width="256" height="256">
+  <img src="assets/examples/load-image.png" width="256">
 </div>
 
 #### Save image
@@ -97,14 +97,14 @@ magic run mojo load_image.mojo
 - Scales an image to half size using bilinear interpolation
 - Source: [examples/scale_image.mojo](examples/scale_image.mojo)
 <div align="center">
-  <img src="assets/examples/scale-image.png" width="128" height="128">
+  <img src="assets/examples/scale-image.png" width="128">
 </div>
 
 #### Resize image
 - Resizes an image to double its width, stretching it in the process
 - Source: [examples/resize_image.mojo](examples/resize_image.mojo)
 <div align="center">
-  <img src="assets/examples/resize-image.png" width="512" height="256">
+  <img src="assets/examples/resize-image.png" width="512">
 </div>
 
 #### Slice image
@@ -112,28 +112,28 @@ magic run mojo load_image.mojo
 - Image slices are mutable views into the underlying image data
 - Source: [examples/slice_image.mojo](examples/slice_image.mojo)
 <div align="center">
-  <img src="assets/examples/slice-image.png" width="256" height="128">
+  <img src="assets/examples/slice-image.png" width="256">
 </div>
 
 #### Rotate image
 - Rotates an image by 90° clockwise
 - Source: [examples/rotate_image.mojo](examples/rotate_image.mojo)
 <div align="center">
-  <img src="assets/examples/rotate-image.png" width="256" height="256">
+  <img src="assets/examples/rotate-image.png" width="256">
 </div>
 
 #### Flip image
 - Flips an image vertically
 - Source: [examples/flip_image.mojo](examples/flip_image.mojo)
 <div align="center">
-  <img src="assets/examples/flip-image.png" width="256" height="256">
+  <img src="assets/examples/flip-image.png" width="256">
 </div>
 
 #### Pad image
 - Pads an image with zeros
 - Source: [examples/pad_image.mojo](examples/pad_image.mojo)
 <div align="center">
-  <img src="assets/examples/pad-image.png" width="300" height="300">
+  <img src="assets/examples/pad-image.png" width="300">
 </div>
 
 #### Convert type
@@ -144,7 +144,7 @@ magic run mojo load_image.mojo
 - Converts an RGB image to greyscale
 - Source: [examples/convert_color_space.mojo](examples/convert_color_space.mojo)
 <div align="center">
-  <img src="assets/examples/convert-color-space.png" width="256" height="256">
+  <img src="assets/examples/convert-color-space.png" width="256">
 </div>
 
 #### Convert color space as type
@@ -155,54 +155,54 @@ magic run mojo load_image.mojo
 - Blurs an image using the built-in Gaussian kernel and reflected border handling
 - Source: [examples/blur_image.mojo](examples/blur_image.mojo)
 <div align="center">
-  <img src="assets/examples/blur-image.png" width="256" height="256">
+  <img src="assets/examples/blur-image.png" width="256">
 </div>
 
 #### Detect edges
 - Detects edges in an image by smoothing and applying a custom Laplacian kernel
 - Source: [examples/detect_edges.mojo](examples/detect_edges.mojo)
 <div align="center">
-  <img src="assets/examples/detect-edges.png" width="256" height="256">
+  <img src="assets/examples/detect-edges.png" width="256">
 </div>
 
 #### Unsharp mask
 - Applies unsharp masking and image stacking to visualize the results
 - Source: [examples/unsharp_mask.mojo](examples/unsharp_mask.mojo)
 <div align="center">
-  <img src="assets/examples/unsharp-mask.png" width="512" height="256">
+  <img src="assets/examples/unsharp-mask.png" width="512">
 </div>
 
 #### Picture in picture
 - Captures a sub-rect of an image and copies it to the top left corner
 - Source: [examples/picture_in_picture.mojo](examples/picture_in_picture.mojo)
 <div align="center">
-  <img src="assets/examples/picture-in-picture.png" width="535" height="426">
+  <img src="assets/examples/picture-in-picture.png" width="535">
 </div>
 
 #### Extract channel
 - Extracts the green channel of an RGB image
 - Source: [examples/extract_channel.mojo](examples/extract_channel.mojo)
 <div align="center">
-  <img src="assets/examples/extract-channel.png" width="535" height="426">
+  <img src="assets/examples/extract-channel.png" width="535">
 </div>
 
 #### Fourier transform
 - Calculates the spectrum of an image using the Fourier transform
 - Source: [examples/fourier_transform.mojo](examples/fourier_transform.mojo)
 <div align="center">
-  <img src="assets/examples/fourier-transform.png" width="535" height="213">
+  <img src="assets/examples/fourier-transform.png" width="1070">
 </div>
 
 #### Inverse Fourier transform
 - Recreates an image from a previously calculated spectrum
 - Source: [examples/inverse_fourier_transform.mojo](examples/inverse_fourier_transform.mojo)
 <div align="center">
-  <img src="assets/examples/inverse-fourier-transform.png" width="535" height="213">
+  <img src="assets/examples/inverse-fourier-transform.png" width="1070">
 </div>
 
 #### High-pass filter
 - Applies a high-pass filter by discarding low frequencies in the spectrum
 - Source: [examples/high_pass_filter.mojo](examples/high_pass_filter.mojo)
 <div align="center">
-  <img src="assets/examples/high-pass-filter.png" width="802" height="213">
+  <img src="assets/examples/high-pass-filter.png" width="1605">
 </div>
