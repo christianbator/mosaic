@@ -204,5 +204,5 @@ magic run mojo load_image.mojo
 - Applies a high-pass filter by discarding low frequencies in the spectrum
 - Source: [examples/high_pass_filter.mojo](examples/high_pass_filter.mojo)
 <div align="center">
-  <img src="assets/examples/high-pass-filter.png" width="535" height="142">
+  <img src="assets/examples/high-pass-filter.png" width="802" height="213">
 </div>
