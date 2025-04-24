@@ -31,7 +31,7 @@ fn main():
             )
         )
 
-        # Step 4: Define a frame processor that is invoked for each new frame, taking a pointer to the image and returning a processed image
+        # Step 4: Define a frame processor that's invoked for each new frame, taking a pointer and returning a processed image
         @parameter
         fn process_frame[V: VideoCapturing](image: Pointer[Image[DType.uint8, V.color_space]]) -> Image[DType.uint8, ColorSpace.greyscale]:
             try:
