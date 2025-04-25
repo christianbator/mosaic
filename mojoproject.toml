@@ -33,7 +33,7 @@ channels = [
 max = "==25.2.0"
 
 [system-requirements]
-macos = "15"
+macos = "15.0"
 linux = "6.8"
 
 [tasks]

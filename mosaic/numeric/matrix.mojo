@@ -9,7 +9,6 @@ from memory import UnsafePointer, memset_zero, memcpy
 from algorithm import vectorize, parallelize
 from math import cos, sin, pi, floor, ceil, trunc, ceildiv, isclose, Ceilable, CeilDivable, Floorable, Truncable
 from collections import InlineArray
-from bit import bit_width, is_power_of_two, next_power_of_two
 
 from mosaic.utility import optimal_simd_width, unroll_factor, fatal_error
 

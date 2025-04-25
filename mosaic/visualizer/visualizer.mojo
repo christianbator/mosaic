@@ -58,7 +58,7 @@ struct Visualizer:
             )
 
     @staticmethod
-    fn _show[dtype: DType, color_space: ColorSpace, //](image: Image[dtype, color_space], window_title: String):
+    fn _show[dtype: DType, color_space: ColorSpace, //](image: Image[dtype, color_space], owned window_title: String):
         var show = Self._libvisualizer().get_function[
             fn (
                 data: UnsafePointer[UInt8],

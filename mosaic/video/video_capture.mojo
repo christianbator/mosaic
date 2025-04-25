@@ -54,7 +54,7 @@ struct VideoCapture[capture_color_space: ColorSpace](VideoCapturing):
 
         self = Self(video_capture, libvideocapture)
 
-    fn __init__(out self, name: String) raises:
+    fn __init__(out self, owned name: String) raises:
         # Load libvideocapture
         var libvideocapture = DLHandle(dynamic_library_filepath("libmosaic-videocapture"))
 
