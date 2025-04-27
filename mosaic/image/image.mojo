@@ -105,10 +105,6 @@ struct Image[dtype: DType, color_space: ColorSpace](
     fn bytes(self) -> Int:
         return self.samples() * self.bit_depth() // 8
 
-    @always_inline
-    fn matrix(self) -> ref [__origin_of(self._matrix)] Matrix[dtype, color_space.channels()]:
-        return self._matrix
-
     #
     # Public Access
     #
