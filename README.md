@@ -190,21 +190,21 @@ magic run mojo load_image.mojo
 - Calculates the spectrum of an image using the Fourier transform
 - Source: [examples/fourier_transform.mojo](examples/fourier_transform.mojo)
 <div align="center">
-  <img src="assets/examples/fourier-transform.png" width="1070">
+  <img src="assets/examples/fourier-transform.png" width="512">
 </div>
 
 #### Inverse Fourier transform
 - Recreates an image from a previously calculated spectrum
 - Source: [examples/inverse_fourier_transform.mojo](examples/inverse_fourier_transform.mojo)
 <div align="center">
-  <img src="assets/examples/inverse-fourier-transform.png" width="1070">
+  <img src="assets/examples/inverse-fourier-transform.png" width="512">
 </div>
 
 #### High-pass filter
 - Applies a high-pass filter by discarding low frequencies in the spectrum
 - Source: [examples/high_pass_filter.mojo](examples/high_pass_filter.mojo)
 <div align="center">
-  <img src="assets/examples/high-pass-filter.png" width="1605">
+  <img src="assets/examples/high-pass-filter.png" width="768">
 </div>
 
 #### Video capture

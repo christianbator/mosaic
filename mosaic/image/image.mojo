@@ -62,9 +62,15 @@ struct Image[dtype: DType, color_space: ColorSpace](
     @staticmethod
     fn from_spectrum[
         spectrum_dtype: DType, //
-    ](spectrum: Matrix[spectrum_dtype, color_space.channels(), complex=True], lower_bound: Float64, upper_bound: Float64) -> Self:
+    ](spectrum: Matrix[spectrum_dtype, color_space.channels(), complex=True], lower_bound: Int, upper_bound: Int) -> Self:
+        return Self.from_spectrum(spectrum, lower_bound=Float64(lower_bound), upper_bound=Float64(upper_bound))
+
+    @staticmethod
+    fn from_spectrum[
+        spectrum_dtype: DType, T: Floatable, //
+    ](spectrum: Matrix[spectrum_dtype, color_space.channels(), complex=True], lower_bound: T, upper_bound: T) -> Self:
         var real = spectrum.fourier_transform[inverse=True]().real()
-        real.map_to_range(lower_bound, upper_bound)
+        real.map_to_range(Float64(lower_bound), Float64(upper_bound))
 
         return Self(real.astype[dtype]())
 

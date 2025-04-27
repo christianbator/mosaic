@@ -12,16 +12,16 @@ from mosaic.visualizer import Visualizer
 fn main():
     try:
         # Step 1: Load an image from a filepath, specifying the desired data type and color space
-        var image = Image[DType.uint8, ColorSpace.rgb]("data/squirrel.jpeg")
+        var image = Image[DType.uint8, ColorSpace.greyscale]("data/camera.png")
 
-        # Step 2: Calculate the 3-channel image spectrum using the Fourier transform
+        # Step 2: Calculate the image spectrum using the Fourier transform
         var spectrum = image.spectrum()
 
-        # Step 3: Recreate image from the spectrum
-        var recreated_image = Image[DType.uint8, ColorSpace.rgb].from_spectrum(spectrum, lower_bound=0, upper_bound=255)
+        # Step 3: Recreate the image from the spectrum, mapping to the uint8 range
+        var recreated_image = Image[DType.uint8, ColorSpace.greyscale].from_spectrum(spectrum, lower_bound=0, upper_bound=255)
 
-        # Step 4: Create spectral image for visualization (see `fourier_transform.mojo` example for details)
-        var spectral_image = Image[DType.uint8, ColorSpace.rgb](
+        # Step 4: Create a spectral image for visualization (see `fourier_transform.mojo` example for details)
+        var spectral_image = Image[DType.uint8, ColorSpace.greyscale](
             (spectrum.shifted_origin_to_center().norm() + 1).log().mapped_to_range(0, 255).astype[DType.uint8]()
         )
 
