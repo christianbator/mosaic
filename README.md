@@ -211,12 +211,12 @@ magic run mojo load_image.mojo
 - Opens the first available camera and visualizes the frames
 - Source: [examples/video_capture.mojo](examples/video_capture.mojo)
 <div align="center">
-  <img src="assets/examples/video-capture.png" width="580">
+  <img src="assets/examples/video-capture.png" width="768">
 </div>
 
 #### Video processing
 - Detects edges in the camera stream
 - Source: [examples/video_processing.mojo](examples/video_processing.mojo)
 <div align="center">
-  <img src="assets/examples/video-processing.png" width="580">
+  <img src="assets/examples/video-processing.png" width="768">
 </div>
