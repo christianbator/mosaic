@@ -79,11 +79,7 @@ fi
 if $build_libmosaic_codec; then
     echo -e "> Building ${cyan}libmosaic-codec${reset} ..."
 
-    stb_options=""
-
-    if [ $os == "macOS" ]; then
-        additional_stb_options="-DSTBI_NEON"
-    fi
+    stb_options="-DSTBI_NEON"
 
     clang -fPIC -shared -Wall -Werror -O3 -march=native $stb_options -o $lib_dir/libmosaic-codec$dynamic_lib_extension libmosaic-codec/codec.c
 fi
