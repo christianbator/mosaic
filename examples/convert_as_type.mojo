@@ -1,5 +1,5 @@
 #
-# convert_astype.mojo
+# convert_as_type.mojo
 # mosaic
 #
 # Created by Christian Bator on 04/23/2025
@@ -16,7 +16,7 @@ fn main():
         var image = Image[DType.float64, ColorSpace.rgb]("data/mandrill.png")
 
         # Step 2: Convert the image to a new color space and data type in one method
-        var uint8_greyscale = image.converted_astype[DType.uint8, ColorSpace.greyscale]()
+        var uint8_greyscale = image.converted_as_type[DType.uint8, ColorSpace.greyscale]()
 
         # Step 3: Request the Visualizer to show the uint8 greyscale image in a window titled "UInt8 Greyscale"
         Visualizer.show(uint8_greyscale, window_title="UInt8 Greyscale")

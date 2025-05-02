@@ -36,7 +36,7 @@ fn main():
         fn process_frame[V: VideoCapturing](image: Pointer[Image[DType.uint8, V.color_space]]) -> Image[DType.uint8, ColorSpace.greyscale]:
             try:
                 # Convert to float64 greyscale for processing
-                var greyscale = image[].converted_astype[DType.float64, ColorSpace.greyscale]()
+                var greyscale = image[].converted_as_type[DType.float64, ColorSpace.greyscale]()
 
                 # Smooth the image for better edge detection
                 var blurred = greyscale.gaussian_blurred[Border.reflect](5)
@@ -48,7 +48,7 @@ fn main():
                 edges.clamp(0, 255)
                 
                 # Return processed image as renderable type
-                return edges.astype[DType.uint8]()
+                return edges.as_type[DType.uint8]()
 
             except error:
                 print(error)

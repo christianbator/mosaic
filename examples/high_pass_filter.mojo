@@ -35,7 +35,7 @@ fn main():
 
         # Step 5: Create a high pass spectral image for visualization (see `fourier_transform.mojo` example for details)
         var high_pass_spectral_image = Image[DType.uint8, ColorSpace.greyscale](
-            (high_pass_spectrum.norm() + 1).log().mapped_to_range(0, 255).astype[DType.uint8]()
+            (high_pass_spectrum.norm() + 1).log().mapped_to_range(0, 255).as_type[DType.uint8]()
         )
 
         # Step 6: Create the high pass image from the filtered spectrum, mapping to the uint8 range

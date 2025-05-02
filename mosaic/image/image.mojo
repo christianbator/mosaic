@@ -73,7 +73,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
         var real = spectrum.fourier_transform[inverse=True]().real()
         real.map_to_range(Float64(lower_bound).cast[fft_dtype](), Float64(upper_bound).cast[fft_dtype]())
 
-        return Self(real.astype[dtype]())
+        return Self(real.as_type[dtype]())
 
     #
     # Properties
@@ -1021,16 +1021,16 @@ struct Image[dtype: DType, color_space: ColorSpace](
     #
     # Type Conversion
     #
-    fn astype[new_dtype: DType](self) -> Image[new_dtype, color_space]:
-        return Image[new_dtype, color_space](self._matrix.astype[new_dtype]())
+    fn as_type[new_dtype: DType](self) -> Image[new_dtype, color_space]:
+        return Image[new_dtype, color_space](self._matrix.as_type[new_dtype]())
 
     #
     # Color Space Conversion
     #
     fn converted[new_color_space: ColorSpace](self) -> Image[dtype, new_color_space]:
-        return self.converted_astype[dtype, new_color_space]()
+        return self.converted_as_type[dtype, new_color_space]()
 
-    fn converted_astype[new_dtype: DType, new_color_space: ColorSpace](self) -> Image[new_dtype, new_color_space]:
+    fn converted_as_type[new_dtype: DType, new_color_space: ColorSpace](self) -> Image[new_dtype, new_color_space]:
         @parameter
         if new_color_space == color_space:
             return Image[new_dtype, new_color_space](self._matrix.rebound_copy[new_dtype, new_color_space.channels()]())

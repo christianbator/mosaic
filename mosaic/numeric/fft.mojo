@@ -71,7 +71,7 @@ fn fft[
         data_in.keep()
 
     elif dtype != fft_dtype:
-        var data_in = matrix.astype[fft_dtype]()
+        var data_in = matrix.as_type[fft_dtype]()
 
         fft(
             rows=matrix.rows(),

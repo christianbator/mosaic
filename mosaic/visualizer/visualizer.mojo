@@ -48,12 +48,12 @@ struct Visualizer:
             Self._show(image=image, window_title=window_title)
         elif color_space.is_display_color_space():
             Self._show(
-                image=image.astype[Self.display_dtype](),
+                image=image.as_type[Self.display_dtype](),
                 window_title=window_title,
             )
         else:
             Self._show(
-                image=image.converted_astype[Self.display_dtype, ColorSpace.rgb](),
+                image=image.converted_as_type[Self.display_dtype, ColorSpace.rgb](),
                 window_title=window_title,
             )
 

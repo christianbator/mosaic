@@ -132,7 +132,7 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
                     data=image_data.bitcast[Scalar[dtype]](),
                 )
             else:
-                image = Image[DType.uint8, color_space](width=width, height=height, data=image_data).astype[dtype]()
+                image = Image[DType.uint8, color_space](width=width, height=height, data=image_data).as_type[dtype]()
 
         #
         # 16-bit images
@@ -164,7 +164,7 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
                     data=image_data.bitcast[Scalar[dtype]](),
                 )
             else:
-                image = Image[DType.uint16, color_space](width=width, height=height, data=image_data).astype[dtype]()
+                image = Image[DType.uint16, color_space](width=width, height=height, data=image_data).as_type[dtype]()
 
         #
         # HDR (32-bit float) images
@@ -196,7 +196,7 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
                     data=image_data.bitcast[Scalar[dtype]](),
                 )
             else:
-                image = Image[DType.float32, color_space](width=width, height=height, data=image_data).astype[dtype]()
+                image = Image[DType.float32, color_space](width=width, height=height, data=image_data).as_type[dtype]()
 
         #
         # Unsupported bit-depth

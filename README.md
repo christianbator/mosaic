@@ -149,7 +149,7 @@ magic run mojo load_image.mojo
 
 #### Convert color space as type
 - Converts a `float64` RGB image to `uint8` greyscale in one method
-- Source: [examples/convert_astype.mojo](examples/convert_astype.mojo)
+- Source: [examples/convert_as_type.mojo](examples/convert_as_type.mojo)
 
 #### Blur image
 - Blurs an image using the built-in Gaussian kernel and reflected border handling

@@ -54,7 +54,7 @@ struct Filters:
 
             result.strided_normalize()
 
-            return result.astype[dtype]()
+            return result.as_type[dtype]()
         else:
             if size == 3:
                 return Matrix[dtype, depth, complex=complex].strided_replication(
@@ -88,7 +88,7 @@ struct Filters:
 
                 result.strided_normalize()
 
-                return result.astype[dtype]()
+                return result.as_type[dtype]()
 
     @staticmethod
     fn gaussian_kernel_2d[

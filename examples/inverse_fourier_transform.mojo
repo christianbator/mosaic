@@ -22,7 +22,7 @@ fn main():
 
         # Step 4: Create a spectral image for visualization (see `fourier_transform.mojo` example for details)
         var spectral_image = Image[DType.uint8, ColorSpace.greyscale](
-            (spectrum.shifted_origin_to_center().norm() + 1).log().mapped_to_range(0, 255).astype[DType.uint8]()
+            (spectrum.shifted_origin_to_center().norm() + 1).log().mapped_to_range(0, 255).as_type[DType.uint8]()
         )
 
         # Step 5: Horizontally stack the spectral image and recreated image for visualization

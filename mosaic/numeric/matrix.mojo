@@ -1502,7 +1502,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     #
     # Type Conversion
     #
-    fn astype[new_dtype: DType](self) -> Matrix[new_dtype, depth, complex=complex]:
+    fn as_type[new_dtype: DType](self) -> Matrix[new_dtype, depth, complex=complex]:
         @parameter
         if new_dtype == dtype:
             return Matrix[new_dtype, depth, complex=complex](rows=self._rows, cols=self._cols, data=self._data.rebound_copy[new_dtype]())

@@ -24,7 +24,7 @@ fn main():
         var scaled_spectrum = (spectrum.norm() + 1).log()
 
         # Step 5: Normalize the scaled spectrum by mapping to the uint8 range
-        var normalized_spectrum = scaled_spectrum.mapped_to_range(0, 255).astype[DType.uint8]()
+        var normalized_spectrum = scaled_spectrum.mapped_to_range(0, 255).as_type[DType.uint8]()
 
         # Step 6: Create an image from the resulting spectral matrix
         var spectral_image = Image[DType.uint8, ColorSpace.greyscale](normalized_spectrum^)

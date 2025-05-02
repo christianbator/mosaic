@@ -63,7 +63,7 @@ struct ImageWriter:
         if dtype == DType.uint8:
             data = image.unsafe_uint8_ptr()
         else:
-            data = image.astype[DType.uint8]().unsafe_uint8_ptr()
+            data = image.as_type[DType.uint8]().unsafe_uint8_ptr()
 
         var result: c_int
 

@@ -15,7 +15,7 @@ fn main():
         var image = Image[DType.uint8, ColorSpace.rgb]("data/mandrill.png")
 
         # Step 2: Convert the image to a floating point data type for processing
-        var float_image = image.astype[DType.float64]()
+        var float_image = image.as_type[DType.float64]()
 
         # Step 3: The Visualizer automatically converts images to a renderable data type
         Visualizer.show(float_image, window_title="Float Image")
