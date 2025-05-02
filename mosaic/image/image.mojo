@@ -129,13 +129,13 @@ struct Image[dtype: DType, color_space: ColorSpace](
         self._matrix[y, x, channel] = value
 
     @always_inline
-    fn strided_load[width: Int](self, y: Int, x: Int) raises -> SIMD[dtype, width]:
+    fn strided_load[width: Int = 1](self, y: Int, x: Int) raises -> SIMD[dtype, width]:
         constrained[color_space.channels() == 1, "Must specify channel for image in color space with channels > 1"]()
 
         return self.strided_load[width](y=y, x=x, channel=0)
 
     @always_inline
-    fn strided_load[width: Int](self, y: Int, x: Int, channel: Int) raises -> SIMD[dtype, width]:
+    fn strided_load[width: Int = 1](self, y: Int, x: Int, channel: Int) raises -> SIMD[dtype, width]:
         return self._matrix.strided_load[width](row=y, col=x, component=channel).value
 
     @always_inline
@@ -147,6 +147,29 @@ struct Image[dtype: DType, color_space: ColorSpace](
     @always_inline
     fn strided_store[width: Int](mut self, value: SIMD[dtype, width], y: Int, x: Int, channel: Int) raises:
         self._matrix.strided_store[width](value, row=y, col=x, component=channel)
+
+    #
+    # Private Access
+    #
+    @always_inline
+    fn _strided_load[width: Int = 1](self, y: Int, x: Int) -> SIMD[dtype, width]:
+        constrained[color_space.channels() == 1, "Must specify channel for image in color space with channels > 1"]()
+
+        return self._strided_load[width](y=y, x=x, channel=0)
+
+    @always_inline
+    fn _strided_load[width: Int = 1](self, y: Int, x: Int, channel: Int) -> SIMD[dtype, width]:
+        return self._matrix._strided_load[width](row=y, col=x, component=channel).value
+
+    @always_inline
+    fn _strided_store[width: Int](mut self, value: SIMD[dtype, width], y: Int, x: Int):
+        constrained[color_space.channels() == 1, "Must specify channel for image in color space with channels > 1"]()
+
+        self._strided_store(value, y=y, x=x, channel=0)
+
+    @always_inline
+    fn _strided_store[width: Int](mut self, value: SIMD[dtype, width], y: Int, x: Int, channel: Int):
+        self._matrix._strided_store[width](value, row=y, col=x, component=channel)
 
     #
     # Unsafe Access
@@ -230,10 +253,6 @@ struct Image[dtype: DType, color_space: ColorSpace](
         return self._matrix.component_slice[channel](row_range=y_range, col_range=x_range)
 
     @always_inline
-    fn strided_slice[channel_range: StridedRange](self) raises -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
-        return self._matrix.strided_slice[channel_range]()
-
-    @always_inline
     fn strided_slice[
         channel_range: StridedRange
     ](self, y_range: StridedRange) raises -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
@@ -269,10 +288,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
             fn store_row(sub_y: Int):
                 @parameter
                 fn store_cols[width: Int](sub_x: Int):
-                    try:
-                        self.strided_store(value.strided_load[width](y=sub_y, x=sub_x, channel=channel), y=y + sub_y, x=x + sub_x, channel=channel)
-                    except error:
-                        fatal_error(error)
+                    self._strided_store(value._strided_load[width](y=sub_y, x=sub_x, channel=channel), y=y + sub_y, x=x + sub_x, channel=channel)
 
                 vectorize[store_cols, Self.optimal_simd_width, unroll_factor=unroll_factor](value.width())
 
@@ -680,21 +696,18 @@ struct Image[dtype: DType, color_space: ColorSpace](
             fn process_row(y: Int):
                 @parameter
                 fn process_col[simd_width: Int](x: Int):
-                    try:
-                        result.strided_store(
-                            self._matrix.strided_gather(
-                                row=y * self.height() // height,
-                                col=x * self.width() // width,
-                                component=channel,
-                                offset=SIMDRange[simd_width]() * self.width() // width,
-                                mask=True,
-                            ).value,
-                            y=y,
-                            x=x,
-                            channel=channel,
-                        )
-                    except error:
-                        fatal_error(error)
+                    result._strided_store(
+                        self._matrix.strided_gather(
+                            row=y * self.height() // height,
+                            col=x * self.width() // width,
+                            component=channel,
+                            offset=SIMDRange[simd_width]() * self.width() // width,
+                            mask=True,
+                        ).value,
+                        y=y,
+                        x=x,
+                        channel=channel,
+                    )
 
                 vectorize[process_col, Self.optimal_simd_width, unroll_factor=unroll_factor](result.width())
 
@@ -716,46 +729,42 @@ struct Image[dtype: DType, color_space: ColorSpace](
 
                 @parameter
                 fn process_col[simd_width: Int](x: Int):
-                    try:
-                        var fractional_x = (x + SIMDRange[simd_width]().cast[DType.float64]()) * self.width() / width
-                        var x1 = floor(fractional_x).cast[DType.index]()
-                        var x2 = (x1 + 1).clamp(0, self.width() - 1)
-                        var x_in_bounds = (x1 != x2)
+                    var fractional_x = (x + SIMDRange[simd_width]().cast[DType.float64]()) * self.width() / width
+                    var x1 = floor(fractional_x).cast[DType.index]()
+                    var x2 = (x1 + 1).clamp(0, self.width() - 1)
+                    var x_in_bounds = (x1 != x2)
 
-                        var top_left = self._matrix.strided_gather(row=y1, col=Int(x1[0]), component=channel, offset=x1 - x1[0], mask=True).value.cast[
+                    var top_left = self._matrix.strided_gather(row=y1, col=Int(x1[0]), component=channel, offset=x1 - x1[0], mask=True).value.cast[
+                        DType.float64
+                    ]()
+                    var top_right = self._matrix.strided_gather(row=y1, col=Int(x2[0]), component=channel, offset=x2 - x2[0], mask=True).value.cast[
+                        DType.float64
+                    ]()
+
+                    var top_intermediate = x_in_bounds.select(
+                        true_case=(x2.cast[DType.float64]() - fractional_x) * top_left + (fractional_x - x1.cast[DType.float64]()) * top_right,
+                        false_case=top_left,
+                    )
+
+                    var value: SIMD[DType.float64, simd_width]
+                    if y1 == y2:
+                        value = top_intermediate
+                    else:
+                        var bottom_left = self._matrix.strided_gather(row=y2, col=Int(x1[0]), component=channel, offset=x1 - x1[0], mask=True).value.cast[
                             DType.float64
                         ]()
-                        var top_right = self._matrix.strided_gather(row=y1, col=Int(x2[0]), component=channel, offset=x2 - x2[0], mask=True).value.cast[
+                        var bottom_right = self._matrix.strided_gather(row=y2, col=Int(x2[0]), component=channel, offset=x2 - x2[0], mask=True).value.cast[
                             DType.float64
                         ]()
 
-                        var top_intermediate = x_in_bounds.select(
-                            true_case=(x2.cast[DType.float64]() - fractional_x) * top_left + (fractional_x - x1.cast[DType.float64]()) * top_right,
-                            false_case=top_left,
+                        var bottom_intermediate = x_in_bounds.select(
+                            true_case=(x2.cast[DType.float64]() - fractional_x) * bottom_left + (fractional_x - x1.cast[DType.float64]()) * bottom_right,
+                            false_case=bottom_left,
                         )
 
-                        var value: SIMD[DType.float64, simd_width]
-                        if y1 == y2:
-                            value = top_intermediate
-                        else:
-                            var bottom_left = self._matrix.strided_gather(row=y2, col=Int(x1[0]), component=channel, offset=x1 - x1[0], mask=True).value.cast[
-                                DType.float64
-                            ]()
-                            var bottom_right = self._matrix.strided_gather(row=y2, col=Int(x2[0]), component=channel, offset=x2 - x2[0], mask=True).value.cast[
-                                DType.float64
-                            ]()
+                        value = (y2 - fractional_y) * top_intermediate + (fractional_y - y1) * bottom_intermediate
 
-                            var bottom_intermediate = x_in_bounds.select(
-                                true_case=(x2.cast[DType.float64]() - fractional_x) * bottom_left + (fractional_x - x1.cast[DType.float64]()) * bottom_right,
-                                false_case=bottom_left,
-                            )
-
-                            value = (y2 - fractional_y) * top_intermediate + (fractional_y - y1) * bottom_intermediate
-
-                        result.strided_store(value.cast[dtype](), y=y, x=x, channel=channel)
-
-                    except error:
-                        fatal_error(error)
+                    result._strided_store(value.cast[dtype](), y=y, x=x, channel=channel)
 
                 vectorize[process_col, Self.optimal_simd_width, unroll_factor=unroll_factor](result.width())
 
@@ -771,26 +780,23 @@ struct Image[dtype: DType, color_space: ColorSpace](
 
         @parameter
         if border != Border.zero:
-            try:
 
-                @parameter
-                for channel in range(color_space.channels()):
-                    for y in range(height):
-                        for x in range(result.width()):
-                            result[y, x, channel] = self._bordered_load[border](y=y - height, x=x - width, channel=channel)
+            @parameter
+            for channel in range(color_space.channels()):
+                for y in range(height):
+                    for x in range(result.width()):
+                        result._strided_store(self._bordered_load[border](y=y - height, x=x - width, channel=channel), y=y, x=x, channel=channel)
 
-                    for y in range(height, height + self.height()):
-                        for x in range(result.width()):
-                            result[y, x, channel] = self._bordered_load[border](y=y - height, x=x - width, channel=channel)
+                for y in range(height, height + self.height()):
+                    for x in range(result.width()):
+                        result._strided_store(self._bordered_load[border](y=y - height, x=x - width, channel=channel), y=y, x=x, channel=channel)
 
-                        for x in range(width + self.width(), result.width()):
-                            result[y, x, channel] = self._bordered_load[border](y=y - height, x=x - width, channel=channel)
+                    for x in range(width + self.width(), result.width()):
+                        result._strided_store(self._bordered_load[border](y=y - height, x=x - width, channel=channel), y=y, x=x, channel=channel)
 
-                    for y in range(height + self.height(), result.height()):
-                        for x in range(result.width()):
-                            result[y, x, channel] = self._bordered_load[border](y=y - height, x=x - width, channel=channel)
-            except error:
-                fatal_error(error)
+                for y in range(height + self.height(), result.height()):
+                    for x in range(result.width()):
+                        result._strided_store(self._bordered_load[border](y=y - height, x=x - width, channel=channel), y=y, x=x, channel=channel)
 
         return result^
 
@@ -799,20 +805,16 @@ struct Image[dtype: DType, color_space: ColorSpace](
 
         @parameter
         if border != Border.zero:
-            try:
 
-                @parameter
-                for channel in range(color_space.channels()):
-                    for y in range(self.height()):
-                        for x in range(self.width(), result.width()):
-                            result[y, x, channel] = self._bordered_load[border](y=y, x=x, channel=channel)
+            @parameter
+            for channel in range(color_space.channels()):
+                for y in range(self.height()):
+                    for x in range(self.width(), result.width()):
+                        result._strided_store(self._bordered_load[border](y=y, x=x, channel=channel), y=y, x=x, channel=channel)
 
-                    for y in range(self.height(), result.height()):
-                        for x in range(result.width()):
-                            result[y, x, channel] = self._bordered_load[border](y=y, x=x, channel=channel)
-
-            except error:
-                fatal_error(error)
+                for y in range(self.height(), result.height()):
+                    for x in range(result.width()):
+                        result._strided_store(self._bordered_load[border](y=y, x=x, channel=channel), y=y, x=x, channel=channel)
 
         return result^
 
@@ -866,6 +868,10 @@ struct Image[dtype: DType, color_space: ColorSpace](
             return self._direct_convolution[border, 64](flipped_kernel)
         elif count <= 128:
             return self._direct_convolution[border, 128](flipped_kernel)
+        elif count <= 256:
+            return self._direct_convolution[border, 256](flipped_kernel)
+        elif count <= 512:
+            return self._direct_convolution[border, 512](flipped_kernel)
         else:
             return self._fourier_convolution[border](flipped_kernel)
 
@@ -880,6 +886,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
         var x_offset = SIMD[DType.index, width]()
         var offset = SIMD[DType.index, width]()
         var mask = SIMD[DType.bool, width](False)
+        var width_range = SIMD[DType.index, width]()
 
         for kernel_y in range(0, kernel.rows()):
             for kernel_x in range(0, kernel.cols()):
@@ -888,126 +895,119 @@ struct Image[dtype: DType, color_space: ColorSpace](
                 x_offset[index] = kernel_x - half_kernel_width
                 offset[index] = (y_offset[index] * self.width() + x_offset[index]) * color_space.channels()
                 mask[index] = True
+                width_range[index] = index
 
         @parameter
         for channel in range(color_space.channels()):
-            # TODO: Create strided slice of kernel data and fill the kernel vector from that, or create an as_simd() method on Matrix?
-            for row in range(kernel.rows()):
-                for col in range(kernel.cols()):
-                    try:
-                        kernel_vector[row * kernel.cols() + col] = kernel.strided_load[1](row=row, col=col, component=channel).value
-                    except error:
-                        fatal_error(error)
+            kernel_vector = kernel.strided_gather(row=0, col=0, component=channel, offset=width_range, mask=mask).value
 
             @parameter
             fn process_row(y: Int):
                 var min_patch_y = y - half_kernel_height
                 var max_patch_y = y + half_kernel_height
 
-                try:
-                    for x in range(result.width()):
-                        if max_patch_y < self.height() and min_patch_y >= 0 and (x + half_kernel_width) < self.width() and (x - half_kernel_width) >= 0:
-                            result[y, x, channel] = (
-                                self._matrix.gather(
-                                    row=y,
-                                    col=x,
-                                    component=channel,
-                                    offset=offset,
-                                    mask=mask,
+                for x in range(result.width()):
+                    if max_patch_y < self.height() and min_patch_y >= 0 and (x + half_kernel_width) < self.width() and (x - half_kernel_width) >= 0:
+                        var value = (
+                            self._matrix.gather(
+                                row=y,
+                                col=x,
+                                component=channel,
+                                offset=offset,
+                                mask=mask,
+                            )
+                            * kernel_vector
+                        ).value.reduce_add()
+
+                        result._strided_store(value, y=y, x=x, channel=channel)
+                    else:
+                        var pixel_sum = Scalar[dtype]()
+
+                        @parameter
+                        for index in range(width):
+                            if mask[index]:
+                                pixel_sum = kernel_vector[index].fma(
+                                    self._bordered_load[border](
+                                        y=Int(y + y_offset[index]),
+                                        x=Int(x + x_offset[index]),
+                                        channel=channel,
+                                    ),
+                                    pixel_sum,
                                 )
-                                * kernel_vector
-                            ).value.reduce_add()
-                        else:
-                            var pixel_sum = Scalar[dtype]()
 
-                            @parameter
-                            for index in range(width):
-                                if mask[index]:
-                                    pixel_sum = kernel_vector[index].fma(
-                                        self._bordered_load[border](
-                                            y=Int(y + y_offset[index]),
-                                            x=Int(x + x_offset[index]),
-                                            channel=channel,
-                                        ),
-                                        pixel_sum,
-                                    )
-
-                            result[y, x, channel] = pixel_sum
-                except error:
-                    fatal_error(error)
+                        result._strided_store(pixel_sum, y=y, x=x, channel=channel)
 
             parallelize[process_row](result.height())
 
         return result^
 
     fn _fourier_convolution[border: Border](self, kernel: Matrix[dtype, color_space.channels()]) -> Self:
-        try:
-            var half_kernel_rows = kernel.rows() // 2
-            var half_kernel_cols = kernel.cols() // 2
+        var half_kernel_rows = kernel.rows() // 2
+        var half_kernel_cols = kernel.cols() // 2
 
-            var padded_self = self.padded[border](width=half_kernel_cols, height=half_kernel_rows)
-            var padded_kernel = Matrix[dtype, color_space.channels()](rows=padded_self.height(), cols=padded_self.width())
+        var padded_self = self.padded[border](width=half_kernel_cols, height=half_kernel_rows)
+        var padded_kernel = Matrix[dtype, color_space.channels()](rows=padded_self.height(), cols=padded_self.width())
 
-            @parameter
-            for component in range(kernel.depth):
-                for row in range(kernel.rows()):
-                    for col in range(kernel.cols()):
-                        var shifted_row = (row - half_kernel_rows) % padded_self.height()
-                        var shifted_col = (col - half_kernel_cols) % padded_self.width()
-                        padded_kernel[shifted_row, shifted_col, component] = kernel[row, col, component]
+        @parameter
+        for component in range(kernel.depth):
+            for row in range(kernel.rows()):
+                for col in range(kernel.cols()):
+                    var shifted_row = (row - half_kernel_rows) % padded_self.height()
+                    var shifted_col = (col - half_kernel_cols) % padded_self.width()
+                    padded_kernel._strided_store(
+                        kernel._strided_load(row=row, col=col, component=component), row=shifted_row, col=shifted_col, component=component
+                    )
 
-            var spectral_multiplication = padded_self.spectrum() * padded_kernel.fourier_transform()
+        var spectral_multiplication = padded_self.spectrum() * padded_kernel.fourier_transform()
 
-            var padded_result = spectral_multiplication.fourier_transform[inverse=True]().real()
+        var padded_result = spectral_multiplication.fourier_transform[inverse=True]()
 
-            var result = padded_result[half_kernel_rows : half_kernel_rows + self.height(), half_kernel_cols : half_kernel_cols + self.width()].rebound_copy[
-                depth = color_space.channels()
-            ]()
+        var result = Self(width=self.width(), height=self.height())
 
-            return Self(result.astype[dtype]())
+        @parameter
+        fn take_real_value[width: Int](row: Int, col: Int, component: Int):
+            result._strided_store(
+                padded_result._strided_load[width](row=half_kernel_rows + row, col=half_kernel_cols + col, component=component).real().cast[dtype](),
+                y=row,
+                x=col,
+                channel=component,
+            )
 
-        except error:
-            fatal_error(error)
-            while True:
-                pass
+        result._matrix.strided_iterate_indices[take_real_value]()
+
+        return result^
 
     @always_inline
     fn _bordered_load[border: Border](self, y: Int, x: Int, channel: Int) -> Scalar[dtype]:
-        try:
-
-            @parameter
-            if border == Border.zero:
-                if y >= 0 and y < self.height() and x >= 0 and x < self.width():
-                    return self[y, x, channel]
-                else:
-                    return Scalar[dtype](0)
-            elif border == Border.wrap:
-                return self[y % self.height(), x % self.width(), channel]
-            elif border == Border.reflect:
-                var reflected_y: Int
-                var reflected_x: Int
-
-                if y < 0:
-                    reflected_y = abs(y)
-                elif y >= self.height():
-                    reflected_y = 2 * (self.height() - 1) - y
-                else:
-                    reflected_y = y
-
-                if x < 0:
-                    reflected_x = abs(x)
-                elif x >= self.width():
-                    reflected_x = 2 * (self.width() - 1) - x
-                else:
-                    reflected_x = x
-
-                return self[reflected_y, reflected_x, channel]
+        @parameter
+        if border == Border.zero:
+            if y >= 0 and y < self.height() and x >= 0 and x < self.width():
+                return self._strided_load(y=y, x=x, channel=channel)
             else:
-                fatal_error("Unimplemented border type in Image._bordered_load()")
-                while True:
-                    pass
-        except error:
-            fatal_error(error)
+                return Scalar[dtype](0)
+        elif border == Border.wrap:
+            return self._strided_load(y=y % self.height(), x=x % self.width(), channel=channel)
+        elif border == Border.reflect:
+            var reflected_y: Int
+            var reflected_x: Int
+
+            if y < 0:
+                reflected_y = abs(y)
+            elif y >= self.height():
+                reflected_y = 2 * (self.height() - 1) - y
+            else:
+                reflected_y = y
+
+            if x < 0:
+                reflected_x = abs(x)
+            elif x >= self.width():
+                reflected_x = 2 * (self.width() - 1) - x
+            else:
+                reflected_x = x
+
+            return self._strided_load(y=reflected_y, x=reflected_x, channel=channel)
+        else:
+            fatal_error("Unimplemented border type in Image._bordered_load()")
             while True:
                 pass
 
@@ -1034,33 +1034,29 @@ struct Image[dtype: DType, color_space: ColorSpace](
             fn convert_row(y: Int):
                 @parameter
                 fn convert_cols[width: Int](x: Int):
-                    try:
-                        # Greyscale ->
+                    # Greyscale ->
+                    @parameter
+                    if color_space == ColorSpace.greyscale:
+                        var grey = self._strided_load[width](y=y, x=x, channel=0).cast[new_dtype]()
+
+                        # RGB
                         @parameter
-                        if color_space == ColorSpace.greyscale:
-                            var grey = self.strided_load[width](y=y, x=x, channel=0).cast[new_dtype]()
+                        if new_color_space == ColorSpace.rgb:
+                            result._strided_store(grey, y=y, x=x, channel=0)
+                            result._strided_store(grey, y=y, x=x, channel=1)
+                            result._strided_store(grey, y=y, x=x, channel=2)
 
-                            # RGB
-                            @parameter
-                            if new_color_space == ColorSpace.rgb:
-                                result.strided_store(grey, y=y, x=x, channel=0)
-                                result.strided_store(grey, y=y, x=x, channel=1)
-                                result.strided_store(grey, y=y, x=x, channel=2)
+                    # RGB ->
+                    elif color_space == ColorSpace.rgb:
+                        var red = self._strided_load[width](y=y, x=x, channel=0).cast[DType.float64]()
+                        var green = self._strided_load[width](y=y, x=x, channel=1).cast[DType.float64]()
+                        var blue = self._strided_load[width](y=y, x=x, channel=2).cast[DType.float64]()
 
-                        # RGB ->
-                        elif color_space == ColorSpace.rgb:
-                            var red = self.strided_load[width](y=y, x=x, channel=0).cast[DType.float64]()
-                            var green = self.strided_load[width](y=y, x=x, channel=1).cast[DType.float64]()
-                            var blue = self.strided_load[width](y=y, x=x, channel=2).cast[DType.float64]()
-
-                            # Greyscale
-                            @parameter
-                            if new_color_space == ColorSpace.greyscale:
-                                var grey = 0.299 * red + 0.587 * green + 0.114 * blue
-                                result.strided_store(grey.cast[new_dtype](), y=y, x=x, channel=0)
-
-                    except error:
-                        fatal_error(error)
+                        # Greyscale
+                        @parameter
+                        if new_color_space == ColorSpace.greyscale:
+                            var grey = 0.299 * red + 0.587 * green + 0.114 * blue
+                            result._strided_store(grey.cast[new_dtype](), y=y, x=x, channel=0)
 
                 vectorize[convert_cols, Self.optimal_simd_width, unroll_factor=unroll_factor](self.width())
 

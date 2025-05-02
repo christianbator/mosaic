@@ -9,7 +9,7 @@ from math import ceildiv
 from memory import Pointer
 from algorithm import parallelize, vectorize
 
-from mosaic.utility import unroll_factor, fatal_error
+from mosaic.utility import unroll_factor
 
 
 #
@@ -40,6 +40,20 @@ struct MatrixSlice[
     #
     # Initialization
     #
+    fn __init__(out self, ref [origin]matrix: Matrix[dtype, depth, complex=complex]):
+        constrained[
+            raw_component_range.can_normalize_in_positive_range(depth),
+            "Invalid component range for matrix with depth = " + String(depth) + ", " + String(raw_component_range),
+        ]()
+
+        self._matrix = Pointer.address_of(matrix)
+
+        self._row_range = StridedRange(matrix.rows())
+        self._col_range = StridedRange(matrix.cols())
+
+        self._rows = matrix.rows()
+        self._cols = matrix.cols()
+
     fn __init__(
         out self,
         ref [origin]matrix: Matrix[dtype, depth, complex=complex],
@@ -112,7 +126,7 @@ struct MatrixSlice[
         return self._component_range
 
     #
-    # Access
+    # Public Access
     #
     @always_inline
     fn __getitem__(self, row: Int, col: Int) raises -> ScalarNumber[dtype, complex=complex]:
@@ -122,7 +136,7 @@ struct MatrixSlice[
 
     @always_inline
     fn __getitem__(self, row: Int, col: Int, component: Int) raises -> ScalarNumber[dtype, complex=complex]:
-        return self.strided_load[1](row=row, col=col, component=component)
+        return self.strided_load(row=row, col=col, component=component)
 
     @always_inline
     fn __setitem__[
@@ -139,13 +153,13 @@ struct MatrixSlice[
         self.strided_store(value, row=row, col=col, component=component)
 
     @always_inline
-    fn load[width: Int](self, row: Int, col: Int) raises -> Number[dtype, width, complex=complex]:
+    fn strided_load[width: Int = 1](self, row: Int, col: Int) raises -> Number[dtype, width, complex=complex]:
         constrained[Self._depth == 1, "Must specify component for matrix slice with depth > 1"]()
 
         return self.strided_load[width](row=row, col=col, component=0)
 
     @always_inline
-    fn strided_load[width: Int](self, row: Int, col: Int, component: Int) raises -> Number[dtype, width, complex=complex]:
+    fn strided_load[width: Int = 1](self, row: Int, col: Int, component: Int) raises -> Number[dtype, width, complex=complex]:
         return self._matrix[].strided_load[width](
             row=self._row_range.start + row * self._row_range.step,
             col=self._col_range.start + col * self._col_range.step,
@@ -153,7 +167,7 @@ struct MatrixSlice[
         )
 
     @always_inline
-    fn store[
+    fn strided_store[
         origin: MutableOrigin, width: Int, //
     ](mut self: MatrixSlice[_, dtype, _, complex, origin], value: Number[dtype, width, complex=complex], row: Int, col: Int) raises:
         constrained[Self._depth == 1, "Must specify component for matrix slice with depth > 1"]()
@@ -165,6 +179,42 @@ struct MatrixSlice[
         origin: MutableOrigin, width: Int, //
     ](mut self: MatrixSlice[_, dtype, _, complex, origin], value: Number[dtype, width, complex=complex], row: Int, col: Int, component: Int) raises:
         self._matrix[].strided_store(
+            value,
+            row=self._row_range.start + row * self._row_range.step,
+            col=self._col_range.start + col * self._col_range.step,
+            component=Self._component_range.start + component * Self._component_range.step,
+        )
+
+    #
+    # Private Access
+    #
+    @always_inline
+    fn _strided_load[width: Int = 1](self, row: Int, col: Int) -> Number[dtype, width, complex=complex]:
+        constrained[Self._depth == 1, "Must specify component for matrix slice with depth > 1"]()
+
+        return self._strided_load[width](row=row, col=col, component=0)
+
+    @always_inline
+    fn _strided_load[width: Int = 1](self, row: Int, col: Int, component: Int) -> Number[dtype, width, complex=complex]:
+        return self._matrix[]._strided_load[width](
+            row=self._row_range.start + row * self._row_range.step,
+            col=self._col_range.start + col * self._col_range.step,
+            component=Self._component_range.start + component * Self._component_range.step,
+        )
+
+    @always_inline
+    fn _strided_store[
+        origin: MutableOrigin, width: Int, //
+    ](mut self: MatrixSlice[_, dtype, _, complex, origin], value: Number[dtype, width, complex=complex], row: Int, col: Int):
+        constrained[Self._depth == 1, "Must specify component for matrix slice with depth > 1"]()
+
+        self._strided_store(value, row=row, col=col, component=0)
+
+    @always_inline
+    fn _strided_store[
+        origin: MutableOrigin, width: Int, //
+    ](mut self: MatrixSlice[_, dtype, _, complex, origin], value: Number[dtype, width, complex=complex], row: Int, col: Int, component: Int):
+        self._matrix[]._strided_store(
             value,
             row=self._row_range.start + row * self._row_range.step,
             col=self._col_range.start + col * self._col_range.step,
@@ -359,15 +409,12 @@ struct MatrixSlice[
                 fn process_col[width: Int](range_col: Int):
                     var col = self._col_range.start + range_col * self._col_range.step
 
-                    try:
-                        result.strided_store(
-                            self._matrix[].strided_load[width](row=row, col=col, component=component),
-                            row=range_row,
-                            col=range_col,
-                            component=slice_component,
-                        )
-                    except error:
-                        fatal_error(error)
+                    result._strided_store(
+                        self._matrix[]._strided_load[width](row=row, col=col, component=component),
+                        row=range_row,
+                        col=range_col,
+                        component=slice_component,
+                    )
 
                 vectorize[process_col, Matrix[dtype, depth, complex=complex].optimal_simd_width, unroll_factor=unroll_factor](self._cols)
 
@@ -393,12 +440,9 @@ struct MatrixSlice[
                 fn process_col[width: Int](range_col: Int):
                     var col = self._col_range.start + range_col * self._col_range.step
 
-                    try:
-                        result.strided_store(
-                            self._matrix[].strided_load[width](row=row, col=col, component=component), row=range_row, col=range_col, component=slice_component
-                        )
-                    except error:
-                        fatal_error(error)
+                    result._strided_store(
+                        self._matrix[]._strided_load[width](row=row, col=col, component=component), row=range_row, col=range_col, component=slice_component
+                    )
 
                 vectorize[process_col, Matrix[dtype, new_depth, complex=complex].optimal_simd_width, unroll_factor=unroll_factor](self._cols)
 
@@ -417,10 +461,7 @@ struct MatrixSlice[
             fn fill_row(row: Int):
                 @parameter
                 fn fill_cols[width: Int](col: Int):
-                    try:
-                        self.strided_store(Number[dtype, width, complex=complex](value), row=row, col=col, component=component)
-                    except error:
-                        fatal_error(error)
+                    self._strided_store(Number[dtype, width, complex=complex](value), row=row, col=col, component=component)
 
                 vectorize[fill_cols, Matrix[dtype, depth, complex=complex].optimal_simd_width, unroll_factor=unroll_factor](self._cols)
 
@@ -445,10 +486,7 @@ struct MatrixSlice[
 
                 @parameter
                 for component in range(Self._depth):
-                    try:
-                        writer.write(self[row, col, component])
-                    except error:
-                        fatal_error(error)
+                    writer.write(self._strided_load(row=row, col=col, component=component))
 
                     @parameter
                     if Self._depth > 1:

@@ -6,7 +6,6 @@
 #
 
 from memory import UnsafePointer, memset_zero, memcpy
-from sys.intrinsics import likely, unlikely
 from random import rand
 
 
@@ -43,7 +42,7 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, 
         self = Self(count=len(values))
 
         for index in range(len(values)):
-            self._unsafe_store(values[index], index=index)
+            self.store(values[index], index=index)
 
     fn __init__(out self, owned values: List[ScalarNumber[dtype, complex=complex]]):
         self._data = values.steal_data().bitcast[Scalar[dtype]]()
@@ -78,9 +77,9 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, 
 
             @parameter
             if complex:
-                result._unsafe_store(ScalarNumber[dtype, complex=complex](real=i, imaginary=0), index=i)
+                result.store(ScalarNumber[dtype, complex=complex](real=i, imaginary=0), index=i)
             else:
-                result._unsafe_store(ScalarNumber[dtype, complex=complex](i), index=i)
+                result.store(ScalarNumber[dtype, complex=complex](i), index=i)
 
         return result^
 
@@ -108,74 +107,60 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, 
     # Access
     #
     @always_inline
-    fn __getitem__(self, index: Int) raises -> ScalarNumber[dtype, complex=complex]:
-        return self.load[1](index)
+    fn __getitem__(self, index: Int) -> ScalarNumber[dtype, complex=complex]:
+        return self.load(index)
 
     @always_inline
-    fn __setitem__(mut self: NumericArray[dtype, complex=complex], index: Int, value: ScalarNumber[dtype, complex=complex]) raises:
+    fn __setitem__(mut self: NumericArray[dtype, complex=complex], index: Int, value: ScalarNumber[dtype, complex=complex]):
         self.store(value, index=index)
 
     @always_inline
-    fn load[width: Int](self, index: Int) raises -> Number[dtype, width, complex=complex]:
-        var verified_index = self._verified_index[width](index, stride=1)
-
+    fn load[width: Int = 1](self, index: Int) -> Number[dtype, width, complex=complex]:
         @parameter
         if complex:
             return Number[dtype, width, complex=complex](
-                rebind[Number[dtype, width, complex=complex].Value](self._data.offset(verified_index * 2).load[width = 2 * width]())
+                rebind[Number[dtype, width, complex=complex].Value](self._data.offset(index * 2).load[width = 2 * width]())
             )
         else:
-            return Number[dtype, width, complex=complex](
-                rebind[Number[dtype, width, complex=complex].Value](self._data.offset(verified_index).load[width=width]())
-            )
+            return Number[dtype, width, complex=complex](rebind[Number[dtype, width, complex=complex].Value](self._data.offset(index).load[width=width]()))
 
     @always_inline
-    fn store[width: Int, //](mut self, value: Number[dtype, width, complex=complex], index: Int) raises:
-        var verified_index = self._verified_index[width](index, stride=1)
-
+    fn store[width: Int, //](mut self, value: Number[dtype, width, complex=complex], index: Int):
         @parameter
         if complex:
-            self._data.offset(verified_index * 2).store(value.value)
+            self._data.offset(index * 2).store(value.value)
         else:
-            self._data.offset(verified_index).store(value.value)
+            self._data.offset(index).store(value.value)
 
     @always_inline
-    fn strided_load[width: Int](self, index: Int, stride: Int) raises -> Number[dtype, width, complex=complex]:
-        var verified_index = self._verified_index[width](index, stride=stride)
-
+    fn strided_load[width: Int = 1](self, index: Int, stride: Int) -> Number[dtype, width, complex=complex]:
         @parameter
         if complex:
             return Number[dtype, width, complex=complex](
-                real=self._data.offset(verified_index * 2).strided_load[width=width](stride * 2),
-                imaginary=self._data.offset(verified_index * 2 + 1).strided_load[width=width](stride * 2),
+                real=self._data.offset(index * 2).strided_load[width=width](stride * 2),
+                imaginary=self._data.offset(index * 2 + 1).strided_load[width=width](stride * 2),
             )
         else:
             return Number[dtype, width, complex=complex](
-                rebind[Number[dtype, width, complex=complex].Value](self._data.offset(verified_index).strided_load[width=width](stride))
+                rebind[Number[dtype, width, complex=complex].Value](self._data.offset(index).strided_load[width=width](stride))
             )
 
     @always_inline
-    fn strided_store[width: Int, //](mut self, value: Number[dtype, width, complex=complex], index: Int, stride: Int) raises:
-        var verified_index = self._verified_index[width](index, stride=stride)
-
+    fn strided_store[width: Int, //](mut self, value: Number[dtype, width, complex=complex], index: Int, stride: Int):
         @parameter
         if complex:
-            self._data.offset(verified_index * 2).strided_store(value.real().value, stride=stride * 2)
-            self._data.offset(verified_index * 2 + 1).strided_store(value.imaginary().value, stride=stride * 2)
+            self._data.offset(index * 2).strided_store(value.real().value, stride=stride * 2)
+            self._data.offset(index * 2 + 1).strided_store(value.imaginary().value, stride=stride * 2)
         else:
-            self._data.offset(verified_index).strided_store(value.value, stride=stride)
+            self._data.offset(index).strided_store(value.value, stride=stride)
 
     @always_inline
-    fn gather[
-        width: Int, //
-    ](self, index: Int, offset: SIMD[DType.index, width], mask: SIMD[DType.bool, width]) raises -> Number[dtype, width, complex=complex]:
-        var verified_index = self._verified_index_with_offset[width](index, offset=offset)
-
+    fn gather[width: Int, //](self, index: Int, offset: SIMD[DType.index, width], mask: SIMD[DType.bool, width]) -> Number[dtype, width, complex=complex]:
         @parameter
         if complex:
             return Number[dtype, width, complex=complex](
                 rebind[Number[dtype, width, complex=complex].Value](
-                    self._data.offset(verified_index * 2).gather(
+                    self._data.offset(index * 2).gather(
                         offset=(offset * 2).interleave(offset * 2 + 1),
                         mask=mask.interleave(mask),
                     )
@@ -183,35 +168,20 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, 
             )
         else:
             return Number[dtype, width, complex=complex](
-                rebind[Number[dtype, width, complex=complex].Value](self._data.offset(verified_index).gather(offset=offset, mask=mask))
+                rebind[Number[dtype, width, complex=complex].Value](self._data.offset(index).gather(offset=offset, mask=mask))
             )
 
     @always_inline
-    fn scatter[
-        width: Int, //
-    ](self, value: Number[dtype, width, complex=complex], index: Int, offset: SIMD[DType.index, width], mask: SIMD[DType.bool, width]) raises:
-        var verified_index = self._verified_index_with_offset[width](index, offset=offset)
-
+    fn scatter[width: Int, //](self, value: Number[dtype, width, complex=complex], index: Int, offset: SIMD[DType.index, width], mask: SIMD[DType.bool, width]):
         @parameter
         if complex:
-            self._data.offset(verified_index * 2).scatter(
+            self._data.offset(index * 2).scatter(
                 offset=(offset * 2).interleave(offset * 2 + 1),
                 val=rebind[SIMD[dtype, 2 * width]](value.value),
                 mask=mask.interleave(mask),
             )
         else:
-            self._data.offset(verified_index).scatter(offset=offset, val=rebind[SIMD[dtype, width]](value.value), mask=mask)
-
-    #
-    # Private Access
-    #
-    @always_inline
-    fn _unsafe_store[width: Int, //](mut self, value: Number[dtype, width, complex=complex], index: Int):
-        @parameter
-        if complex:
-            self._data.offset(index * 2).store(value.value)
-        else:
-            self._data.offset(index).store(value.value)
+            self._data.offset(index).scatter(offset=offset, val=rebind[SIMD[dtype, width]](value.value), mask=mask)
 
     #
     # Unsafe Access
@@ -223,83 +193,6 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, 
     @always_inline
     fn unsafe_uint8_ptr(self) -> UnsafePointer[UInt8]:
         return self._data.bitcast[UInt8]()
-
-    #
-    # Bounds Checking
-    #
-    @always_inline
-    fn _verified_index[width: Int](self, index: Int, stride: Int) raises -> Int:
-        var shifted_index: Int
-
-        if unlikely(index < 0):
-            shifted_index = index + self._count
-        else:
-            shifted_index = index
-
-        @parameter
-        if width == 1:
-            if likely(0 <= shifted_index < self._count):
-                return shifted_index
-            else:
-                raise Error(
-                    "Out of bounds NumericArray access: index = ",
-                    index,
-                    ", width = ",
-                    width,
-                    ", stride = ",
-                    stride,
-                    ", valid index range [",
-                    -self._count,
-                    ", ",
-                    self._count,
-                    ")",
-                )
-        else:
-            if likely((0 <= shifted_index < self._count) and ((shifted_index + (width - 1) * stride) < self._count)):
-                return shifted_index
-            else:
-                raise Error(
-                    "Out of bounds NumericArray access: index = ",
-                    index,
-                    ", width = ",
-                    width,
-                    ", stride = ",
-                    stride,
-                    ", valid index range [",
-                    -self._count,
-                    ", ",
-                    self._count,
-                    ")",
-                )
-
-    @always_inline
-    fn _verified_index_with_offset[width: Int](self, index: Int, offset: SIMD[DType.index, width]) raises -> Int:
-        var shifted_index: Int
-
-        if unlikely(index < 0):
-            shifted_index = index + self._count
-        else:
-            shifted_index = index
-
-        var min_offset = offset.reduce_min()
-        var max_offset = offset.reduce_max()
-
-        if likely(((shifted_index + min_offset) >= 0) and ((shifted_index + max_offset) < self._count)):
-            return shifted_index
-        else:
-            raise Error(
-                "Out of bounds NumericArray access: index = ",
-                index,
-                ", min_offset_index = ",
-                shifted_index + min_offset,
-                ", max_offset_index = ",
-                index + max_offset,
-                ", valid index range [",
-                -self._count,
-                ", ",
-                self._count,
-                ")",
-            )
 
     #
     # ExplicitlyCopyable

@@ -9,8 +9,6 @@ from math import pi, cos, sin, sqrt, ceildiv
 from memory import memset_zero
 from algorithm import parallelize
 
-from mosaic.utility import fatal_error
-
 
 #
 # FFT
@@ -131,48 +129,42 @@ struct _FactorPlan:
 fn _permute[
     dtype: DType, depth: Int, complex: Bool, //, *, flip_imaginary_sign: Bool = False
 ](matrix: Matrix[dtype, depth, complex=complex], plan: _FactorPlan, mut result: Matrix[DType.float64, depth, complex=True]):
-    try:
-        var N = matrix.cols()
-        var indices = List[Int](capacity=N)
-        var count = NumericArray[DType.index](count=len(plan.actual))
+    var N = matrix.cols()
+    var indices = List[Int](capacity=N)
+    var count = NumericArray[DType.index](count=len(plan.actual))
 
-        var k = 0
-        for _ in range(N - 1):
-            indices.append(k)
+    var k = 0
+    for _ in range(N - 1):
+        indices.append(k)
 
-            var j = 1
-            k += plan.remain[j]
-            count[1] += 1
-            while count[j] >= plan.actual[j]:
-                count[j] = 0
-                k = k - plan.remain[j - 1] + plan.remain[j + 1]
-                j += 1
-                count[j] += 1
+        var j = 1
+        k += plan.remain[j]
+        count[1] += 1
+        while count[j] >= plan.actual[j]:
+            count[j] = 0
+            k = k - plan.remain[j - 1] + plan.remain[j + 1]
+            j += 1
+            count[j] += 1
 
-        indices.append(N - 1)
+    indices.append(N - 1)
+
+    @parameter
+    for component in range(depth):
 
         @parameter
-        for component in range(depth):
+        fn move_elements(row: Int):
+            for i in range(len(indices)):
+                var value = matrix._strided_load(row=row, col=indices[i], component=component).as_complex[DType.float64]()
 
-            @parameter
-            fn move_elements(row: Int):
-                try:
-                    for i in range(len(indices)):
-                        var value = matrix[row, indices[i], component].as_complex[DType.float64]()
+                @parameter
+                if flip_imaginary_sign:
+                    result._strided_store(
+                        ScalarNumber[DType.float64, complex=True](real=value.real(), imaginary=-value.imaginary()), row=row, col=i, component=component
+                    )
+                else:
+                    result._strided_store(value, row=row, col=i, component=component)
 
-                        @parameter
-                        if flip_imaginary_sign:
-                            result[row, i, component] = ScalarNumber[DType.float64, complex=True](real=value.real(), imaginary=-value.imaginary())
-                        else:
-                            result[row, i, component] = value
-
-                except error:
-                    fatal_error(error)
-
-            parallelize[move_elements](matrix.rows())
-
-    except error:
-        fatal_error(error)
+        parallelize[move_elements](matrix.rows())
 
 
 #
@@ -181,40 +173,36 @@ fn _permute[
 fn _dispatch[
     depth: Int, //, *, twiddle: Bool
 ](radix: Int, sofar_radix: Int, remain_radix: Int, row: Int, component: Int, mut result: Matrix[DType.float64, depth, complex=True]):
-    try:
-        # Radix-specific method dispatch
-        var twiddle_factors = NumericArray[DType.float64, complex=True](count=radix)
-        var omega = 2.0 * pi / (sofar_radix * radix)
-        var base_twiddle_factor: ScalarNumber[DType.float64, complex=True] = (cos(omega), -sin(omega))
-        var twiddle_factor: ScalarNumber[DType.float64, complex=True] = (1.0, 0.0)
+    # Radix-specific method dispatch
+    var twiddle_factors = NumericArray[DType.float64, complex=True](count=radix)
+    var omega = 2.0 * pi / (sofar_radix * radix)
+    var base_twiddle_factor: ScalarNumber[DType.float64, complex=True] = (cos(omega), -sin(omega))
+    var twiddle_factor: ScalarNumber[DType.float64, complex=True] = (1.0, 0.0)
 
-        for group_offset in range(sofar_radix):
+    for group_offset in range(sofar_radix):
 
-            @parameter
-            if twiddle:
-                twiddle_factors[0] = (1.0, 0.0)
-                twiddle_factors[1] = twiddle_factor
+        @parameter
+        if twiddle:
+            twiddle_factors[0] = (1.0, 0.0)
+            twiddle_factors[1] = twiddle_factor
 
-                for i in range(2, radix):
-                    twiddle_factors[i] = twiddle_factor * twiddle_factors[i - 1]
+            for i in range(2, radix):
+                twiddle_factors[i] = twiddle_factor * twiddle_factors[i - 1]
 
-                twiddle_factor *= base_twiddle_factor
+            twiddle_factor *= base_twiddle_factor
 
-            if radix == 2:
-                _radix_2_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, row, component, result)
-            elif radix == 3:
-                _radix_3_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, row, component, result)
-            elif radix == 4:
-                _radix_4_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, row, component, result)
-            elif radix == 5:
-                _radix_5_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, row, component, result)
-            elif radix == 7:
-                _radix_7_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, row, component, result)
-            else:
-                _radix_prime_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, row, component, result)
-
-    except error:
-        fatal_error(error)
+        if radix == 2:
+            _radix_2_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, row, component, result)
+        elif radix == 3:
+            _radix_3_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, row, component, result)
+        elif radix == 4:
+            _radix_4_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, row, component, result)
+        elif radix == 5:
+            _radix_5_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, row, component, result)
+        elif radix == 7:
+            _radix_7_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, row, component, result)
+        else:
+            _radix_prime_fft[twiddle](radix, sofar_radix, remain_radix, group_offset, twiddle_factors, row, component, result)
 
 
 #
@@ -232,31 +220,27 @@ fn _radix_2_fft[
     component: Int,
     mut result: Matrix[DType.float64, depth, complex=True],
 ):
-    try:
-        var group_offset_copy = group_offset
-        var offset = group_offset_copy
-        var indices = InlineArray[Int, 2](fill=0)
+    var group_offset_copy = group_offset
+    var offset = group_offset_copy
+    var indices = InlineArray[Int, 2](fill=0)
 
-        for _ in range(remain_radix):
-            for block in range(radix):
-                indices[block] = offset
-                offset += sofar_radix
+    for _ in range(remain_radix):
+        for block in range(radix):
+            indices[block] = offset
+            offset += sofar_radix
 
-            var value_0 = result[row, indices[0], component]
-            var value_1 = result[row, indices[1], component]
+        var value_0 = result._strided_load(row=row, col=indices[0], component=component)
+        var value_1 = result._strided_load(row=row, col=indices[1], component=component)
 
-            @parameter
-            if twiddle:
-                value_1 *= twiddle_factors[1]
+        @parameter
+        if twiddle:
+            value_1 *= twiddle_factors[1]
 
-            result[row, indices[0], component] = value_0 + value_1
-            result[row, indices[1], component] = value_0 - value_1
+        result._strided_store(value_0 + value_1, row=row, col=indices[0], component=component)
+        result._strided_store(value_0 - value_1, row=row, col=indices[0], component=component)
 
-            group_offset_copy = group_offset_copy + sofar_radix * radix
-            offset = group_offset_copy
-
-    except error:
-        fatal_error(error)
+        group_offset_copy = group_offset_copy + sofar_radix * radix
+        offset = group_offset_copy
 
 
 #
@@ -274,44 +258,40 @@ fn _radix_3_fft[
     component: Int,
     mut result: Matrix[DType.float64, depth, complex=True],
 ):
-    try:
-        alias theta = 2 * pi / 3
-        var c3_1 = cos(theta) - 1
-        var c3_2 = sin(theta)
+    alias theta = 2 * pi / 3
+    var c3_1 = cos(theta) - 1
+    var c3_2 = sin(theta)
 
-        var group_offset_copy = group_offset
-        var offset = group_offset_copy
-        var indices = InlineArray[Int, 3](fill=0)
+    var group_offset_copy = group_offset
+    var offset = group_offset_copy
+    var indices = InlineArray[Int, 3](fill=0)
 
-        for _ in range(remain_radix):
-            for block in range(radix):
-                indices[block] = offset
-                offset += sofar_radix
+    for _ in range(remain_radix):
+        for block in range(radix):
+            indices[block] = offset
+            offset += sofar_radix
 
-            var value_0 = result[row, indices[0], component]
-            var value_1 = result[row, indices[1], component]
-            var value_2 = result[row, indices[2], component]
+        var value_0 = result._strided_load(row=row, col=indices[0], component=component)
+        var value_1 = result._strided_load(row=row, col=indices[1], component=component)
+        var value_2 = result._strided_load(row=row, col=indices[2], component=component)
 
-            @parameter
-            if twiddle:
-                value_1 *= twiddle_factors[1]
-                value_2 *= twiddle_factors[2]
+        @parameter
+        if twiddle:
+            value_1 *= twiddle_factors[1]
+            value_2 *= twiddle_factors[2]
 
-            var t1 = value_1 + value_2
-            var z0 = value_0 + t1
-            var m1 = c3_1 * t1
-            var m2 = (c3_2 * (value_1.imaginary() - value_2.imaginary()), c3_2 * (value_2.real() - value_1.real()))
-            var s1 = z0 + m1
+        var t1 = value_1 + value_2
+        var z0 = value_0 + t1
+        var m1 = c3_1 * t1
+        var m2 = (c3_2 * (value_1.imaginary() - value_2.imaginary()), c3_2 * (value_2.real() - value_1.real()))
+        var s1 = z0 + m1
 
-            result[row, indices[0], component] = z0
-            result[row, indices[1], component] = s1 + m2
-            result[row, indices[2], component] = s1 - m2
+        result._strided_store(z0, row=row, col=indices[0], component=component)
+        result._strided_store(s1 + m2, row=row, col=indices[1], component=component)
+        result._strided_store(s1 - m2, row=row, col=indices[2], component=component)
 
-            group_offset_copy = group_offset_copy + sofar_radix * radix
-            offset = group_offset_copy
-
-    except error:
-        fatal_error(error)
+        group_offset_copy = group_offset_copy + sofar_radix * radix
+        offset = group_offset_copy
 
 
 #
@@ -329,42 +309,38 @@ fn _radix_4_fft[
     component: Int,
     mut result: Matrix[DType.float64, depth, complex=True],
 ):
-    try:
-        var group_offset_copy = group_offset
-        var offset = group_offset_copy
-        var indices = InlineArray[Int, 4](fill=0)
+    var group_offset_copy = group_offset
+    var offset = group_offset_copy
+    var indices = InlineArray[Int, 4](fill=0)
 
-        for _ in range(remain_radix):
-            for block in range(radix):
-                indices[block] = offset
-                offset += sofar_radix
+    for _ in range(remain_radix):
+        for block in range(radix):
+            indices[block] = offset
+            offset += sofar_radix
 
-            var value_0 = result[row, indices[0], component]
-            var value_1 = result[row, indices[1], component]
-            var value_2 = result[row, indices[2], component]
-            var value_3 = result[row, indices[3], component]
+        var value_0 = result._strided_load(row=row, col=indices[0], component=component)
+        var value_1 = result._strided_load(row=row, col=indices[1], component=component)
+        var value_2 = result._strided_load(row=row, col=indices[2], component=component)
+        var value_3 = result._strided_load(row=row, col=indices[3], component=component)
 
-            @parameter
-            if twiddle:
-                value_1 *= twiddle_factors[1]
-                value_2 *= twiddle_factors[2]
-                value_3 *= twiddle_factors[3]
+        @parameter
+        if twiddle:
+            value_1 *= twiddle_factors[1]
+            value_2 *= twiddle_factors[2]
+            value_3 *= twiddle_factors[3]
 
-            var t1 = value_0 + value_2
-            var m2 = value_0 - value_2
-            var t2 = value_1 + value_3
-            var m3 = (value_1.imaginary() - value_3.imaginary(), value_3.real() - value_1.real())
+        var t1 = value_0 + value_2
+        var m2 = value_0 - value_2
+        var t2 = value_1 + value_3
+        var m3 = (value_1.imaginary() - value_3.imaginary(), value_3.real() - value_1.real())
 
-            result[row, indices[0], component] = t1 + t2
-            result[row, indices[1], component] = m2 + m3
-            result[row, indices[2], component] = t1 - t2
-            result[row, indices[3], component] = m2 - m3
+        result._strided_store(t1 + t2, row=row, col=indices[0], component=component)
+        result._strided_store(m2 + m3, row=row, col=indices[1], component=component)
+        result._strided_store(t1 - t2, row=row, col=indices[2], component=component)
+        result._strided_store(m2 - m3, row=row, col=indices[3], component=component)
 
-            group_offset_copy = group_offset_copy + sofar_radix * radix
-            offset = group_offset_copy
-
-    except error:
-        fatal_error(error)
+        group_offset_copy = group_offset_copy + sofar_radix * radix
+        offset = group_offset_copy
 
 
 #
@@ -382,66 +358,62 @@ fn _radix_5_fft[
     component: Int,
     mut result: Matrix[DType.float64, depth, complex=True],
 ):
-    try:
-        alias theta = 2 * pi / 5
-        var c5_1 = (cos(theta) + cos(2 * theta)) / 2 - 1
-        var c5_2 = (cos(theta) - cos(2 * theta)) / 2
-        var c5_3 = -sin(theta)
-        var c5_4 = -(sin(theta) + sin(2 * theta))
-        var c5_5 = sin(theta) - sin(2 * theta)
+    alias theta = 2 * pi / 5
+    var c5_1 = (cos(theta) + cos(2 * theta)) / 2 - 1
+    var c5_2 = (cos(theta) - cos(2 * theta)) / 2
+    var c5_3 = -sin(theta)
+    var c5_4 = -(sin(theta) + sin(2 * theta))
+    var c5_5 = sin(theta) - sin(2 * theta)
 
-        var group_offset_copy = group_offset
-        var offset = group_offset_copy
-        var indices = InlineArray[Int, 5](fill=0)
+    var group_offset_copy = group_offset
+    var offset = group_offset_copy
+    var indices = InlineArray[Int, 5](fill=0)
 
-        for _ in range(remain_radix):
-            for block in range(radix):
-                indices[block] = offset
-                offset += sofar_radix
+    for _ in range(remain_radix):
+        for block in range(radix):
+            indices[block] = offset
+            offset += sofar_radix
 
-            var value_0 = result[row, indices[0], component]
-            var value_1 = result[row, indices[1], component]
-            var value_2 = result[row, indices[2], component]
-            var value_3 = result[row, indices[3], component]
-            var value_4 = result[row, indices[4], component]
+        var value_0 = result._strided_load(row=row, col=indices[0], component=component)
+        var value_1 = result._strided_load(row=row, col=indices[1], component=component)
+        var value_2 = result._strided_load(row=row, col=indices[2], component=component)
+        var value_3 = result._strided_load(row=row, col=indices[3], component=component)
+        var value_4 = result._strided_load(row=row, col=indices[4], component=component)
 
-            @parameter
-            if twiddle:
-                value_1 *= twiddle_factors[1]
-                value_2 *= twiddle_factors[2]
-                value_3 *= twiddle_factors[3]
-                value_4 *= twiddle_factors[4]
+        @parameter
+        if twiddle:
+            value_1 *= twiddle_factors[1]
+            value_2 *= twiddle_factors[2]
+            value_3 *= twiddle_factors[3]
+            value_4 *= twiddle_factors[4]
 
-            var t1 = value_1 + value_4
-            var t2 = value_2 + value_3
-            var t3 = value_1 - value_4
-            var t4 = value_3 - value_2
-            var t5 = t1 + t2
+        var t1 = value_1 + value_4
+        var t2 = value_2 + value_3
+        var t3 = value_1 - value_4
+        var t4 = value_3 - value_2
+        var t5 = t1 + t2
 
-            value_0 += t5
+        value_0 += t5
 
-            var m1 = c5_1 * t5
-            var m2 = c5_2 * (t1 - t2)
-            var m3: ScalarNumber[DType.float64, complex=True] = (-c5_3 * (t3.imaginary() + t4.imaginary()), c5_3 * (t3.real() + t4.real()))
-            var m4 = (-c5_4 * t4.imaginary(), c5_4 * t4.real())
-            var m5 = (-c5_5 * t3.imaginary(), c5_5 * t3.real())
+        var m1 = c5_1 * t5
+        var m2 = c5_2 * (t1 - t2)
+        var m3: ScalarNumber[DType.float64, complex=True] = (-c5_3 * (t3.imaginary() + t4.imaginary()), c5_3 * (t3.real() + t4.real()))
+        var m4 = (-c5_4 * t4.imaginary(), c5_4 * t4.real())
+        var m5 = (-c5_5 * t3.imaginary(), c5_5 * t3.real())
 
-            var s2 = value_0 + m1 + m2
-            var s4 = value_0 + m1 - m2
-            var s3 = m3 - m4
-            var s5 = m3 + m5
+        var s2 = value_0 + m1 + m2
+        var s4 = value_0 + m1 - m2
+        var s3 = m3 - m4
+        var s5 = m3 + m5
 
-            result[row, indices[0], component] = value_0
-            result[row, indices[1], component] = s2 + s3
-            result[row, indices[2], component] = s4 + s5
-            result[row, indices[3], component] = s4 - s5
-            result[row, indices[4], component] = s2 - s3
+        result._strided_store(value_0, row=row, col=indices[0], component=component)
+        result._strided_store(s2 + s3, row=row, col=indices[1], component=component)
+        result._strided_store(s4 + s5, row=row, col=indices[2], component=component)
+        result._strided_store(s4 - s5, row=row, col=indices[3], component=component)
+        result._strided_store(s2 - s3, row=row, col=indices[4], component=component)
 
-            group_offset_copy = group_offset_copy + sofar_radix * radix
-            offset = group_offset_copy
-
-    except error:
-        fatal_error(error)
+        group_offset_copy = group_offset_copy + sofar_radix * radix
+        offset = group_offset_copy
 
 
 #
@@ -459,87 +431,83 @@ fn _radix_7_fft[
     component: Int,
     mut result: Matrix[DType.float64, depth, complex=True],
 ):
-    try:
-        alias theta = 2 * pi / 7
-        var c7_1 = 0.222520933956314404288902564496794759466355569
-        var c7_2 = 0.900968867902419126236102319507445051165919162
-        var c7_3 = 0.623489801858733530525004884004239810632274731  # cos(theta)
-        var c7_4 = 0.433883739117558120475768332848358754609990728
-        var c7_5 = 0.781831482468029808708444526674057750232334519  # sin(theta)
-        var c7_6 = 0.974927912181823607018131682993931217232785801
+    alias theta = 2 * pi / 7
+    var c7_1 = 0.222520933956314404288902564496794759466355569
+    var c7_2 = 0.900968867902419126236102319507445051165919162
+    var c7_3 = 0.623489801858733530525004884004239810632274731  # cos(theta)
+    var c7_4 = 0.433883739117558120475768332848358754609990728
+    var c7_5 = 0.781831482468029808708444526674057750232334519  # sin(theta)
+    var c7_6 = 0.974927912181823607018131682993931217232785801
 
-        var group_offset_copy = group_offset
-        var offset = group_offset_copy
-        var indices = InlineArray[Int, 7](fill=0)
+    var group_offset_copy = group_offset
+    var offset = group_offset_copy
+    var indices = InlineArray[Int, 7](fill=0)
 
-        for _ in range(remain_radix):
-            for block in range(radix):
-                indices[block] = offset
-                offset += sofar_radix
+    for _ in range(remain_radix):
+        for block in range(radix):
+            indices[block] = offset
+            offset += sofar_radix
 
-            var value_0 = result[row, indices[0], component]
-            var value_1 = result[row, indices[1], component]
-            var value_2 = result[row, indices[2], component]
-            var value_3 = result[row, indices[3], component]
-            var value_4 = result[row, indices[4], component]
-            var value_5 = result[row, indices[5], component]
-            var value_6 = result[row, indices[6], component]
+        var value_0 = result._strided_load(row=row, col=indices[0], component=component)
+        var value_1 = result._strided_load(row=row, col=indices[1], component=component)
+        var value_2 = result._strided_load(row=row, col=indices[2], component=component)
+        var value_3 = result._strided_load(row=row, col=indices[3], component=component)
+        var value_4 = result._strided_load(row=row, col=indices[4], component=component)
+        var value_5 = result._strided_load(row=row, col=indices[5], component=component)
+        var value_6 = result._strided_load(row=row, col=indices[6], component=component)
 
-            @parameter
-            if twiddle:
-                value_1 *= twiddle_factors[1]
-                value_2 *= twiddle_factors[2]
-                value_3 *= twiddle_factors[3]
-                value_4 *= twiddle_factors[4]
-                value_5 *= twiddle_factors[5]
-                value_6 *= twiddle_factors[6]
+        @parameter
+        if twiddle:
+            value_1 *= twiddle_factors[1]
+            value_2 *= twiddle_factors[2]
+            value_3 *= twiddle_factors[3]
+            value_4 *= twiddle_factors[4]
+            value_5 *= twiddle_factors[5]
+            value_6 *= twiddle_factors[6]
 
-            var com_16_add = value_1 + value_6
-            var re_16_add = com_16_add.real()
-            var im_16_add = com_16_add.imaginary()
-            var re_61_sub = value_6.real() - value_1.real()
-            var im_16_sub = value_1.imaginary() - value_6.imaginary()
+        var com_16_add = value_1 + value_6
+        var re_16_add = com_16_add.real()
+        var im_16_add = com_16_add.imaginary()
+        var re_61_sub = value_6.real() - value_1.real()
+        var im_16_sub = value_1.imaginary() - value_6.imaginary()
 
-            var com_25_add = value_2 + value_5
-            var re_25_add = com_25_add.real()
-            var im_25_add = com_25_add.imaginary()
-            var re_52_sub = value_5.real() - value_2.real()
-            var im_25_sub = value_2.imaginary() - value_5.imaginary()
+        var com_25_add = value_2 + value_5
+        var re_25_add = com_25_add.real()
+        var im_25_add = com_25_add.imaginary()
+        var re_52_sub = value_5.real() - value_2.real()
+        var im_25_sub = value_2.imaginary() - value_5.imaginary()
 
-            var com_34_add = value_3 + value_4
-            var re_34_add = com_34_add.real()
-            var im_34_add = com_34_add.imaginary()
-            var re_43_sub = value_4.real() - value_3.real()
-            var im_34_sub = value_3.imaginary() - value_4.imaginary()
+        var com_34_add = value_3 + value_4
+        var re_34_add = com_34_add.real()
+        var im_34_add = com_34_add.imaginary()
+        var re_43_sub = value_4.real() - value_3.real()
+        var im_34_sub = value_3.imaginary() - value_4.imaginary()
 
-            var re_16_result_x = c7_5 * im_16_sub + c7_6 * im_25_sub + c7_4 * im_34_sub
-            var re_16_result_y = c7_3 * re_16_add - c7_1 * re_25_add - c7_2 * re_34_add + value_0.real()
-            var im_16_result_x = c7_5 * re_61_sub + c7_6 * re_52_sub + c7_4 * re_43_sub
-            var im_16_result_y = c7_3 * im_16_add - c7_1 * im_25_add - c7_2 * im_34_add + value_0.imaginary()
+        var re_16_result_x = c7_5 * im_16_sub + c7_6 * im_25_sub + c7_4 * im_34_sub
+        var re_16_result_y = c7_3 * re_16_add - c7_1 * re_25_add - c7_2 * re_34_add + value_0.real()
+        var im_16_result_x = c7_5 * re_61_sub + c7_6 * re_52_sub + c7_4 * re_43_sub
+        var im_16_result_y = c7_3 * im_16_add - c7_1 * im_25_add - c7_2 * im_34_add + value_0.imaginary()
 
-            var re_25_result_x = c7_6 * im_16_sub - c7_5 * im_34_sub - c7_4 * im_25_sub
-            var re_25_result_y = c7_3 * re_34_add - c7_2 * re_25_add - c7_1 * re_16_add + value_0.real()
-            var im_25_result_x = c7_6 * re_61_sub - c7_5 * re_43_sub - c7_4 * re_52_sub
-            var im_25_result_y = c7_3 * im_34_add - c7_2 * im_25_add - c7_1 * im_16_add + value_0.imaginary()
+        var re_25_result_x = c7_6 * im_16_sub - c7_5 * im_34_sub - c7_4 * im_25_sub
+        var re_25_result_y = c7_3 * re_34_add - c7_2 * re_25_add - c7_1 * re_16_add + value_0.real()
+        var im_25_result_x = c7_6 * re_61_sub - c7_5 * re_43_sub - c7_4 * re_52_sub
+        var im_25_result_y = c7_3 * im_34_add - c7_2 * im_25_add - c7_1 * im_16_add + value_0.imaginary()
 
-            var re_34_result_x = c7_4 * im_16_sub + c7_6 * im_34_sub - c7_5 * im_25_sub
-            var re_34_result_y = c7_3 * re_25_add - c7_1 * re_34_add - c7_2 * re_16_add + value_0.real()
-            var im_34_result_x = c7_4 * re_61_sub + c7_6 * re_43_sub - c7_5 * re_52_sub
-            var im_34_result_y = c7_3 * im_25_add - c7_1 * im_34_add - c7_2 * im_16_add + value_0.imaginary()
+        var re_34_result_x = c7_4 * im_16_sub + c7_6 * im_34_sub - c7_5 * im_25_sub
+        var re_34_result_y = c7_3 * re_25_add - c7_1 * re_34_add - c7_2 * re_16_add + value_0.real()
+        var im_34_result_x = c7_4 * re_61_sub + c7_6 * re_43_sub - c7_5 * re_52_sub
+        var im_34_result_y = c7_3 * im_25_add - c7_1 * im_34_add - c7_2 * im_16_add + value_0.imaginary()
 
-            result[row, indices[0], component] = value_0 + com_16_add + com_25_add + com_34_add
-            result[row, indices[1], component] = (re_16_result_x + re_16_result_y, im_16_result_x + im_16_result_y)
-            result[row, indices[2], component] = (re_25_result_x + re_25_result_y, im_25_result_x + im_25_result_y)
-            result[row, indices[3], component] = (re_34_result_x + re_34_result_y, im_34_result_x + im_34_result_y)
-            result[row, indices[4], component] = (re_34_result_y - re_34_result_x, im_34_result_y - im_34_result_x)
-            result[row, indices[5], component] = (re_25_result_y - re_25_result_x, im_25_result_y - im_25_result_x)
-            result[row, indices[6], component] = (re_16_result_y - re_16_result_x, im_16_result_y - im_16_result_x)
+        result._strided_store(value_0 + com_16_add + com_25_add + com_34_add, row=row, col=indices[0], component=component)
+        result._strided_store((re_16_result_x + re_16_result_y, im_16_result_x + im_16_result_y), row=row, col=indices[1], component=component)
+        result._strided_store((re_25_result_x + re_25_result_y, im_25_result_x + im_25_result_y), row=row, col=indices[2], component=component)
+        result._strided_store((re_34_result_x + re_34_result_y, im_34_result_x + im_34_result_y), row=row, col=indices[3], component=component)
+        result._strided_store((re_34_result_y - re_34_result_x, im_34_result_y - im_34_result_x), row=row, col=indices[4], component=component)
+        result._strided_store((re_25_result_y - re_25_result_x, im_25_result_y - im_25_result_x), row=row, col=indices[5], component=component)
+        result._strided_store((re_16_result_y - re_16_result_x, im_16_result_y - im_16_result_x), row=row, col=indices[6], component=component)
 
-            group_offset_copy = group_offset_copy + sofar_radix * radix
-            offset = group_offset_copy
-
-    except error:
-        fatal_error(error)
+        group_offset_copy = group_offset_copy + sofar_radix * radix
+        offset = group_offset_copy
 
 
 #
@@ -557,75 +525,71 @@ fn _radix_prime_fft[
     component: Int,
     mut result: Matrix[DType.float64, depth, complex=True],
 ):
-    try:
-        var group_offset_copy = group_offset
-        var offset = group_offset_copy
-        var indices = NumericArray[DType.index](count=radix)
+    var group_offset_copy = group_offset
+    var offset = group_offset_copy
+    var indices = NumericArray[DType.index](count=radix)
 
-        # TODO: Make this better, prepare factors in advance?
-        var values = NumericArray[DType.float64, complex=True](count=radix)
-        var v_values = NumericArray[DType.float64, complex=True](count=ceildiv(radix, 2))
-        var w_values = NumericArray[DType.float64, complex=True](count=ceildiv(radix, 2))
-        var trig = NumericArray[DType.float64, complex=True](count=radix)
-        var theta = 2 * pi / radix
-        var factor = (cos(theta), -sin(theta))
+    # TODO: Make this better, prepare factors in advance?
+    var values = NumericArray[DType.float64, complex=True](count=radix)
+    var v_values = NumericArray[DType.float64, complex=True](count=ceildiv(radix, 2))
+    var w_values = NumericArray[DType.float64, complex=True](count=ceildiv(radix, 2))
+    var trig = NumericArray[DType.float64, complex=True](count=radix)
+    var theta = 2 * pi / radix
+    var factor = (cos(theta), -sin(theta))
 
-        trig[0] = (1.0, 0.0)
-        trig[1] = factor
+    trig[0] = (1.0, 0.0)
+    trig[1] = factor
 
-        for i in range(2, radix):
-            trig[i] = factor * trig[i - 1]
-        ##
+    for i in range(2, radix):
+        trig[i] = factor * trig[i - 1]
+    ##
 
-        for _ in range(remain_radix):
-            for block in range(radix):
-                indices[block] = offset
-                offset += sofar_radix
+    for _ in range(remain_radix):
+        for block in range(radix):
+            indices[block] = offset
+            offset += sofar_radix
 
-            values[0] = result[row, Int(indices[0]), component]
+        values[0] = result._strided_load(row=row, col=Int(indices[0]), component=component)
 
-            for block in range(1, radix):
+        for block in range(1, radix):
 
-                @parameter
-                if twiddle:
-                    values[block] = twiddle_factors[block] * result[row, Int(indices[block]), component]
-                else:
-                    values[block] = result[row, Int(indices[block]), component]
+            @parameter
+            if twiddle:
+                values[block] = twiddle_factors[block] * result._strided_load(row=row, col=Int(indices[block]), component=component)
+            else:
+                values[block] = result._strided_load(row=row, col=Int(indices[block]), component=component)
 
-            var value_0 = values[0]
+        var value_0 = values[0]
 
-            var n = radix
-            var half_n = ceildiv(n, 2)
-            for j in range(1, half_n):
-                v_values[j] = (values[j].real() + values[n - j].real(), values[j].imaginary() - values[n - j].imaginary())
-                w_values[j] = (values[j].real() - values[n - j].real(), values[j].imaginary() + values[n - j].imaginary())
+        var n = radix
+        var half_n = ceildiv(n, 2)
+        for j in range(1, half_n):
+            v_values[j] = (values[j].real() + values[n - j].real(), values[j].imaginary() - values[n - j].imaginary())
+            w_values[j] = (values[j].real() - values[n - j].real(), values[j].imaginary() + values[n - j].imaginary())
 
-            for j in range(1, half_n):
-                values[j] = value_0
-                values[n - j] = value_0
+        for j in range(1, half_n):
+            values[j] = value_0
+            values[n - j] = value_0
 
-                var k = j
-                for i in range(1, half_n):
-                    var rere = trig[k].real() * v_values[i].real()
-                    var imim = trig[k].imaginary() * v_values[i].imaginary()
-                    var reim = trig[k].real() * w_values[i].imaginary()
-                    var imre = trig[k].imaginary() * w_values[i].real()
+            var k = j
+            for i in range(1, half_n):
+                var rere = trig[k].real() * v_values[i].real()
+                var imim = trig[k].imaginary() * v_values[i].imaginary()
+                var reim = trig[k].real() * w_values[i].imaginary()
+                var imre = trig[k].imaginary() * w_values[i].real()
 
-                    values[j] += (rere - imim, reim + imre)
-                    values[n - j] += (rere + imim, reim - imre)
+                values[j] += (rere - imim, reim + imre)
+                values[n - j] += (rere + imim, reim - imre)
 
-                    k += j
-                    if k >= n:
-                        k -= n
+                k += j
+                if k >= n:
+                    k -= n
 
-            for j in range(1, half_n):
-                values[0] = (values[0].real() + v_values[j].real(), values[0].imaginary() + w_values[j].imaginary())
+        for j in range(1, half_n):
+            values[0] = (values[0].real() + v_values[j].real(), values[0].imaginary() + w_values[j].imaginary())
 
-            for j in range(radix):
-                result[row, Int(indices[j]), component] = values[j]
+        for j in range(radix):
+            result._strided_store(values[j], row=row, col=Int(indices[j]), component=component)
 
-            group_offset_copy = group_offset_copy + sofar_radix * radix
-            offset = group_offset_copy
-
-    except error:
-        fatal_error(error)
+        group_offset_copy = group_offset_copy + sofar_radix * radix
+        offset = group_offset_copy
