@@ -43,12 +43,14 @@ mkdir -p $share_dir
 # Check for build sub-commands
 #
 build_libmosaic_codec=false
+build_libmosaic_fft=false
 build_libmosaic_videocapture=false
 build_libmosaic_visualizer=false
 build_mosaic=false
 
 if [ $# -eq 0 ]; then
     build_libmosaic_codec=true
+    build_libmosaic_fft=true
     build_libmosaic_videocapture=true
     build_libmosaic_visualizer=true
     build_mosaic=true
@@ -56,6 +58,8 @@ else
     for arg in $@; do
         if [ $arg == "libmosaic-codec" ]; then
             build_libmosaic_codec=true
+        elif [ $arg == "libmosaic-fft" ]; then
+            build_libmosaic_fft=true
         elif [ $arg == "libmosaic-videocapture" ]; then
             build_libmosaic_videocapture=true
         elif [ $arg == "libmosaic-visualizer" ]; then
@@ -81,7 +85,16 @@ if $build_libmosaic_codec; then
         additional_stb_options="-DSTBI_NEON"
     fi
 
-    clang -fPIC -shared -Wall -Werror $stb_options -o $lib_dir/libmosaic-codec$dynamic_lib_extension libmosaic-codec/codec.c
+    clang -fPIC -shared -Wall -Werror -O3 -march=native $stb_options -o $lib_dir/libmosaic-codec$dynamic_lib_extension libmosaic-codec/codec.c
+fi
+
+#
+# Build libmosaic-fft
+#
+if $build_libmosaic_fft; then
+    echo -e "> Building ${cyan}libmosaic-fft${reset} ..."
+
+    clang++ -fPIC -shared -Wall -Werror -O3 -march=native -o $lib_dir/libmosaic-fft$dynamic_lib_extension libmosaic-fft/fft.cpp
 fi
 
 #
@@ -92,7 +105,7 @@ if $build_libmosaic_videocapture; then
 
     if [ $os == "macOS" ]; then
         swift_source_files=$(find libmosaic-videocapture/mac -name "*.swift")
-        swiftc -warnings-as-errors -emit-library -o $lib_dir/libmosaic-videocapture$dynamic_lib_extension $swift_source_files
+        swiftc -warnings-as-errors -emit-library -O -o $lib_dir/libmosaic-videocapture$dynamic_lib_extension $swift_source_files
     else
         echo -e "  > ${bright_red}[Warning]${reset} Unsupported os for libmosaic-videocapture: $os, skipping ..."
     fi
@@ -106,7 +119,7 @@ if $build_libmosaic_visualizer; then
 
     if [ $os == "macOS" ]; then
         swift_source_files=$(find libmosaic-visualizer/mac -name "*.swift")
-        swiftc -warnings-as-errors -emit-library -o $lib_dir/libmosaic-visualizer$dynamic_lib_extension $swift_source_files
+        swiftc -warnings-as-errors -emit-library -O -o $lib_dir/libmosaic-visualizer$dynamic_lib_extension $swift_source_files
     else
         echo -e "  > ${bright_red}[Warning]${reset} Unsupported os for libmosaic-visualizer: $os, skipping ..."
     fi

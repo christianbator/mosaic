@@ -12,7 +12,8 @@ from collections import Optional
 from math import floor, ceil, ceildiv, trunc, Ceilable, CeilDivable, Floorable, Truncable
 from bit import next_power_of_two
 
-from mosaic.numeric import Matrix, MatrixSlice, StridedRange, SIMDRange, Number
+from mosaic.numeric import Matrix, MatrixSlice, StridedRange, SIMDRange, Number, ScalarNumber
+from mosaic.numeric.fft import fft_dtype
 from mosaic.utility import optimal_simd_width, unroll_factor, fatal_error
 
 from .image_reader import ImageReader
@@ -70,7 +71,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
         spectrum_dtype: DType, T: Floatable, //
     ](spectrum: Matrix[spectrum_dtype, color_space.channels(), complex=True], lower_bound: T, upper_bound: T) -> Self:
         var real = spectrum.fourier_transform[inverse=True]().real()
-        real.map_to_range(Float64(lower_bound), Float64(upper_bound))
+        real.map_to_range(Float64(lower_bound).cast[fft_dtype](), Float64(upper_bound).cast[fft_dtype]())
 
         return Self(real.astype[dtype]())
 
@@ -181,6 +182,9 @@ struct Image[dtype: DType, color_space: ColorSpace](
     @always_inline
     fn unsafe_uint8_ptr(self) -> UnsafePointer[UInt8]:
         return self._matrix.unsafe_uint8_ptr()
+
+    fn keep(self):
+        pass
 
     #
     # Slicing
@@ -639,7 +643,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
 
         return result^
 
-    fn spectrum(self) -> Matrix[DType.float64, color_space.channels(), complex=True]:
+    fn spectrum(self) -> Matrix[fft_dtype, color_space.channels(), complex=True]:
         return self._matrix.fourier_transform()
 
     #
@@ -868,10 +872,6 @@ struct Image[dtype: DType, color_space: ColorSpace](
             return self._direct_convolution[border, 64](flipped_kernel)
         elif count <= 128:
             return self._direct_convolution[border, 128](flipped_kernel)
-        elif count <= 256:
-            return self._direct_convolution[border, 256](flipped_kernel)
-        elif count <= 512:
-            return self._direct_convolution[border, 512](flipped_kernel)
         else:
             return self._fourier_convolution[border](flipped_kernel)
 
@@ -946,7 +946,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
         var half_kernel_cols = kernel.cols() // 2
 
         var padded_self = self.padded[border](width=half_kernel_cols, height=half_kernel_rows)
-        var padded_kernel = Matrix[dtype, color_space.channels()](rows=padded_self.height(), cols=padded_self.width())
+        var padded_kernel = Matrix[fft_dtype, color_space.channels(), complex=True](rows=padded_self.height(), cols=padded_self.width())
 
         @parameter
         for component in range(kernel.depth):
@@ -954,13 +954,18 @@ struct Image[dtype: DType, color_space: ColorSpace](
                 for col in range(kernel.cols()):
                     var shifted_row = (row - half_kernel_rows) % padded_self.height()
                     var shifted_col = (col - half_kernel_cols) % padded_self.width()
+
                     padded_kernel._strided_store(
-                        kernel._strided_load(row=row, col=col, component=component), row=shifted_row, col=shifted_col, component=component
+                        (kernel._strided_load(row=row, col=col, component=component).value.cast[fft_dtype](), Scalar[fft_dtype](0.0)),
+                        row=shifted_row,
+                        col=shifted_col,
+                        component=component,
                     )
 
-        var spectral_multiplication = padded_self.spectrum() * padded_kernel.fourier_transform()
+        var padded_spectrum = padded_self.spectrum()
+        padded_spectrum *= padded_kernel.fourier_transform()
 
-        var padded_result = spectral_multiplication.fourier_transform[inverse=True]()
+        var padded_result = padded_spectrum.fourier_transform[inverse=True]()
 
         var result = Self(width=self.width(), height=self.height())
 
@@ -974,6 +979,8 @@ struct Image[dtype: DType, color_space: ColorSpace](
             )
 
         result._matrix.strided_iterate_indices[take_real_value]()
+
+        padded_result.keep()
 
         return result^
 

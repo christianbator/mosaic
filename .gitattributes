@@ -14,3 +14,4 @@ hooks/* -linguist-detectable
 
 # Exclude third-party files from language statistics
 libmosaic-codec/*.h linguist-vendored
+libmosaic-fft/*.h linguist-vendored

@@ -12,7 +12,7 @@ from collections import InlineArray
 
 from mosaic.utility import optimal_simd_width, unroll_factor, fatal_error
 
-from .fft import fft
+from .fft import fft, fft_dtype
 
 
 #
@@ -329,6 +329,9 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     @always_inline
     fn unsafe_uint8_ptr(self) -> UnsafePointer[UInt8]:
         return self._data.unsafe_uint8_ptr()
+
+    fn keep(self):
+        pass
 
     #
     # Index Utilities
@@ -1214,7 +1217,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
         return result^
 
-    fn fourier_transform[inverse: Bool = False](self) -> Matrix[DType.float64, depth, complex=True]:
+    fn fourier_transform[*, inverse: Bool = False](self) -> Matrix[fft_dtype, depth, complex=True]:
         return fft[inverse=inverse](self)
 
     #
@@ -1519,6 +1522,40 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
             parallelize[convert_row](self._rows)
 
             return result^
+
+    fn as_complex(self) -> Matrix[dtype, depth, complex=True]:
+        var result = Matrix[dtype, depth, complex=True](rows=self._rows, cols=self._cols)
+
+        @parameter
+        fn convert_row(row: Int):
+            @parameter
+            fn convert_flattened_elements[width: Int](flattened_element: Int):
+                var index = self.flattened_index(row=row, offset=flattened_element)
+                var value = self._load[width](index).as_complex()
+                result._store(value, index=index)
+
+            vectorize[convert_flattened_elements, Self.optimal_simd_width, unroll_factor=unroll_factor](self._cols * depth)
+
+        parallelize[convert_row](self._rows)
+
+        return result^
+
+    fn as_complex[new_dtype: DType = dtype](self) -> Matrix[new_dtype, depth, complex=True]:
+        var result = Matrix[new_dtype, depth, complex=True](rows=self._rows, cols=self._cols)
+
+        @parameter
+        fn convert_row(row: Int):
+            @parameter
+            fn convert_flattened_elements[width: Int](flattened_element: Int):
+                var index = self.flattened_index(row=row, offset=flattened_element)
+                var value = self._load[width](index).as_complex[new_dtype]()
+                result._store(value, index=index)
+
+            vectorize[convert_flattened_elements, Self.optimal_simd_width, unroll_factor=unroll_factor](self._cols * depth)
+
+        parallelize[convert_row](self._rows)
+
+        return result^
 
     #
     # Rebind

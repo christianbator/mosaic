@@ -40,7 +40,7 @@ jobs:
       shell: bash
       env:
         PREFIX: tmp
-      run: build/build.sh libmosaic-codec
+      run: build/build.sh libmosaic-codec libmosaic-fft
     - if: matrix.language == 'swift'
       name: Compile (swift)
       shell: bash

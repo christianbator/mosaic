@@ -15,7 +15,7 @@ package:
   version: ${{ version }}
 
 source:
-  - git: https://github.com/christianbator/mosaic
+  - git: https://github.com/christianbator/mosaic.git
     rev: main
 
 build:
