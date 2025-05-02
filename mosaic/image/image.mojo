@@ -786,21 +786,25 @@ struct Image[dtype: DType, color_space: ColorSpace](
         if border != Border.zero:
 
             @parameter
+            fn store_value(y: Int, x: Int, channel: Int):
+                result._strided_store(self._bordered_load[border](y=y - height, x=x - width, channel=channel), y=y, x=x, channel=channel)
+
+            @parameter
             for channel in range(color_space.channels()):
                 for y in range(height):
                     for x in range(result.width()):
-                        result._strided_store(self._bordered_load[border](y=y - height, x=x - width, channel=channel), y=y, x=x, channel=channel)
+                        store_value(y=y, x=x, channel=channel)
 
                 for y in range(height, height + self.height()):
                     for x in range(result.width()):
-                        result._strided_store(self._bordered_load[border](y=y - height, x=x - width, channel=channel), y=y, x=x, channel=channel)
+                        store_value(y=y, x=x, channel=channel)
 
                     for x in range(width + self.width(), result.width()):
-                        result._strided_store(self._bordered_load[border](y=y - height, x=x - width, channel=channel), y=y, x=x, channel=channel)
+                        store_value(y=y, x=x, channel=channel)
 
                 for y in range(height + self.height(), result.height()):
                     for x in range(result.width()):
-                        result._strided_store(self._bordered_load[border](y=y - height, x=x - width, channel=channel), y=y, x=x, channel=channel)
+                        store_value(y=y, x=x, channel=channel)
 
         return result^
 
