@@ -79,7 +79,11 @@ fi
 if $build_libmosaic_codec; then
     echo -e "> Building ${cyan}libmosaic-codec${reset} ..."
 
-    stb_options="-DSTBI_NEON"
+    stb_options=""
+
+    if [ $os == "macOS" ]; then
+        additional_stb_options="-DSTBI_NEON"
+    fi
 
     clang -fPIC -shared -Wall -Werror -O3 -march=native $stb_options -o $lib_dir/libmosaic-codec$dynamic_lib_extension libmosaic-codec/codec.c
 fi
@@ -90,7 +94,7 @@ fi
 if $build_libmosaic_fft; then
     echo -e "> Building ${cyan}libmosaic-fft${reset} ..."
 
-    clang++ -fPIC -shared -Wall -Werror -O3 -march=native -o $lib_dir/libmosaic-fft$dynamic_lib_extension libmosaic-fft/fft.cpp
+    clang++ -fPIC -shared -Wall -Werror -std=c++17 -O3 -march=native -o $lib_dir/libmosaic-fft$dynamic_lib_extension libmosaic-fft/fft.cpp
 fi
 
 #

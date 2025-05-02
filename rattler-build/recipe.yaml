@@ -26,7 +26,6 @@ build:
       - if: osx
         then:
           - /usr/lib/swift/libswift*.dylib
-          - /usr/lib/libc++*.dylib
 
 requirements:
   build:
