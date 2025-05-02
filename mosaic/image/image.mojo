@@ -911,7 +911,10 @@ struct Image[dtype: DType, color_space: ColorSpace](
                 var max_patch_y = y + half_kernel_height
 
                 for x in range(result.width()):
-                    if max_patch_y < self.height() and min_patch_y >= 0 and (x + half_kernel_width) < self.width() and (x - half_kernel_width) >= 0:
+                    var min_patch_x = x - half_kernel_width
+                    var max_patch_x = x + half_kernel_width
+
+                    if min_patch_y >= 0 and max_patch_y < self.height() and min_patch_x >= 0 and max_patch_x < self.width():
                         var value = (
                             self._matrix.gather(
                                 row=y,
