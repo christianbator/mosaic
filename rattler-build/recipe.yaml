@@ -26,10 +26,12 @@ build:
       - if: osx
         then:
           - /usr/lib/swift/libswift*.dylib
+          - /usr/lib/libc++*.dylib
 
 requirements:
   build:
-    - clang-20
+    - clang==20.1.4
+    - lld==20.1.4
   host:
     - max==25.2.0
   run:
@@ -41,7 +43,8 @@ tests:
       mojo test
     files:
       source:
-        - test/
+        - test/**.mojo
+        - test/data/
 
 about:
   homepage: https://mosaiclib.org
