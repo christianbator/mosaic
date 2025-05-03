@@ -13,9 +13,14 @@ from collections import InlineArray
 from utils import IndexList
 
 #
-# Aliases
+# Type Aliases
 #
 alias ScalarNumber = Number[width=1, complex=_]
+
+#
+# Print Precision
+#
+alias print_precision = 3
 
 
 #
@@ -868,9 +873,3 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
                 writer.write(abs(rounded))
             else:
                 writer.write(rounded)
-
-
-#
-# Print Precision
-#
-var print_precision = 3
