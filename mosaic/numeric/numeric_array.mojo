@@ -23,7 +23,7 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, 
     # Initialization
     #
     fn __init__(out self, *, count: Int):
-        debug_assert[assert_mode="safe"](count > 0)
+        debug_assert[assert_mode="safe"](count > 0, "Count must be greater than 0")
 
         @parameter
         if complex:
@@ -49,13 +49,13 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, 
         self._count = len(values)
 
     fn __init__(out self, owned data: UnsafePointer[ScalarNumber[dtype, complex=complex]], count: Int):
-        debug_assert[assert_mode="safe"](count > 0)
+        debug_assert[assert_mode="safe"](count > 0, "Count must be greater than 0")
 
         self._data = data.bitcast[Scalar[dtype]]()
         self._count = count
 
     fn __init__(out self, owned data: UnsafePointer[Scalar[dtype]], count: Int):
-        debug_assert[assert_mode="safe"](count > 0)
+        debug_assert[assert_mode="safe"](count > 0, "Count must be greater than 0")
 
         self._data = data
         self._count = count
@@ -69,7 +69,7 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, 
 
     @staticmethod
     fn ascending(*, count: Int) -> Self:
-        debug_assert[assert_mode="safe"](count > 0)
+        debug_assert[assert_mode="safe"](count > 0, "Count must be greater than 0")
 
         var result = Self(count=count)
 
@@ -85,7 +85,7 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, 
 
     @staticmethod
     fn random(*, count: Int, min: Scalar[dtype] = Scalar[dtype].MIN_FINITE, max: Scalar[dtype] = Scalar[dtype].MAX_FINITE) -> Self:
-        debug_assert[assert_mode="safe"](count > 0)
+        debug_assert[assert_mode="safe"](count > 0, "Count must be greater than 0")
 
         var result = Self(count=count)
         rand(result.unsafe_data_ptr(), result._scalar_count(), min=min.cast[DType.float64](), max=max.cast[DType.float64]())

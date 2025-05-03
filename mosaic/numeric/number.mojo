@@ -137,7 +137,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     @implicit
     fn __init__(out self, *elems: Scalar[dtype]):
         # TODO: Make this a compile-time check when possible
-        debug_assert(width == len(elems), "mismatch in the number of elements in the Number variadic constructor")
+        debug_assert(width == len(elems), "Mismatch in the number of elements in the Number variadic constructor")
 
         self.value = Self.Value(0)
 

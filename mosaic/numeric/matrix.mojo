@@ -35,7 +35,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     #
     fn __init__(out self, *, rows: Int, cols: Int):
         constrained[depth > 0]()
-        debug_assert[assert_mode="safe"](rows > 0 and cols > 0)
+        debug_assert[assert_mode="safe"](rows > 0 and cols > 0, "Rows and cols must be greather than 0")
 
         self._rows = rows
         self._cols = cols
@@ -43,7 +43,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
     fn __init__(out self, *, rows: Int, cols: Int, value: ScalarNumber[dtype, complex=complex]):
         constrained[depth > 0]()
-        debug_assert[assert_mode="safe"](rows > 0 and cols > 0)
+        debug_assert[assert_mode="safe"](rows > 0 and cols > 0, "Rows and cols must be greather than 0")
 
         self._rows = rows
         self._cols = cols
@@ -69,7 +69,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     # This is an unsafe convenience constructor
     fn __init__(out self, rows: Int, cols: Int, owned data: UnsafePointer[Scalar[dtype]]):
         constrained[depth > 0]()
-        debug_assert[assert_mode="safe"](rows > 0 and cols > 0)
+        debug_assert[assert_mode="safe"](rows > 0 and cols > 0, "Rows and cols must be greather than 0")
 
         self._rows = rows
         self._cols = cols
@@ -210,7 +210,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
     fn create_full_depth_value(self, *values: ScalarNumber[dtype, complex=complex]) -> InlineArray[ScalarNumber[dtype, complex=complex], depth]:
         # TODO: Make this a compile-time check when possible
-        debug_assert(depth == len(values), "mismatch in the number of values in the full depth value variadic constructor")
+        debug_assert(depth == len(values), "Mismatch in the number of values in the full depth value variadic constructor")
 
         var result = InlineArray[ScalarNumber[dtype, complex=complex], depth](uninitialized=True)
 
