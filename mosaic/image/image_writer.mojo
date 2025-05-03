@@ -8,10 +8,12 @@
 from os import makedirs
 from os.path import dirname
 from pathlib import Path
-from sys.ffi import DLHandle, c_int, c_char
+from sys.ffi import _get_dylib_function, c_int, c_char
 from memory import UnsafePointer
 
 from mosaic.utility import dynamic_library_filepath, fatal_error
+
+from .codec import _libcodec
 
 
 #
@@ -23,15 +25,6 @@ struct ImageWriter:
     #
     var _path: Path
 
-    @staticmethod
-    fn _libcodec() raises -> DLHandle:
-        var libcodec = DLHandle(dynamic_library_filepath("libmosaic-codec"))
-
-        if not libcodec:
-            fatal_error("Failed to load libcodec")
-
-        return libcodec
-
     #
     # Initialization
     #
@@ -42,8 +35,6 @@ struct ImageWriter:
     # Writing
     #
     fn write[dtype: DType, //, file_type: ImageFile](self, image: Image[dtype]) raises:
-        var libcodec = Self._libcodec()
-
         var path_string: String
         if self._path.suffix() in file_type.valid_extensions():
             path_string = self._path.__fspath__()
@@ -69,15 +60,17 @@ struct ImageWriter:
 
         @parameter
         if file_type == ImageFile.png:
-            var write_image_data_png = libcodec.get_function[
+            var write_image_data_png = _get_dylib_function[
+                _libcodec,
+                "write_image_data_png",
                 fn (
                     filename: UnsafePointer[c_char],
                     data: UnsafePointer[UInt8],
                     width: c_int,
                     height: c_int,
                     channels: c_int,
-                ) -> c_int
-            ]("write_image_data_png")
+                ) -> c_int,
+            ]()
 
             result = write_image_data_png(
                 filename=path_string.unsafe_cstr_ptr(),
@@ -87,15 +80,17 @@ struct ImageWriter:
                 channels=c_int(image.channels()),
             )
         elif file_type == ImageFile.jpeg:
-            var write_image_data_jpeg = libcodec.get_function[
+            var write_image_data_jpeg = _get_dylib_function[
+                _libcodec,
+                "write_image_data_jpeg",
                 fn (
                     filename: UnsafePointer[c_char],
                     data: UnsafePointer[UInt8],
                     width: c_int,
                     height: c_int,
                     channels: c_int,
-                ) -> c_int
-            ]("write_image_data_jpeg")
+                ) -> c_int,
+            ]()
 
             result = write_image_data_jpeg(
                 filename=path_string.unsafe_cstr_ptr(),

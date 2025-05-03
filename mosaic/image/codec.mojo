@@ -1,11 +1,23 @@
 #
-# image_file.mojo
+# codec.mojo
 # mosaic
 #
-# Created by Christian Bator on 03/11/2025
+# Created by Christian Bator on 05/03/2025
 #
 
-from mosaic.utility import fatal_error
+from sys.ffi import _Global, _OwnedDLHandle
+
+from mosaic.utility import dynamic_library_filepath, fatal_error
+
+
+#
+# Backend
+#
+alias _libcodec = _Global["libcodec", _OwnedDLHandle, _load_libcodec]()
+
+
+fn _load_libcodec() -> _OwnedDLHandle:
+    return _OwnedDLHandle(dynamic_library_filepath("libmosaic-codec"))
 
 
 #

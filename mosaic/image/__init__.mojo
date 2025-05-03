@@ -6,7 +6,7 @@
 #
 
 from .image import Image
-from .image_file import ImageFile
+from .codec import ImageFile
 from .color_space import ColorSpace
 from .border import Border
 from .filters import Filters

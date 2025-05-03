@@ -6,11 +6,20 @@
 #
 
 from memory import Pointer, UnsafePointer
-from sys.ffi import DLHandle, OpaquePointer, c_int, c_char
+from sys.ffi import _Global, _OwnedDLHandle, _get_dylib_function, OpaquePointer, c_int, c_char
 
 from mosaic.image import Image, ColorSpace
-from mosaic.utility import dynamic_library_filepath, fatal_error
+from mosaic.utility import dynamic_library_filepath
 from mosaic.numeric import Size
+
+#
+# Backend
+#
+alias _libvideocapture = _Global["libvideocapture", _OwnedDLHandle, _load_libvideocapture]()
+
+
+fn _load_libvideocapture() -> _OwnedDLHandle:
+    return _OwnedDLHandle(dynamic_library_filepath("libmosaic-videocapture"))
 
 
 #
@@ -45,31 +54,24 @@ struct VideoCapture[capture_color_space: ColorSpace](VideoCapturing):
     # Initialization
     #
     fn __init__(out self, index: Int) raises:
-        # Load libvideocapture
-        var libvideocapture = DLHandle(dynamic_library_filepath("libmosaic-videocapture"))
-
-        # Initialize system video capture
-        var initialize_with_index = libvideocapture.get_function[fn (index: c_int) -> OpaquePointer]("initialize_with_index")
+        var initialize_with_index = _get_dylib_function[_libvideocapture, "initialize_with_index", fn (index: c_int) -> OpaquePointer]()
         var video_capture = initialize_with_index(c_int(index))
 
-        self = Self(video_capture, libvideocapture)
+        self = Self(video_capture)
 
     fn __init__(out self, owned name: String) raises:
-        # Load libvideocapture
-        var libvideocapture = DLHandle(dynamic_library_filepath("libmosaic-videocapture"))
-
-        # Initialize system video capture
-        var initialize_with_name = libvideocapture.get_function[fn (index: UnsafePointer[c_char]) -> OpaquePointer]("initialize_with_name")
+        var initialize_with_name = _get_dylib_function[_libvideocapture, "initialize_with_name", fn (index: UnsafePointer[c_char]) -> OpaquePointer]()
         var video_capture = initialize_with_name(name.unsafe_cstr_ptr())
 
-        self = Self(video_capture, libvideocapture)
+        self = Self(video_capture)
 
     @doc_private
-    fn __init__(out self, video_capture: OpaquePointer, libvideocapture: DLHandle) raises:
+    fn __init__(out self, video_capture: OpaquePointer) raises:
         # Open system video capture
-        var open = libvideocapture.get_function[
-            fn (video_capture: OpaquePointer, color_space: c_int, dimensions: UnsafePointer[_VideoCaptureDimensions]) -> Bool
-        ]("open")
+        var open = _get_dylib_function[
+            _libvideocapture, "open", fn (video_capture: OpaquePointer, color_space: c_int, dimensions: UnsafePointer[_VideoCaptureDimensions]) -> Bool
+        ]()
+
         var dimensions = _VideoCaptureDimensions(width=0, height=0)
 
         if not open(video_capture, color_space=c_int(capture_color_space.raw_value()), dimensions=UnsafePointer.address_of(dimensions)):
@@ -83,11 +85,11 @@ struct VideoCapture[capture_color_space: ColorSpace](VideoCapturing):
         self._dimensions = Size(width=width, height=height)
         self._frame_buffer = Image[DType.uint8, Self.color_space](width=width, height=height)
 
-        self._start = libvideocapture.get_function[fn (video_capture: OpaquePointer, frame_buffer: UnsafePointer[UInt8]) -> None]("start")
-        self._is_next_frame_available = libvideocapture.get_function[fn (video_capture: OpaquePointer) -> Bool]("is_next_frame_available")
-        self._did_read_next_frame = libvideocapture.get_function[fn (video_capture: OpaquePointer) -> None]("did_read_next_frame")
-        self._stop = libvideocapture.get_function[fn (video_capture: OpaquePointer) -> None]("stop")
-        self._deinitialize = libvideocapture.get_function[fn (videoCapture: OpaquePointer) -> None]("deinitialize")
+        self._start = _get_dylib_function[_libvideocapture, "start", fn (video_capture: OpaquePointer, frame_buffer: UnsafePointer[UInt8]) -> None]()
+        self._is_next_frame_available = _get_dylib_function[_libvideocapture, "is_next_frame_available", fn (video_capture: OpaquePointer) -> Bool]()
+        self._did_read_next_frame = _get_dylib_function[_libvideocapture, "did_read_next_frame", fn (video_capture: OpaquePointer) -> None]()
+        self._stop = _get_dylib_function[_libvideocapture, "stop", fn (video_capture: OpaquePointer) -> None]()
+        self._deinitialize = _get_dylib_function[_libvideocapture, "deinitialize", fn (videoCapture: OpaquePointer) -> None]()
 
     fn __del__(owned self):
         self._deinitialize(self._video_capture)

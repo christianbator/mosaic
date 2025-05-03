@@ -6,10 +6,9 @@
 #
 
 from memory import UnsafePointer
-from collections.string import StaticString
 from sys.ffi import _Global, _OwnedDLHandle, _get_dylib_function, c_int
 
-from mosaic.utility import dynamic_library_filepath, fatal_error
+from mosaic.utility import dynamic_library_filepath
 
 
 #

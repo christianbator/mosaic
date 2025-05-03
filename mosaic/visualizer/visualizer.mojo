@@ -5,12 +5,21 @@
 # Created by Christian Bator on 12/14/2024
 #
 
-from sys.ffi import DLHandle, c_int, c_char, c_float
+from sys.ffi import _Global, _OwnedDLHandle, _get_dylib_function, c_int, c_char, c_float
 from memory import UnsafePointer
 
-from mosaic.utility import dynamic_library_filepath, fatal_error
+from mosaic.utility import dynamic_library_filepath
 from mosaic.image import Image, ImageSlice, ColorSpace
 from mosaic.video import VideoCapturing
+
+#
+# Backend
+#
+alias _libvisualizer = _Global["libvisualizer", _OwnedDLHandle, _load_libvisualizer]()
+
+
+fn _load_libvisualizer() -> _OwnedDLHandle:
+    return _OwnedDLHandle(dynamic_library_filepath("libmosaic-visualizer"))
 
 
 #
@@ -21,15 +30,6 @@ struct Visualizer:
     # Fields
     #
     alias display_dtype = DType.uint8
-
-    @staticmethod
-    fn _libvisualizer() -> DLHandle:
-        var libvisualizer = DLHandle(dynamic_library_filepath("libmosaic-visualizer"))
-
-        if not libvisualizer:
-            fatal_error("Failed to load libmosaic-visualizer")
-
-        return libvisualizer
 
     #
     # ImageSlice
@@ -59,15 +59,17 @@ struct Visualizer:
 
     @staticmethod
     fn _show[dtype: DType, color_space: ColorSpace, //](image: Image[dtype, color_space], owned window_title: String):
-        var show = Self._libvisualizer().get_function[
+        var show = _get_dylib_function[
+            _libvisualizer,
+            "show",
             fn (
                 data: UnsafePointer[UInt8],
                 width: c_int,
                 height: c_int,
                 channels: c_int,
                 window_title: UnsafePointer[c_char],
-            ) -> None
-        ]("show")
+            ) -> None,
+        ]()
 
         show(
             data=image.unsafe_uint8_ptr(),
@@ -117,6 +119,6 @@ struct Visualizer:
 
     @staticmethod
     fn wait(timeout: Float32) -> Bool:
-        var wait = Self._libvisualizer().get_function[fn (timeout: c_float) -> Bool]("wait")
+        var wait = _get_dylib_function[_libvisualizer, "wait", fn (timeout: c_float) -> Bool]()
 
         return wait(c_float(timeout))
