@@ -458,7 +458,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
     @always_inline
     fn extract_component[component: Int](self) -> Matrix[dtype, complex=complex]:
-        return self.component_slice[component]().rebound_copy[depth=1]()
+        return self.component_slice[component]().copy[rebound_depth=1]()
 
     fn store_sub_matrix(mut self, value: Self, row: Int, col: Int) raises:
         self.store_sub_matrix(value[:, :], row=row, col=col)
@@ -1505,7 +1505,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     fn as_type[new_dtype: DType](self) -> Matrix[new_dtype, depth, complex=complex]:
         @parameter
         if new_dtype == dtype:
-            return Matrix[new_dtype, depth, complex=complex](rows=self._rows, cols=self._cols, data=self._data.rebound_copy[new_dtype]())
+            return rebind[UnsafePointer[Matrix[new_dtype, depth, complex=complex]]](UnsafePointer.address_of(self)).take_pointee()
         else:
             var result = Matrix[new_dtype, depth, complex=complex](rows=self._rows, cols=self._cols)
 
@@ -1523,58 +1523,23 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
             return result^
 
-    fn as_complex(self) -> Matrix[dtype, depth, complex=True]:
-        var result = Matrix[dtype, depth, complex=True](rows=self._rows, cols=self._cols)
-
-        @parameter
-        fn convert_row(row: Int):
-            @parameter
-            fn convert_flattened_elements[width: Int](flattened_element: Int):
-                var index = self.flattened_index(row=row, offset=flattened_element)
-                var value = self._load[width](index).as_complex()
-                result._store(value, index=index)
-
-            vectorize[convert_flattened_elements, Self.optimal_simd_width, unroll_factor=unroll_factor](self._cols * depth)
-
-        parallelize[convert_row](self._rows)
-
-        return result^
-
     fn as_complex[new_dtype: DType = dtype](self) -> Matrix[new_dtype, depth, complex=True]:
-        var result = Matrix[new_dtype, depth, complex=True](rows=self._rows, cols=self._cols)
-
         @parameter
-        fn convert_row(row: Int):
-            @parameter
-            fn convert_flattened_elements[width: Int](flattened_element: Int):
-                var index = self.flattened_index(row=row, offset=flattened_element)
-                var value = self._load[width](index).as_complex[new_dtype]()
-                result._store(value, index=index)
+        if complex and new_dtype == dtype:
+            return rebind[UnsafePointer[Matrix[new_dtype, depth, complex=True]]](UnsafePointer.address_of(self)).take_pointee()
+        elif complex:
+            var result = self.as_type[new_dtype]()
 
-            vectorize[convert_flattened_elements, Self.optimal_simd_width, unroll_factor=unroll_factor](self._cols * depth)
-
-        parallelize[convert_row](self._rows)
-
-        return result^
-
-    #
-    # Rebind
-    #
-    fn rebound_copy[new_dtype: DType, new_depth: Int](self) -> Matrix[new_dtype, new_depth, complex=complex]:
-        constrained[new_depth == depth]()
-
-        @parameter
-        if new_dtype == dtype:
-            return Matrix[new_dtype, new_depth, complex=complex](rows=self._rows, cols=self._cols, data=self._data.rebound_copy[new_dtype]())
+            return rebind[UnsafePointer[Matrix[new_dtype, depth, complex=True]]](UnsafePointer.address_of(result)).take_pointee()
         else:
-            var result = Matrix[new_dtype, new_depth, complex=complex](rows=self._rows, cols=self._cols)
+            var result = Matrix[new_dtype, depth, complex=True](rows=self._rows, cols=self._cols)
 
             @parameter
             fn convert_row(row: Int):
                 @parameter
                 fn convert_flattened_elements[width: Int](flattened_element: Int):
                     var index = self.flattened_index(row=row, offset=flattened_element)
-                    var value = self._load[width](index).cast[new_dtype]()
+                    var value = self._load[width](index).as_complex[new_dtype]()
                     result._store(value, index=index)
 
                 vectorize[convert_flattened_elements, Self.optimal_simd_width, unroll_factor=unroll_factor](self._cols * depth)
@@ -1582,6 +1547,11 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
             parallelize[convert_row](self._rows)
 
             return result^
+
+    fn rebind[new_depth: Int](self) -> Matrix[dtype, new_depth, complex=complex]:
+        constrained[new_depth == depth, "new_depth must be equal to depth for rebind"]()
+
+        return rebind[UnsafePointer[Matrix[dtype, new_depth, complex=complex]]](UnsafePointer.address_of(self)).take_pointee()
 
     #
     # Stringable & Writable

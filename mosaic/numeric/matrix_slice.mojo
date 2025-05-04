@@ -394,11 +394,13 @@ struct MatrixSlice[
     #
     # Copy
     #
-    fn copy(self) -> Matrix[dtype, Self._depth, complex=complex]:
-        var result = Matrix[dtype, Self._depth, complex=complex](rows=self._rows, cols=self._cols)
+    fn copy[*, rebound_depth: Int = Self._depth](self) -> Matrix[dtype, rebound_depth, complex=complex]:
+        constrained[rebound_depth == Self._depth, "rebound_depth must equal matrix slice depth"]()
+
+        var result = Matrix[dtype, rebound_depth, complex=complex](rows=self._rows, cols=self._cols)
 
         @parameter
-        for slice_component in range(Self._depth):
+        for slice_component in range(rebound_depth):
             var component = Self._component_range.start + slice_component * Self._component_range.step
 
             @parameter
@@ -417,34 +419,6 @@ struct MatrixSlice[
                     )
 
                 vectorize[process_col, Matrix[dtype, depth, complex=complex].optimal_simd_width, unroll_factor=unroll_factor](self._cols)
-
-            parallelize[process_row](self._rows)
-
-        return result^
-
-    fn rebound_copy[*, depth: Int](self) -> Matrix[dtype, depth, complex=complex]:
-        alias new_depth = depth
-        constrained[new_depth == Self._depth]()
-
-        var result = Matrix[dtype, new_depth, complex=complex](rows=self._rows, cols=self._cols)
-
-        @parameter
-        for slice_component in range(new_depth):
-            var component = Self._component_range.start + slice_component * Self._component_range.step
-
-            @parameter
-            fn process_row(range_row: Int):
-                var row = self._row_range.start + range_row * self._row_range.step
-
-                @parameter
-                fn process_col[width: Int](range_col: Int):
-                    var col = self._col_range.start + range_col * self._col_range.step
-
-                    result._strided_store(
-                        self._matrix[]._strided_load[width](row=row, col=col, component=component), row=range_row, col=range_col, component=slice_component
-                    )
-
-                vectorize[process_col, Matrix[dtype, new_depth, complex=complex].optimal_simd_width, unroll_factor=unroll_factor](self._cols)
 
             parallelize[process_row](self._rows)
 

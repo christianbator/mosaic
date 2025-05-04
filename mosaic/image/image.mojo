@@ -8,9 +8,7 @@
 from pathlib import Path
 from memory import UnsafePointer
 from algorithm import vectorize, parallelize
-from collections import Optional
 from math import floor, ceil, ceildiv, trunc, Ceilable, CeilDivable, Floorable, Truncable
-from bit import next_power_of_two
 
 from mosaic.numeric import Matrix, MatrixSlice, StridedRange, SIMDRange, Number, ScalarNumber
 from mosaic.numeric.fft import fft_dtype
@@ -277,6 +275,20 @@ struct Image[dtype: DType, color_space: ColorSpace](
     @always_inline
     fn extract_channel[channel: Int](self) -> Matrix[dtype]:
         return self._matrix.extract_component[channel]()
+
+    fn extract_channel(self, channel: Int) -> Matrix[dtype]:
+        debug_assert[assert_mode="safe"](0 <= channel < color_space.channels(), "Channel must be in color space channel bounds")
+
+        if channel == 0:
+            return self.extract_channel[0]()
+        elif channel == 1:
+            return self.extract_channel[1]()
+        elif channel == 2:
+            return self.extract_channel[2]()
+        else:
+            fatal_error("Unimplemented runtime extract_channel")
+            while True:
+                pass
 
     fn store_sub_image(mut self, value: Self, y: Int, x: Int) raises:
         self.store_sub_image(value[:, :], y=y, x=x)
@@ -1029,18 +1041,29 @@ struct Image[dtype: DType, color_space: ColorSpace](
     # Type Conversion
     #
     fn as_type[new_dtype: DType](self) -> Image[new_dtype, color_space]:
-        return Image[new_dtype, color_space](self._matrix.as_type[new_dtype]())
+        @parameter
+        if new_dtype == dtype:
+            return rebind[UnsafePointer[Image[new_dtype, color_space]]](UnsafePointer.address_of(self)).take_pointee()
+        else:
+            return Image[new_dtype, color_space](self._matrix.as_type[new_dtype]())
 
     #
     # Color Space Conversion
     #
+    @always_inline
     fn converted[new_color_space: ColorSpace](self) -> Image[dtype, new_color_space]:
-        return self.converted_as_type[dtype, new_color_space]()
+        @parameter
+        if new_color_space == color_space:
+            return rebind[UnsafePointer[Image[dtype, new_color_space]]](UnsafePointer.address_of(self)).take_pointee()
+        else:
+            return self.converted_as_type[dtype, new_color_space]()
 
     fn converted_as_type[new_dtype: DType, new_color_space: ColorSpace](self) -> Image[new_dtype, new_color_space]:
         @parameter
-        if new_color_space == color_space:
-            return Image[new_dtype, new_color_space](self._matrix.rebound_copy[new_dtype, new_color_space.channels()]())
+        if new_dtype == dtype and new_color_space == color_space:
+            return rebind[UnsafePointer[Image[new_dtype, new_color_space]]](UnsafePointer.address_of(self)).take_pointee()
+        elif new_color_space == color_space:
+            return Image[new_dtype, new_color_space](self._matrix.as_type[new_dtype]().rebind[new_color_space.channels()]())
         else:
             var result = Image[new_dtype, new_color_space](width=self.width(), height=self.height())
 

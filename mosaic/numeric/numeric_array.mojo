@@ -211,18 +211,6 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, 
         memcpy(dest=other.unsafe_data_ptr(), src=self.unsafe_data_ptr(), count=self._scalar_count())
 
     #
-    # Rebind
-    #
-    fn rebound_copy[new_dtype: DType](self) -> NumericArray[new_dtype, complex=complex]:
-        constrained[new_dtype == dtype]()
-
-        var result = NumericArray[new_dtype, complex=complex](count=self._count)
-
-        memcpy(dest=result.unsafe_data_ptr(), src=self.unsafe_data_ptr().bitcast[Scalar[new_dtype]](), count=self._scalar_count())
-
-        return result^
-
-    #
     # Sized
     #
     @always_inline

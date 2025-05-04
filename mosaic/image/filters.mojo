@@ -6,7 +6,6 @@
 #
 
 from math import pi, exp
-from collections import Optional
 
 from mosaic.numeric import Matrix, Number, ScalarNumber
 from mosaic.utility import fatal_error

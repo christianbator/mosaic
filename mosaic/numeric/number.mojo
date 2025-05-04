@@ -814,20 +814,18 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     #
     @always_inline
     fn cast[new_dtype: DType](self) -> Number[new_dtype, width, complex=complex]:
-        return Number[new_dtype, width, complex=complex](self.value.cast[new_dtype]())
-
-    @always_inline
-    fn as_complex(self) -> Number[dtype, width, complex=True]:
         @parameter
-        if complex:
-            return rebind[Number[dtype, width, complex=True]](self)
+        if new_dtype == dtype:
+            return rebind[Number[new_dtype, width, complex=complex]](self)
         else:
-            return Number[dtype, width, complex=True](real=rebind[Number[dtype, width, complex=False].Value](self.value), imaginary=0)
+            return Number[new_dtype, width, complex=complex](self.value.cast[new_dtype]())
 
     @always_inline
-    fn as_complex[new_dtype: DType](self) -> Number[new_dtype, width, complex=True]:
+    fn as_complex[new_dtype: DType = dtype](self) -> Number[new_dtype, width, complex=True]:
         @parameter
-        if complex:
+        if complex and new_dtype == dtype:
+            return rebind[Number[new_dtype, width, complex=True]](self)
+        elif complex:
             return rebind[Number[new_dtype, width, complex=True]](self.cast[new_dtype]())
         else:
             return Number[new_dtype, width, complex=True](real=rebind[Number[new_dtype, width, complex=False].Value](self.value.cast[new_dtype]()), imaginary=0)
