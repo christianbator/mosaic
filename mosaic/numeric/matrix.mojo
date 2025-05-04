@@ -410,7 +410,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     fn slice[
         mut: Bool, //, origin: Origin[mut]
     ](ref [origin]self, row_range: StridedRange, col_range: StridedRange) raises -> MatrixSlice[StridedRange(depth), dtype, depth, complex, origin]:
-        return MatrixSlice[StridedRange(depth), dtype, depth, complex, origin](matrix=self, row_range=row_range, col_range=col_range)
+        return MatrixSlice[StridedRange(depth), dtype, depth, complex, origin](self, row_range=row_range, col_range=col_range)
 
     @always_inline
     fn component_slice[
@@ -441,6 +441,12 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     @always_inline
     fn strided_slice[
         component_range: StridedRange, mut: Bool, origin: Origin[mut]
+    ](ref [origin]self) -> MatrixSlice[component_range, dtype, depth, complex, origin]:
+        return MatrixSlice[component_range, dtype, depth, complex, origin](self)
+
+    @always_inline
+    fn strided_slice[
+        component_range: StridedRange, mut: Bool, origin: Origin[mut]
     ](ref [origin]self, row_range: StridedRange) raises -> MatrixSlice[component_range, dtype, depth, complex, origin]:
         return self.strided_slice[component_range](row_range=row_range, col_range=StridedRange(self._cols))
 
@@ -454,17 +460,18 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     fn strided_slice[
         component_range: StridedRange, mut: Bool, origin: Origin[mut]
     ](ref [origin]self, row_range: StridedRange, col_range: StridedRange) raises -> MatrixSlice[component_range, dtype, depth, complex, origin]:
-        return MatrixSlice[component_range, dtype, depth, complex, origin](matrix=self, row_range=row_range, col_range=col_range)
-
-    @always_inline
-    fn extract_component[component: Int](self) -> Matrix[dtype, complex=complex]:
-        return self.component_slice[component]().copy[rebound_depth=1]()
+        return MatrixSlice[component_range, dtype, depth, complex, origin](self, row_range=row_range, col_range=col_range)
 
     fn store_sub_matrix(mut self, value: Self, row: Int, col: Int) raises:
         self.store_sub_matrix(value[:, :], row=row, col=col)
 
-    fn store_sub_matrix(mut self, value: MatrixSlice[dtype=dtype, depth=depth, complex=complex], row: Int, col: Int) raises:
-        if (value.component_range().end > depth) or (value.row_range().end > self._rows) or (value.col_range().end > self._cols):
+    fn store_sub_matrix[component_range: StridedRange, //](mut self, value: MatrixSlice[component_range, dtype, depth, complex], row: Int, col: Int) raises:
+        constrained[
+            component_range.count() <= depth,
+            "Attempt to store sub-matrix with " + String(component_range.count()) + " components in matrix with depth = " + String(depth),
+        ]()
+
+        if (value.row_range().end > self._rows) or (value.col_range().end > self._cols):
             raise Error("Attempt to store sub-matrix out of bounds")
 
         @parameter

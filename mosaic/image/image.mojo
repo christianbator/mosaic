@@ -224,19 +224,17 @@ struct Image[dtype: DType, color_space: ColorSpace](
     fn slice[
         mut: Bool, origin: Origin[mut], //
     ](ref [origin]self, y_range: StridedRange, x_range: StridedRange) raises -> ImageSlice[dtype, color_space, origin]:
-        return ImageSlice[dtype, color_space, origin](image=self, y_range=y_range, x_range=x_range)
+        return ImageSlice[dtype, color_space, origin](self, y_range=y_range, x_range=x_range)
 
     @always_inline
-    fn channel_slice[
-        channel: Int
-    ](self) raises -> MatrixSlice[StridedRange(channel, channel + 1), dtype, color_space.channels(), False, __origin_of(self._matrix)]:
+    fn channel_slice[channel: Int](self) -> MatrixSlice[StridedRange(channel, channel + 1), dtype, color_space.channels(), False, __origin_of(self._matrix)]:
         return self._matrix.component_slice[channel]()
 
     @always_inline
     fn channel_slice[
         channel: Int
     ](self, y_range: StridedRange) raises -> MatrixSlice[StridedRange(channel, channel + 1), dtype, color_space.channels(), False, __origin_of(self._matrix)]:
-        return self._matrix.component_slice[channel](row_range=y_range)
+        return self._matrix.component_slice[channel](y_range)
 
     @always_inline
     fn channel_slice[
@@ -255,10 +253,14 @@ struct Image[dtype: DType, color_space: ColorSpace](
         return self._matrix.component_slice[channel](row_range=y_range, col_range=x_range)
 
     @always_inline
+    fn strided_slice[channel_range: StridedRange](self) -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
+        return self._matrix.strided_slice[channel_range]()
+
+    @always_inline
     fn strided_slice[
         channel_range: StridedRange
     ](self, y_range: StridedRange) raises -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
-        return self._matrix.strided_slice[channel_range](row_range=y_range)
+        return self._matrix.strided_slice[channel_range](y_range)
 
     @always_inline
     fn strided_slice[
@@ -270,11 +272,11 @@ struct Image[dtype: DType, color_space: ColorSpace](
     fn strided_slice[
         channel_range: StridedRange
     ](self, y_range: StridedRange, x_range: StridedRange) raises -> MatrixSlice[channel_range, dtype, color_space.channels(), False, __origin_of(self._matrix)]:
-        return self._matrix.strided_slice[channel_range](y_range, x_range)
+        return self._matrix.strided_slice[channel_range](row_range=y_range, col_range=x_range)
 
     @always_inline
     fn extract_channel[channel: Int](self) -> Matrix[dtype]:
-        return self._matrix.extract_component[channel]()
+        return self.channel_slice[channel]().copy[rebound_depth=1]()
 
     fn extract_channel(self, channel: Int) -> Matrix[dtype]:
         debug_assert[assert_mode="safe"](0 <= channel < color_space.channels(), "Channel must be in color space channel bounds")

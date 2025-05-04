@@ -5,7 +5,6 @@
 # Created by Christian Bator on 03/15/2025
 #
 
-from math import ceildiv
 from memory import Pointer
 from algorithm import parallelize, vectorize
 from pathlib import Path
@@ -26,57 +25,41 @@ struct ImageSlice[mut: Bool, //, dtype: DType, color_space: ColorSpace, origin: 
     var _image: Pointer[Image[dtype, color_space], origin]
     var _y_range: StridedRange
     var _x_range: StridedRange
-    var _height: Int
-    var _width: Int
 
     #
     # Initialization
     #
-    fn __init__(
-        out self,
-        ref [origin]image: Image[dtype, color_space],
-        y_range: StridedRange,
-        x_range: StridedRange,
-    ) raises:
+    fn __init__(out self, ref [origin]image: Image[dtype, color_space], y_range: StridedRange, x_range: StridedRange) raises:
+        if y_range.end > image.height() or x_range.end > image.width():
+            raise Error("Out of bounds image slice for image ", image, ": y_range: ", y_range, " x_range: ", x_range)
+
         self._image = Pointer.address_of(image)
-        self._y_range = y_range.normalized_in_positive_range(image.height())
-        self._x_range = x_range.normalized_in_positive_range(image.width())
-        self._height = ceildiv(y_range.end - y_range.start, y_range.step)
-        self._width = ceildiv(x_range.end - x_range.start, x_range.step)
+        self._y_range = y_range
+        self._x_range = x_range
 
-    fn __init__(out self, other: Self, y_range: StridedRange, x_range: StridedRange) raises:
-        self._image = other._image
+    fn __init__(out self, existing: Self, y_range: StridedRange, x_range: StridedRange) raises:
+        var new_y_range = StridedRange(
+            existing._y_range.start + y_range.start * existing._y_range.step,
+            existing._y_range.start + y_range.end * existing._y_range.step,
+            existing._y_range.step * y_range.step,
+        )
 
-        self._y_range = StridedRange(
-            other._y_range.start + y_range.start,
-            other._y_range.start + y_range.end,
-            other._y_range.step * y_range.step,
-        ).normalized_in_positive_range(other._height)
+        var new_x_range = StridedRange(
+            existing._x_range.start + x_range.start * existing._x_range.step,
+            existing._x_range.start + x_range.end * existing._x_range.step,
+            existing._x_range.step * x_range.step,
+        )
 
-        self._x_range = StridedRange(
-            other._x_range.start + x_range.start,
-            other._x_range.start + x_range.end,
-            other._x_range.step * x_range.step,
-        ).normalized_in_positive_range(other._width)
+        if new_y_range.end > existing._image[].height() or new_x_range.end > existing._image[].width():
+            raise Error("Out of bounds image slice for image ", existing._image[], ": y_range: ", new_y_range, " x_range: ", new_x_range)
 
-        self._height = ceildiv(y_range.end - y_range.start, y_range.step)
-        self._width = ceildiv(x_range.end - x_range.start, x_range.step)
+        self._image = existing._image
+        self._y_range = new_y_range
+        self._x_range = new_x_range
 
     #
     # Properties
     #
-    @always_inline
-    fn height(self) -> Int:
-        return self._height
-
-    @always_inline
-    fn width(self) -> Int:
-        return self._width
-
-    @parameter
-    fn channels(self) -> Int:
-        return color_space.channels()
-
     @always_inline
     fn y_range(self) -> StridedRange:
         return self._y_range
@@ -84,6 +67,18 @@ struct ImageSlice[mut: Bool, //, dtype: DType, color_space: ColorSpace, origin: 
     @always_inline
     fn x_range(self) -> StridedRange:
         return self._x_range
+
+    @always_inline
+    fn height(self) -> Int:
+        return self._y_range.count()
+
+    @always_inline
+    fn width(self) -> Int:
+        return self._x_range.count()
+
+    @parameter
+    fn channels(self) -> Int:
+        return color_space.channels()
 
     #
     # Public Access
@@ -161,6 +156,14 @@ struct ImageSlice[mut: Bool, //, dtype: DType, color_space: ColorSpace, origin: 
     # Slicing
     #
     @always_inline
+    fn __getitem__(self, y: Int, x_slice: Slice) raises -> Self:
+        return self[y : y + 1, x_slice]
+
+    @always_inline
+    fn __getitem__(self, y_slice: Slice, x: Int) raises -> Self:
+        return self[y_slice, x : x + 1]
+
+    @always_inline
     fn __getitem__(self, y_slice: Slice, x_slice: Slice) raises -> Self:
         return self.slice(
             y_range=StridedRange(
@@ -187,13 +190,13 @@ struct ImageSlice[mut: Bool, //, dtype: DType, color_space: ColorSpace, origin: 
 
     @always_inline
     fn slice(self, y_range: StridedRange, x_range: StridedRange) raises -> Self:
-        return Self(other=self, y_range=y_range, x_range=x_range)
+        return Self(self, y_range=y_range, x_range=x_range)
 
     #
     # Copy
     #
     fn copy(self) -> Image[dtype, color_space]:
-        var result = Image[dtype, color_space](height=self._height, width=self._width)
+        var result = Image[dtype, color_space](height=self.height(), width=self.width())
 
         @parameter
         for channel in range(color_space.channels()):
@@ -207,9 +210,9 @@ struct ImageSlice[mut: Bool, //, dtype: DType, color_space: ColorSpace, origin: 
                     var x = self._x_range.start + range_x * self._x_range.step
                     result._strided_store(self._image[]._strided_load[width](y=y, x=x, channel=channel), y=range_y, x=range_x, channel=channel)
 
-                vectorize[process_col, Image[dtype, color_space].optimal_simd_width, unroll_factor=unroll_factor](self._width)
+                vectorize[process_col, Image[dtype, color_space].optimal_simd_width, unroll_factor=unroll_factor](self.width())
 
-            parallelize[process_row](self._height)
+            parallelize[process_row](self.height())
 
         return result^
 

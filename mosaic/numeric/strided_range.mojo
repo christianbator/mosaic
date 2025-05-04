@@ -5,6 +5,8 @@
 # Created by Christian Bator on 03/15/2025
 #
 
+from math import ceildiv
+
 from mosaic.utility import fatal_error
 
 
@@ -20,17 +22,27 @@ struct StridedRange(Stringable, Writable):
     var end: Int
     var step: Int
 
+    @always_inline
+    fn count(self) -> Int:
+        return ceildiv(self.end - self.start, self.step)
+
     #
     # Initialization
     #
     @always_inline
     fn __init__(out self, end: Int):
+        if not (end >= 0):
+            fatal_error("Failed StridedRange init requirement: 0 <= end")
+
         self.start = 0
         self.end = end
         self.step = 1
 
     @always_inline
     fn __init__(out self, start: Int, end: Int):
+        if not (0 <= start <= end):
+            fatal_error("Failed StridedRange init requirement: 0 <= start <= end")
+
         self.start = start
         self.end = end
         self.step = 1
@@ -38,12 +50,13 @@ struct StridedRange(Stringable, Writable):
     @always_inline
     @implicit
     fn __init__(out self, tuple: Tuple[Int, Int]):
-        self.start = tuple[0]
-        self.end = tuple[1]
-        self.step = 1
+        self = Self(start=tuple[0], end=tuple[1])
 
     @always_inline
     fn __init__(out self, start: Int, end: Int, step: Int):
+        if not (0 <= start <= end and step > 0):
+            fatal_error("Failed StridedRange init requirement: 0 <= start <= end and step > 0")
+
         self.start = start
         self.end = end
         self.step = step
@@ -51,9 +64,7 @@ struct StridedRange(Stringable, Writable):
     @always_inline
     @implicit
     fn __init__(out self, tuple: Tuple[Int, Int, Int]):
-        self.start = tuple[0]
-        self.end = tuple[1]
-        self.step = tuple[2]
+        self = Self(start=tuple[0], end=tuple[1], step=tuple[2])
 
     @always_inline
     fn __init__(
@@ -63,37 +74,11 @@ struct StridedRange(Stringable, Writable):
         default_end: Int,
         default_step: Int,
     ):
-        self.start = slice.start.value() if slice.start else default_start
-        self.end = slice.end.value() if slice.end else default_end
-        self.step = slice.step.value() if slice.step else default_step
-
-    #
-    # Normalization
-    #
-    fn normalized_in_positive_range(self, end_of_range: Int) raises -> Self:
-        var start = self.start + end_of_range if self.start < 0 else self.start
-        var end = self.end + end_of_range if self.end < 0 else self.end
-
-        if (0 <= start < end <= end_of_range) and (self.step > 0):
-            return Self(start, end, self.step)
-        else:
-            raise Error("Unable to normalize ", self, " in positive range: [0, ", end_of_range, ")")
-
-    # TODO: Remove these two methods when calling raising function at compile-time works
-    fn unsafe_normalized_in_positive_range(self, end_of_range: Int) -> Self:
-        var start = self.start + end_of_range if self.start < 0 else self.start
-        var end = self.end + end_of_range if self.end < 0 else self.end
-
-        return Self(start, end, self.step)
-
-    fn can_normalize_in_positive_range(self, end_of_range: Int) -> Bool:
-        var start = self.start + end_of_range if self.start < 0 else self.start
-        var end = self.end + end_of_range if self.end < 0 else self.end
-
-        if (0 <= start < end <= end_of_range) and (self.step > 0):
-            return True
-        else:
-            return False
+        self = Self(
+            start=slice.start.value() if slice.start else default_start,
+            end=slice.end.value() if slice.end else default_end,
+            step=slice.step.value() if slice.step else default_step,
+        )
 
     #
     # Stringable & Writable
