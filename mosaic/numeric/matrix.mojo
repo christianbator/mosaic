@@ -462,32 +462,32 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     ](ref [origin]self, row_range: StridedRange, col_range: StridedRange) raises -> MatrixSlice[component_range, dtype, depth, complex, origin]:
         return MatrixSlice[component_range, dtype, depth, complex, origin](self, row_range=row_range, col_range=col_range)
 
-    fn store_sub_matrix(mut self, value: Self, row: Int, col: Int) raises:
-        self.store_sub_matrix(value[:, :], row=row, col=col)
+    fn store_sub_matrix(mut self, value: Self, row: Int, col: Int, component: Int = 0) raises:
+        self.store_sub_matrix(value[:, :], row=row, col=col, component=component)
 
-    fn store_sub_matrix[component_range: StridedRange, //](mut self, value: MatrixSlice[component_range, dtype, depth, complex], row: Int, col: Int) raises:
-        constrained[
-            component_range.count() <= depth,
-            "Attempt to store sub-matrix with " + String(component_range.count()) + " components in matrix with depth = " + String(depth),
-        ]()
-
-        if (value.row_range().end > self._rows) or (value.col_range().end > self._cols):
-            raise Error("Attempt to store sub-matrix out of bounds")
+    fn store_sub_matrix[
+        component_range: StridedRange, //
+    ](mut self, matrix_slice: MatrixSlice[component_range, dtype, complex=complex], row: Int, col: Int, component: Int = 0) raises:
+        if (component + component_range.count()) > depth or (matrix_slice.row_range().end > self._rows) or (matrix_slice.col_range().end > self._cols):
+            raise Error("Out of bounds sub-matrix store")
 
         @parameter
-        for component in range(depth):
+        for matrix_slice_component in range(component_range.count()):
 
             @parameter
-            fn store_row(sub_row: Int):
+            fn store_row(matrix_slice_row: Int):
                 @parameter
-                fn store_cols[width: Int](sub_col: Int):
+                fn store_cols[width: Int](matrix_slice_col: Int):
                     self._strided_store(
-                        value._strided_load[width](row=sub_row, col=sub_col, component=component), row=row + sub_row, col=col + sub_col, component=component
+                        matrix_slice._strided_load[width](row=matrix_slice_row, col=matrix_slice_col, component=matrix_slice_component),
+                        row=row + matrix_slice_row,
+                        col=col + matrix_slice_col,
+                        component=component + matrix_slice_component,
                     )
 
-                vectorize[store_cols, Self.optimal_simd_width, unroll_factor=unroll_factor](value.cols())
+                vectorize[store_cols, Self.optimal_simd_width, unroll_factor=unroll_factor](matrix_slice.cols())
 
-            parallelize[store_row](value.rows())
+            parallelize[store_row](matrix_slice.rows())
 
     fn strided_replication[new_depth: Int](self: Matrix[dtype, 1, complex=complex]) -> Matrix[dtype, new_depth, complex=complex]:
         constrained[new_depth > depth, "Strided replication requires a desired depth > 1"]()

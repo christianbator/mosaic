@@ -295,28 +295,33 @@ struct Image[dtype: DType, color_space: ColorSpace](
     fn store_sub_image(mut self, value: Self, y: Int, x: Int) raises:
         self.store_sub_image(value[:, :], y=y, x=x)
 
-    fn store_sub_image(mut self, value: ImageSlice[dtype=dtype, color_space=color_space], y: Int, x: Int) raises:
-        if (value.y_range().end > self.height()) or (value.x_range().end > self.width()):
-            raise Error("Attempt to store sub-image out of bounds")
+    fn store_sub_image(mut self, image_slice: ImageSlice[dtype=dtype, color_space=color_space], y: Int, x: Int) raises:
+        if (image_slice.y_range().end > self.height()) or (image_slice.x_range().end > self.width()):
+            raise Error("Out of bounds sub-image store")
 
         @parameter
         for channel in range(color_space.channels()):
 
             @parameter
-            fn store_row(sub_y: Int):
+            fn store_row(image_slice_y: Int):
                 @parameter
-                fn store_cols[width: Int](sub_x: Int):
-                    self._strided_store(value._strided_load[width](y=sub_y, x=sub_x, channel=channel), y=y + sub_y, x=x + sub_x, channel=channel)
+                fn store_cols[width: Int](image_slice_x: Int):
+                    self._strided_store(
+                        image_slice._strided_load[width](y=image_slice_y, x=image_slice_x, channel=channel),
+                        y=y + image_slice_y,
+                        x=x + image_slice_x,
+                        channel=channel,
+                    )
 
-                vectorize[store_cols, Self.optimal_simd_width, unroll_factor=unroll_factor](value.width())
+                vectorize[store_cols, Self.optimal_simd_width, unroll_factor=unroll_factor](image_slice.width())
 
-            parallelize[store_row](value.height())
+            parallelize[store_row](image_slice.height())
 
-    fn store_sub_matrix(mut self, value: Matrix[dtype, color_space.channels()], y: Int, x: Int) raises:
-        self._matrix.store_sub_matrix(value, row=y, col=x)
+    fn store_sub_matrix(mut self, value: Matrix[dtype, color_space.channels()], y: Int, x: Int, channel: Int = 0) raises:
+        self._matrix.store_sub_matrix(value, row=y, col=x, component=channel)
 
-    fn store_sub_matrix(mut self, value: MatrixSlice[dtype=dtype, depth = color_space.channels(), complex=False], y: Int, x: Int) raises:
-        self._matrix.store_sub_matrix(value, row=y, col=x)
+    fn store_sub_matrix(mut self, value: MatrixSlice[dtype=dtype, depth = color_space.channels(), complex=False], y: Int, x: Int, channel: Int = 0) raises:
+        self._matrix.store_sub_matrix(value, row=y, col=x, component=channel)
 
     #
     # ExplicitlyCopyable
