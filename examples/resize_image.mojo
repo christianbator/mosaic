@@ -15,7 +15,7 @@ fn main():
         var image = Image[DType.uint8, ColorSpace.rgb]("data/mandrill.png")
 
         # Step 2: Resize the image by stretching, optionally specifying an interpolation type
-        var resized = image.resized[Interpolation.bilinear](width=512, height=256)
+        var resized = image.resized[Interpolation.bilinear](height=256, width=512)
 
         # Step 3: Request the Visualizer to show the resized image in a window titled "Resized"
         Visualizer.show(resized, window_title="Resized")

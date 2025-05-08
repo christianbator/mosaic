@@ -41,11 +41,11 @@ struct Image[dtype: DType, color_space: ColorSpace](
     fn __init__(out self, path: Path) raises:
         self = ImageReader[dtype, color_space](path).read()
 
-    fn __init__(out self, width: Int, height: Int):
+    fn __init__(out self, height: Int, width: Int):
         self._matrix = Matrix[dtype, color_space.channels()](rows=height, cols=width)
 
     # This is an unsafe convenience constructor
-    fn __init__(out self, width: Int, height: Int, owned data: UnsafePointer[Scalar[dtype]]):
+    fn __init__(out self, height: Int, width: Int, owned data: UnsafePointer[Scalar[dtype]]):
         self._matrix = Matrix[dtype, color_space.channels()](rows=height, cols=width, data=data)
 
     fn __init__(out self, owned matrix: Matrix[dtype, color_space.channels()]):
@@ -77,12 +77,12 @@ struct Image[dtype: DType, color_space: ColorSpace](
     # Properties
     #
     @always_inline
-    fn width(self) -> Int:
-        return self._matrix.cols()
-
-    @always_inline
     fn height(self) -> Int:
         return self._matrix.rows()
+
+    @always_inline
+    fn width(self) -> Int:
+        return self._matrix.cols()
 
     @always_inline
     fn pixels(self) -> Int:
@@ -693,24 +693,24 @@ struct Image[dtype: DType, color_space: ColorSpace](
         return Self(self._matrix.rotated_180())
 
     fn scaled[interpolation: Interpolation = Interpolation.bilinear](self, factor: Int) -> Self:
-        return self.resized[interpolation](width=factor * self.width(), height=factor * self.height())
+        return self.resized[interpolation](height=factor * self.height(), width=factor * self.width())
 
     fn scaled[T: Floatable, //, interpolation: Interpolation = Interpolation.bilinear](self, factor: T) -> Self:
-        return self.resized[interpolation](width=Int(factor.__float__() * self.width()), height=Int(factor.__float__() * self.height()))
+        return self.resized[interpolation](height=Int(factor.__float__() * self.height()), width=Int(factor.__float__() * self.width()))
 
-    fn resized[interpolation: Interpolation = Interpolation.bilinear](self, width: Int, height: Int) -> Self:
+    fn resized[interpolation: Interpolation = Interpolation.bilinear](self, height: Int, width: Int) -> Self:
         @parameter
         if interpolation == Interpolation.nearest:
-            return self._resized_nearest(width=width, height=height)
+            return self._resized_nearest(height=height, width=width)
         elif interpolation == Interpolation.bilinear:
-            return self._resized_bilinear(width=width, height=height)
+            return self._resized_bilinear(height=height, width=width)
         else:
             fatal_error("Unimplemented interpolation for Image.resized(): ", interpolation)
             while True:
                 pass
 
-    fn _resized_nearest(self, width: Int, height: Int) -> Self:
-        var result = Self(width=width, height=height)
+    fn _resized_nearest(self, height: Int, width: Int) -> Self:
+        var result = Self(height=height, width=width)
 
         @parameter
         for channel in range(color_space.channels()):
@@ -738,8 +738,8 @@ struct Image[dtype: DType, color_space: ColorSpace](
 
         return result^
 
-    fn _resized_bilinear(self, width: Int, height: Int) -> Self:
-        var result = Self(width=width, height=height)
+    fn _resized_bilinear(self, height: Int, width: Int) -> Self:
+        var result = Self(height=height, width=width)
 
         @parameter
         for channel in range(color_space.channels()):
@@ -796,9 +796,9 @@ struct Image[dtype: DType, color_space: ColorSpace](
         return result^
 
     fn padded[border: Border = Border.zero](self, size: Int) -> Self:
-        return self.padded[border](width=size, height=size)
+        return self.padded[border](height=size, width=size)
 
-    fn padded[border: Border = Border.zero](self, width: Int, height: Int) -> Self:
+    fn padded[border: Border = Border.zero](self, height: Int, width: Int) -> Self:
         var result = Self(self._matrix.padded(rows=height, cols=width))
 
         @parameter
@@ -827,7 +827,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
 
         return result^
 
-    fn padded_trailing[border: Border = Border.zero](self, width: Int, height: Int) -> Self:
+    fn padded_trailing[border: Border = Border.zero](self, height: Int, width: Int) -> Self:
         var result = Self(self._matrix.padded_trailing(rows=height, cols=width))
 
         @parameter
@@ -899,10 +899,10 @@ struct Image[dtype: DType, color_space: ColorSpace](
             return self._fourier_convolution[border](flipped_kernel)
 
     fn _direct_convolution[border: Border, width: Int](self, kernel: Matrix[dtype, color_space.channels()]) -> Self:
-        var result = Self(width=self.width(), height=self.height())
+        var result = Self(height=self.height(), width=self.width())
 
-        var half_kernel_width = kernel.cols() // 2
         var half_kernel_height = kernel.rows() // 2
+        var half_kernel_width = kernel.cols() // 2
 
         var kernel_vector = SIMD[dtype, width]()
         var y_offset = SIMD[DType.index, width]()
@@ -971,7 +971,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
         var half_kernel_rows = kernel.rows() // 2
         var half_kernel_cols = kernel.cols() // 2
 
-        var padded_self = self.padded[border](width=half_kernel_cols, height=half_kernel_rows)
+        var padded_self = self.padded[border](height=half_kernel_rows, width=half_kernel_cols)
         var padded_kernel = Matrix[fft_dtype, color_space.channels(), complex=True](rows=padded_self.height(), cols=padded_self.width())
 
         @parameter
@@ -993,7 +993,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
 
         var padded_result = padded_spectrum.fourier_transform[inverse=True]()
 
-        var result = Self(width=self.width(), height=self.height())
+        var result = Self(height=self.height(), width=self.width())
 
         @parameter
         fn take_real_value[width: Int](row: Int, col: Int, component: Int):
@@ -1072,7 +1072,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
         elif new_color_space == color_space:
             return Image[new_dtype, new_color_space](self._matrix.as_type[new_dtype]().rebind[new_color_space.channels()]())
         else:
-            var result = Image[new_dtype, new_color_space](width=self.width(), height=self.height())
+            var result = Image[new_dtype, new_color_space](height=self.height(), width=self.width())
 
             @parameter
             fn convert_row(y: Int):

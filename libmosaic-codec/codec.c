@@ -16,8 +16,8 @@
 // ImageInfo
 //
 struct ImageInfo {
-    int width;
     int height;
+    int width;
     int bit_depth;
 };
 
@@ -49,7 +49,7 @@ int decode_image_info(uint8_t* raw_data, int raw_data_length, struct ImageInfo* 
 __attribute__((visibility("default")))
 int decode_image_data_uint8(uint8_t* raw_data, int raw_data_length, int desired_channels, uint8_t* image_data) {
     
-    int width, height;
+    int height, width;
     uint8_t* decoded_image_data = stbi_load_from_memory(raw_data, raw_data_length, &width, &height, NULL, desired_channels);
 
     if (decoded_image_data == NULL) {
@@ -57,7 +57,7 @@ int decode_image_data_uint8(uint8_t* raw_data, int raw_data_length, int desired_
     }
 
     int bytes_per_channel = 1;
-    int byte_count = width * height * desired_channels * bytes_per_channel;
+    int byte_count = height * width * desired_channels * bytes_per_channel;
     memcpy(image_data, decoded_image_data, byte_count);
 
     stbi_image_free(decoded_image_data);
@@ -68,7 +68,7 @@ int decode_image_data_uint8(uint8_t* raw_data, int raw_data_length, int desired_
 __attribute__((visibility("default")))
 int decode_image_data_uint16(uint8_t* raw_data, int raw_data_length, int desired_channels, uint16_t* image_data) {
     
-    int width, height;
+    int height, width;
     uint16_t* decoded_image_data = stbi_load_16_from_memory(raw_data, raw_data_length, &width, &height, NULL, desired_channels);
 
     if (decoded_image_data == NULL) {
@@ -76,7 +76,7 @@ int decode_image_data_uint16(uint8_t* raw_data, int raw_data_length, int desired
     }
 
     int bytes_per_channel = 2;
-    int byte_count = width * height * desired_channels * bytes_per_channel;
+    int byte_count = height * width * desired_channels * bytes_per_channel;
     memcpy(image_data, decoded_image_data, byte_count);
 
     stbi_image_free(decoded_image_data);
@@ -88,7 +88,7 @@ __attribute__((visibility("default")))
 int decode_image_data_float32(uint8_t* raw_data, int raw_data_length, int desired_channels, float* image_data) {
     assert(sizeof(float) == 4);
 
-    int width, height;
+    int height, width;
     float* decoded_image_data = stbi_loadf_from_memory(raw_data, raw_data_length, &width, &height, NULL, desired_channels);
 
     if (decoded_image_data == NULL) {
@@ -96,7 +96,7 @@ int decode_image_data_float32(uint8_t* raw_data, int raw_data_length, int desire
     }
 
     int bytes_per_channel = 4;
-    int byte_count = width * height * desired_channels * bytes_per_channel;
+    int byte_count = height * width * desired_channels * bytes_per_channel;
     memcpy(image_data, decoded_image_data, byte_count);
 
     stbi_image_free(decoded_image_data);
@@ -108,12 +108,12 @@ int decode_image_data_float32(uint8_t* raw_data, int raw_data_length, int desire
 // Writing
 //
 __attribute__((visibility("default")))
-int write_image_data_png(const char* filename, uint8_t* data, int width, int height, int channels) {
+int write_image_data_png(const char* filename, uint8_t* data, int height, int width, int channels) {
     return stbi_write_png(filename, width, height, channels, data, width * channels);
 }
 
 __attribute__((visibility("default")))
-int write_image_data_jpeg(const char* filename, uint8_t* data, int width, int height, int channels) {
+int write_image_data_jpeg(const char* filename, uint8_t* data, int height, int width, int channels) {
     // JPEG quality value in range [1, 100]
     const int quality = 85; 
 

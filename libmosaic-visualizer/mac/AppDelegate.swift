@@ -143,8 +143,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
     
     private func scaledWindowContentSize(for size: NSSize) -> NSSize {
-        let width = size.width
         let height = size.height
+        let width = size.width
 
         if let screenFrame = NSScreen.main?.frame, width > screenFrame.width || height > screenFrame.height {
             let aspectRatio = width / height
@@ -166,9 +166,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     
     private func centerWindow(_ window: NSWindow) {
         let screenFrame = NSScreen.main?.frame ?? .zero
-        let windowWidth = window.frame.width
         let windowHeight = window.frame.height
-        
+        let windowWidth = window.frame.width
+
         let centeredOrigin = NSPoint(
             x: (screenFrame.width - windowWidth) / 2,
             y: 1.2 * (screenFrame.height - windowHeight) / 2

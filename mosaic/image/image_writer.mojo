@@ -66,8 +66,8 @@ struct ImageWriter:
                 fn (
                     filename: UnsafePointer[c_char],
                     data: UnsafePointer[UInt8],
-                    width: c_int,
                     height: c_int,
+                    width: c_int,
                     channels: c_int,
                 ) -> c_int,
             ]()
@@ -75,8 +75,8 @@ struct ImageWriter:
             result = write_image_data_png(
                 filename=path_string.unsafe_cstr_ptr(),
                 data=data,
-                width=c_int(image.width()),
                 height=c_int(image.height()),
+                width=c_int(image.width()),
                 channels=c_int(image.channels()),
             )
         elif file_type == ImageFile.jpeg:
@@ -86,8 +86,8 @@ struct ImageWriter:
                 fn (
                     filename: UnsafePointer[c_char],
                     data: UnsafePointer[UInt8],
-                    width: c_int,
                     height: c_int,
+                    width: c_int,
                     channels: c_int,
                 ) -> c_int,
             ]()
@@ -95,8 +95,8 @@ struct ImageWriter:
             result = write_image_data_jpeg(
                 filename=path_string.unsafe_cstr_ptr(),
                 data=data,
-                width=c_int(image.width()),
                 height=c_int(image.height()),
+                width=c_int(image.width()),
                 channels=c_int(image.channels()),
             )
         else:

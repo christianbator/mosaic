@@ -264,7 +264,7 @@ class VideoCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
                 return
             }
             
-            memcpy(destBuffer.data, greyscaleData, width * height)
+            memcpy(destBuffer.data, greyscaleData, height * width)
             CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly)
             
             isNextFrameAvailable = true

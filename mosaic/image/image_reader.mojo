@@ -19,13 +19,13 @@ from .codec import _libcodec
 #
 @value
 struct ImageInfo(Stringable, Writable):
-    var width: c_int
     var height: c_int
+    var width: c_int
     var bit_depth: c_int
 
     fn __init__(out self):
-        self.width = 0
         self.height = 0
+        self.width = 0
         self.bit_depth = 0
 
     fn __str__(self) -> String:
@@ -33,10 +33,10 @@ struct ImageInfo(Stringable, Writable):
 
     fn write_to[W: Writer](self, mut writer: W):
         writer.write(
-            "[ImageInfo: width = ",
-            self.width,
-            ", height = ",
+            "[ImageInfo: height = ",
             self.height,
+            ", width = ",
+            self.width,
             ", bit_depth = ",
             self.bit_depth,
             "]",
@@ -88,8 +88,8 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
             raise Error("Failed to read image from file (invalid info): ", self._path)
 
         # Decode image data
-        var width = Int(image_info.width)
         var height = Int(image_info.height)
+        var width = Int(image_info.width)
         var num_elements = height * width * color_space.channels()
 
         var is_valid_data: c_int
@@ -122,12 +122,12 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
             @parameter
             if dtype == DType.uint8:
                 image = Image[dtype, color_space](
-                    width=width,
                     height=height,
+                    width=width,
                     data=image_data.bitcast[Scalar[dtype]](),
                 )
             else:
-                image = Image[DType.uint8, color_space](width=width, height=height, data=image_data).as_type[dtype]()
+                image = Image[DType.uint8, color_space](height=height, width=width, data=image_data).as_type[dtype]()
 
         #
         # 16-bit images
@@ -156,12 +156,12 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
             @parameter
             if dtype == DType.uint16:
                 image = Image[dtype, color_space](
-                    width=width,
                     height=height,
+                    width=width,
                     data=image_data.bitcast[Scalar[dtype]](),
                 )
             else:
-                image = Image[DType.uint16, color_space](width=width, height=height, data=image_data).as_type[dtype]()
+                image = Image[DType.uint16, color_space](height=height, width=width, data=image_data).as_type[dtype]()
 
         #
         # HDR (32-bit float) images
@@ -190,12 +190,12 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
             @parameter
             if dtype == DType.float32:
                 image = Image[dtype, color_space](
-                    width=width,
                     height=height,
+                    width=width,
                     data=image_data.bitcast[Scalar[dtype]](),
                 )
             else:
-                image = Image[DType.float32, color_space](width=width, height=height, data=image_data).as_type[dtype]()
+                image = Image[DType.float32, color_space](height=height, width=width, data=image_data).as_type[dtype]()
 
         #
         # Unsupported bit-depth

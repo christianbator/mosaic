@@ -72,7 +72,7 @@ struct VideoCapture[capture_color_space: ColorSpace](VideoCapturing):
             _libvideocapture, "open", fn (video_capture: OpaquePointer, color_space: c_int, dimensions: UnsafePointer[_VideoCaptureDimensions]) -> Bool
         ]()
 
-        var dimensions = _VideoCaptureDimensions(width=0, height=0)
+        var dimensions = _VideoCaptureDimensions(height=0, width=0)
 
         if not open(video_capture, color_space=c_int(capture_color_space.raw_value()), dimensions=UnsafePointer.address_of(dimensions)):
             raise ("Failed to open VideoCapture")
@@ -82,8 +82,8 @@ struct VideoCapture[capture_color_space: ColorSpace](VideoCapturing):
         var height = Int(dimensions.height)
 
         self._video_capture = video_capture
-        self._dimensions = Size(width=width, height=height)
-        self._frame_buffer = Image[DType.uint8, Self.color_space](width=width, height=height)
+        self._dimensions = Size(height=height, width=width)
+        self._frame_buffer = Image[DType.uint8, Self.color_space](height=height, width=width)
 
         self._start = _get_dylib_function[_libvideocapture, "start", fn (video_capture: OpaquePointer, frame_buffer: UnsafePointer[UInt8]) -> None]()
         self._is_next_frame_available = _get_dylib_function[_libvideocapture, "is_next_frame_available", fn (video_capture: OpaquePointer) -> Bool]()

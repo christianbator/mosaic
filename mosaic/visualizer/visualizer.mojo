@@ -64,8 +64,8 @@ struct Visualizer:
             "show",
             fn (
                 data: UnsafePointer[UInt8],
-                width: c_int,
                 height: c_int,
+                width: c_int,
                 channels: c_int,
                 window_title: UnsafePointer[c_char],
             ) -> None,
@@ -73,8 +73,8 @@ struct Visualizer:
 
         show(
             data=image.unsafe_uint8_ptr(),
-            width=c_int(image.width()),
             height=c_int(image.height()),
+            width=c_int(image.width()),
             channels=c_int(image.channels()),
             window_title=window_title.unsafe_cstr_ptr(),
         )
