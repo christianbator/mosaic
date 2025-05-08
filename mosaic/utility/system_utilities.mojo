@@ -32,15 +32,3 @@ fn dynamic_library_filepath(name: String) -> String:
         fatal_error("Unsupported os for dynamic library filepath determination")
         while True:
             pass
-
-
-@no_inline
-fn fatal_error(error: Error):
-    print(error)
-    exit(1)
-
-
-@no_inline
-fn fatal_error[*Ts: Writable](*messages: *Ts):
-    print(String(messages), flush=True)
-    exit(1)
