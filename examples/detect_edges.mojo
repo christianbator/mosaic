@@ -12,8 +12,8 @@ from mosaic.visualizer import Visualizer
 
 fn main():
     try:
-        # Step 1: Load an image from a filepath as float64 in greyscale for processing
-        var image = Image[DType.float64, ColorSpace.greyscale]("data/mandrill.png")
+        # Step 1: Load an image from a filepath in greyscale float64 for processing
+        var image = Image[ColorSpace.greyscale, DType.float64]("data/mandrill.png")
 
         # Step 2: Smooth the image for better edge detection
         image.gaussian_blur[Border.reflect](7)

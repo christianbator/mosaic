@@ -46,7 +46,7 @@ struct ImageInfo(Stringable, Writable):
 #
 # ImageReader
 #
-struct ImageReader[dtype: DType, color_space: ColorSpace]:
+struct ImageReader[color_space: ColorSpace, dtype: DType]:
     #
     # Fields
     #
@@ -61,7 +61,7 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
     #
     # Reading
     #
-    fn read(self) raises -> Image[dtype, color_space]:
+    fn read(self) raises -> Image[color_space, dtype]:
         # Read raw file data
         var raw_data = self._path.read_bytes()
 
@@ -93,7 +93,7 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
         var num_elements = height * width * color_space.channels()
 
         var is_valid_data: c_int
-        var image: Image[dtype, color_space]
+        var image: Image[color_space, dtype]
 
         #
         # 8-bit images
@@ -121,13 +121,13 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
 
             @parameter
             if dtype == DType.uint8:
-                image = Image[dtype, color_space](
+                image = Image[color_space, dtype](
                     height=height,
                     width=width,
                     data=image_data.bitcast[Scalar[dtype]](),
                 )
             else:
-                image = Image[DType.uint8, color_space](height=height, width=width, data=image_data).as_type[dtype]()
+                image = Image[color_space, DType.uint8](height=height, width=width, data=image_data).as_type[dtype]()
 
         #
         # 16-bit images
@@ -155,13 +155,13 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
 
             @parameter
             if dtype == DType.uint16:
-                image = Image[dtype, color_space](
+                image = Image[color_space, dtype](
                     height=height,
                     width=width,
                     data=image_data.bitcast[Scalar[dtype]](),
                 )
             else:
-                image = Image[DType.uint16, color_space](height=height, width=width, data=image_data).as_type[dtype]()
+                image = Image[color_space, DType.uint16](height=height, width=width, data=image_data).as_type[dtype]()
 
         #
         # HDR (32-bit float) images
@@ -189,13 +189,13 @@ struct ImageReader[dtype: DType, color_space: ColorSpace]:
 
             @parameter
             if dtype == DType.float32:
-                image = Image[dtype, color_space](
+                image = Image[color_space, dtype](
                     height=height,
                     width=width,
                     data=image_data.bitcast[Scalar[dtype]](),
                 )
             else:
-                image = Image[DType.float32, color_space](height=height, width=width, data=image_data).as_type[dtype]()
+                image = Image[color_space, DType.float32](height=height, width=width, data=image_data).as_type[dtype]()
 
         #
         # Unsupported bit-depth

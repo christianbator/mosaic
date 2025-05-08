@@ -22,7 +22,7 @@ from .filters import Filters
 #
 # Image
 #
-struct Image[dtype: DType, color_space: ColorSpace](
+struct Image[color_space: ColorSpace, dtype: DType](
     Absable, Ceilable, CeilDivable, EqualityComparable, ExplicitlyCopyable, Floorable, Movable, Roundable, Stringable, Truncable, Writable
 ):
     #
@@ -39,7 +39,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
         self = Self(Path(path))
 
     fn __init__(out self, path: Path) raises:
-        self = ImageReader[dtype, color_space](path).read()
+        self = ImageReader[color_space, dtype](path).read()
 
     fn __init__(out self, height: Int, width: Int):
         self._matrix = Matrix[dtype, color_space.channels()](rows=height, cols=width)
@@ -188,15 +188,15 @@ struct Image[dtype: DType, color_space: ColorSpace](
     # Slicing
     #
     @always_inline
-    fn __getitem__[mut: Bool, origin: Origin[mut], //](ref [origin]self, y: Int, x_slice: Slice) raises -> ImageSlice[dtype, color_space, origin]:
+    fn __getitem__[mut: Bool, origin: Origin[mut], //](ref [origin]self, y: Int, x_slice: Slice) raises -> ImageSlice[color_space, dtype, origin]:
         return self[y : y + 1, x_slice]
 
     @always_inline
-    fn __getitem__[mut: Bool, origin: Origin[mut], //](ref [origin]self, y_slice: Slice, x: Int) raises -> ImageSlice[dtype, color_space, origin]:
+    fn __getitem__[mut: Bool, origin: Origin[mut], //](ref [origin]self, y_slice: Slice, x: Int) raises -> ImageSlice[color_space, dtype, origin]:
         return self[y_slice, x : x + 1]
 
     @always_inline
-    fn __getitem__[mut: Bool, origin: Origin[mut], //](ref [origin]self, y_slice: Slice, x_slice: Slice) raises -> ImageSlice[dtype, color_space, origin]:
+    fn __getitem__[mut: Bool, origin: Origin[mut], //](ref [origin]self, y_slice: Slice, x_slice: Slice) raises -> ImageSlice[color_space, dtype, origin]:
         return self.slice(
             y_range=StridedRange(
                 slice=y_slice,
@@ -213,18 +213,18 @@ struct Image[dtype: DType, color_space: ColorSpace](
         )
 
     @always_inline
-    fn slice[mut: Bool, origin: Origin[mut], //](ref [origin]self, y_range: StridedRange) raises -> ImageSlice[dtype, color_space, origin]:
+    fn slice[mut: Bool, origin: Origin[mut], //](ref [origin]self, y_range: StridedRange) raises -> ImageSlice[color_space, dtype, origin]:
         return self.slice(y_range=y_range, x_range=StridedRange(self.width()))
 
     @always_inline
-    fn slice[mut: Bool, origin: Origin[mut], //](ref [origin]self, *, x_range: StridedRange) raises -> ImageSlice[dtype, color_space, origin]:
+    fn slice[mut: Bool, origin: Origin[mut], //](ref [origin]self, *, x_range: StridedRange) raises -> ImageSlice[color_space, dtype, origin]:
         return self.slice(y_range=StridedRange(self.height()), x_range=x_range)
 
     @always_inline
     fn slice[
         mut: Bool, origin: Origin[mut], //
-    ](ref [origin]self, y_range: StridedRange, x_range: StridedRange) raises -> ImageSlice[dtype, color_space, origin]:
-        return ImageSlice[dtype, color_space, origin](self, y_range=y_range, x_range=x_range)
+    ](ref [origin]self, y_range: StridedRange, x_range: StridedRange) raises -> ImageSlice[color_space, dtype, origin]:
+        return ImageSlice[color_space, dtype, origin](self, y_range=y_range, x_range=x_range)
 
     @always_inline
     fn channel_slice[channel: Int](self) -> MatrixSlice[StridedRange(channel, channel + 1), dtype, color_space.channels(), False, __origin_of(self._matrix)]:
@@ -295,7 +295,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
     fn store_sub_image(mut self, value: Self, y: Int, x: Int) raises:
         self.store_sub_image(value[:, :], y=y, x=x)
 
-    fn store_sub_image(mut self, image_slice: ImageSlice[dtype=dtype, color_space=color_space], y: Int, x: Int) raises:
+    fn store_sub_image(mut self, image_slice: ImageSlice[color_space, dtype], y: Int, x: Int) raises:
         if (image_slice.y_range().end > self.height()) or (image_slice.x_range().end > self.width()):
             raise Error("Out of bounds sub-image store")
 
@@ -1047,32 +1047,32 @@ struct Image[dtype: DType, color_space: ColorSpace](
     #
     # Type Conversion
     #
-    fn as_type[new_dtype: DType](self) -> Image[new_dtype, color_space]:
+    fn as_type[new_dtype: DType](self) -> Image[color_space, new_dtype]:
         @parameter
         if new_dtype == dtype:
-            return rebind[UnsafePointer[Image[new_dtype, color_space]]](UnsafePointer.address_of(self)).take_pointee()
+            return rebind[UnsafePointer[Image[color_space, new_dtype]]](UnsafePointer.address_of(self)).take_pointee()
         else:
-            return Image[new_dtype, color_space](self._matrix.as_type[new_dtype]())
+            return Image[color_space, new_dtype](self._matrix.as_type[new_dtype]())
 
     #
     # Color Space Conversion
     #
     @always_inline
-    fn converted[new_color_space: ColorSpace](self) -> Image[dtype, new_color_space]:
+    fn converted[new_color_space: ColorSpace](self) -> Image[new_color_space, dtype]:
         @parameter
         if new_color_space == color_space:
-            return rebind[UnsafePointer[Image[dtype, new_color_space]]](UnsafePointer.address_of(self)).take_pointee()
+            return rebind[UnsafePointer[Image[new_color_space, dtype]]](UnsafePointer.address_of(self)).take_pointee()
         else:
-            return self.converted_as_type[dtype, new_color_space]()
+            return self.converted_as_type[new_color_space, dtype]()
 
-    fn converted_as_type[new_dtype: DType, new_color_space: ColorSpace](self) -> Image[new_dtype, new_color_space]:
+    fn converted_as_type[new_color_space: ColorSpace, new_dtype: DType](self) -> Image[new_color_space, new_dtype]:
         @parameter
         if new_dtype == dtype and new_color_space == color_space:
-            return rebind[UnsafePointer[Image[new_dtype, new_color_space]]](UnsafePointer.address_of(self)).take_pointee()
+            return rebind[UnsafePointer[Image[new_color_space, new_dtype]]](UnsafePointer.address_of(self)).take_pointee()
         elif new_color_space == color_space:
-            return Image[new_dtype, new_color_space](self._matrix.as_type[new_dtype]().rebind[new_color_space.channels()]())
+            return Image[new_color_space, new_dtype](self._matrix.as_type[new_dtype]().rebind[new_color_space.channels()]())
         else:
-            var result = Image[new_dtype, new_color_space](height=self.height(), width=self.width())
+            var result = Image[new_color_space, new_dtype](height=self.height(), width=self.width())
 
             @parameter
             fn convert_row(y: Int):
@@ -1104,7 +1104,7 @@ struct Image[dtype: DType, color_space: ColorSpace](
 
                 vectorize[convert_cols, Self.optimal_simd_width, unroll_factor=unroll_factor](self.width())
 
-            parallelize[convert_row](num_work_items=self.height())
+            parallelize[convert_row](self.height())
 
             return result^
 
@@ -1124,4 +1124,4 @@ struct Image[dtype: DType, color_space: ColorSpace](
         return String.write(self)
 
     fn write_to[W: Writer](self, mut writer: W):
-        writer.write("[Image: width = ", self.width(), ", height = ", self.height(), ", color_space = ", color_space, ", bit_depth = ", dtype.bitwidth(), "]")
+        writer.write("[Image: height = ", self.height(), ", width = ", self.width(), ", color_space = ", color_space, ", bit_depth = ", dtype.bitwidth(), "]")

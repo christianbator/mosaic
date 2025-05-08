@@ -33,10 +33,10 @@ fn main():
 
         # Step 4: Define a frame processor that's invoked for each new frame, taking a pointer and returning a processed image
         @parameter
-        fn process_frame[V: VideoCapturing](image: Pointer[Image[DType.uint8, V.color_space]]) -> Image[DType.uint8, ColorSpace.greyscale]:
+        fn process_frame[V: VideoCapturing](image: Pointer[Image[V.color_space, DType.uint8]]) -> Image[ColorSpace.greyscale, DType.uint8]:
             try:
                 # Convert to float64 greyscale for processing
-                var greyscale = image[].converted_as_type[DType.float64, ColorSpace.greyscale]()
+                var greyscale = image[].converted_as_type[ColorSpace.greyscale, DType.float64]()
 
                 # Smooth the image for better edge detection
                 var blurred = greyscale.gaussian_blurred[Border.reflect](5)

@@ -13,13 +13,13 @@ fn main():
     try:
         # Step 1: Load an image from a filepath into any data type and color space representation
         #         (the specified data type and color space don't have to match the image file).
-        var image = Image[DType.float64, ColorSpace.rgb]("data/mandrill.png")
+        var image = Image[ColorSpace.rgb, DType.float64]("data/mandrill.png")
 
         # Step 2: Convert the image to a new color space and data type in one method
-        var uint8_greyscale = image.converted_as_type[DType.uint8, ColorSpace.greyscale]()
+        var greyscale_uint8 = image.converted_as_type[ColorSpace.greyscale, DType.uint8]()
 
-        # Step 3: Request the Visualizer to show the uint8 greyscale image in a window titled "UInt8 Greyscale"
-        Visualizer.show(uint8_greyscale, window_title="UInt8 Greyscale")
+        # Step 3: Request the Visualizer to show the greyscale uint8 image in a window titled "Greyscale UInt8"
+        Visualizer.show(greyscale_uint8, window_title="Greyscale UInt8")
 
         # Step 4: Wait for user interaction (CMD+W closes the window)
         Visualizer.wait()

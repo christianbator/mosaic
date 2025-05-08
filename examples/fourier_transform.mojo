@@ -11,8 +11,8 @@ from mosaic.visualizer import Visualizer
 
 fn main():
     try:
-        # Step 1: Load an image from a filepath, specifying the desired data type and color space
-        var image = Image[DType.uint8, ColorSpace.greyscale]("data/camera.png")
+        # Step 1: Load an image from a filepath, specifying the desired color space and data type
+        var image = Image[ColorSpace.greyscale, DType.uint8]("data/camera.png")
 
         # Step 2: Calculate the image spectrum using the Fourier transform
         var spectrum = image.spectrum()
@@ -27,7 +27,7 @@ fn main():
         var normalized_spectrum = scaled_spectrum.mapped_to_range(0, 255).as_type[DType.uint8]()
 
         # Step 6: Create an image from the resulting spectral matrix
-        var spectral_image = Image[DType.uint8, ColorSpace.greyscale](normalized_spectrum^)
+        var spectral_image = Image[ColorSpace.greyscale, DType.uint8](normalized_spectrum^)
 
         # Step 7: Horizontally stack the original image and its spectrum for visualization
         var stacked = image.horizontally_stacked(spectral_image)

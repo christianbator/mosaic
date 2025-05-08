@@ -15,7 +15,7 @@ from utils import IndexList
 #
 # Type Aliases
 #
-alias ScalarNumber = Number[width=1, complex=_]
+alias ScalarNumber = Number[_, width=1, complex=_]
 
 #
 # Print Precision

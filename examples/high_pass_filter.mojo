@@ -11,8 +11,8 @@ from mosaic.visualizer import Visualizer
 
 fn main():
     try:
-        # Step 1: Load an image from a filepath, specifying the desired data type and color space
-        var image = Image[DType.uint8, ColorSpace.greyscale]("data/camera.png")
+        # Step 1: Load an image from a filepath, specifying the desired color space and data type
+        var image = Image[ColorSpace.greyscale, DType.uint8]("data/camera.png")
 
         # Step 2: Calculate the image spectrum using the Fourier transform
         var spectrum = image.spectrum()
@@ -34,12 +34,12 @@ fn main():
         low_frequency_slice.fill(0)
 
         # Step 5: Create a high pass spectral image for visualization (see `fourier_transform.mojo` example for details)
-        var high_pass_spectral_image = Image[DType.uint8, ColorSpace.greyscale](
+        var high_pass_spectral_image = Image[ColorSpace.greyscale, DType.uint8](
             (high_pass_spectrum.norm() + 1).log().mapped_to_range(0, 255).as_type[DType.uint8]()
         )
 
         # Step 6: Create the high pass image from the filtered spectrum, mapping to the uint8 range
-        var high_pass_filtered_image = Image[DType.uint8, ColorSpace.greyscale].from_spectrum(
+        var high_pass_filtered_image = Image[ColorSpace.greyscale, DType.uint8].from_spectrum(
             high_pass_spectrum.shifted_center_to_origin(), lower_bound=0, upper_bound=255
         )
 

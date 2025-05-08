@@ -12,7 +12,7 @@ from mosaic.visualizer import Visualizer
 fn main():
     try:
         # Step 1: Load an image from a filepath as float64 for processing
-        var image = Image[DType.float64, ColorSpace.rgb]("data/mandrill.png")
+        var image = Image[ColorSpace.rgb, DType.float64]("data/mandrill.png")
 
         # Step 2: Blur the image with reflected border handling and a gaussian filter of size 9
         image.gaussian_blur[Border.reflect](size=9)

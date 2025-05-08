@@ -25,7 +25,7 @@ trait VideoCapturing:
     fn is_next_frame_available(self) -> Bool:
         ...
 
-    fn next_frame(self) -> Pointer[Image[DType.uint8, Self.color_space], ImmutableAnyOrigin]:
+    fn next_frame(self) -> Pointer[Image[Self.color_space, DType.uint8], ImmutableAnyOrigin]:
         ...
 
     fn did_read_next_frame(mut self):

@@ -35,14 +35,14 @@ struct Visualizer:
     # ImageSlice
     #
     @staticmethod
-    fn show[dtype: DType, color_space: ColorSpace, //](image_slice: ImageSlice[dtype, color_space], window_title: String):
+    fn show[dtype: DType, color_space: ColorSpace, //](image_slice: ImageSlice[color_space, dtype], window_title: String):
         Self.show(image=image_slice.copy(), window_title=window_title)
 
     #
     # Image
     #
     @staticmethod
-    fn show[dtype: DType, color_space: ColorSpace, //](image: Image[dtype, color_space], window_title: String):
+    fn show[dtype: DType, color_space: ColorSpace, //](image: Image[color_space, dtype], window_title: String):
         @parameter
         if color_space.is_display_color_space() and dtype == Self.display_dtype:
             Self._show(image=image, window_title=window_title)
@@ -53,12 +53,12 @@ struct Visualizer:
             )
         else:
             Self._show(
-                image=image.converted_as_type[Self.display_dtype, ColorSpace.rgb](),
+                image=image.converted_as_type[ColorSpace.rgb, Self.display_dtype](),
                 window_title=window_title,
             )
 
     @staticmethod
-    fn _show[dtype: DType, color_space: ColorSpace, //](image: Image[dtype, color_space], owned window_title: String):
+    fn _show[dtype: DType, color_space: ColorSpace, //](image: Image[color_space, dtype], owned window_title: String):
         var show = _get_dylib_function[
             _libvisualizer,
             "show",
@@ -98,7 +98,7 @@ struct Visualizer:
         V: VideoCapturing,
         out_dtype: DType,
         out_color_space: ColorSpace, //,
-        frame_processor: fn[V: VideoCapturing] (Pointer[Image[DType.uint8, V.color_space]]) capturing [_] -> Image[out_dtype, out_color_space],
+        frame_processor: fn[V: VideoCapturing] (Pointer[Image[V.color_space, DType.uint8]]) capturing [_] -> Image[out_color_space, out_dtype],
     ](mut video_capture: V, window_title: String):
         while True:
             if video_capture.is_next_frame_available():

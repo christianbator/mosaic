@@ -42,7 +42,7 @@ struct VideoCapture[capture_color_space: ColorSpace](VideoCapturing):
 
     var _video_capture: OpaquePointer
     var _dimensions: Size
-    var _frame_buffer: Image[DType.uint8, capture_color_space]
+    var _frame_buffer: Image[capture_color_space, DType.uint8]
 
     var _start: fn (video_capture: OpaquePointer, frame_buffer: UnsafePointer[UInt8]) -> None
     var _is_next_frame_available: fn (video_capture: OpaquePointer) -> Bool
@@ -78,12 +78,12 @@ struct VideoCapture[capture_color_space: ColorSpace](VideoCapturing):
             raise ("Failed to open VideoCapture")
 
         # Prepare properties and cache functions
-        var width = Int(dimensions.width)
         var height = Int(dimensions.height)
+        var width = Int(dimensions.width)
 
         self._video_capture = video_capture
         self._dimensions = Size(height=height, width=width)
-        self._frame_buffer = Image[DType.uint8, Self.color_space](height=height, width=width)
+        self._frame_buffer = Image[Self.color_space, DType.uint8](height=height, width=width)
 
         self._start = _get_dylib_function[_libvideocapture, "start", fn (video_capture: OpaquePointer, frame_buffer: UnsafePointer[UInt8]) -> None]()
         self._is_next_frame_available = _get_dylib_function[_libvideocapture, "is_next_frame_available", fn (video_capture: OpaquePointer) -> Bool]()
@@ -116,8 +116,8 @@ struct VideoCapture[capture_color_space: ColorSpace](VideoCapturing):
     fn is_next_frame_available(self) -> Bool:
         return self._is_next_frame_available(self._video_capture)
 
-    fn next_frame(self) -> Pointer[Image[DType.uint8, capture_color_space], ImmutableAnyOrigin]:
-        return rebind[Pointer[Image[DType.uint8, capture_color_space], ImmutableAnyOrigin]](Pointer.address_of(self._frame_buffer))
+    fn next_frame(self) -> Pointer[Image[capture_color_space, DType.uint8], ImmutableAnyOrigin]:
+        return rebind[Pointer[Image[capture_color_space, DType.uint8], ImmutableAnyOrigin]](Pointer.address_of(self._frame_buffer))
 
     fn did_read_next_frame(mut self):
         self._did_read_next_frame(self._video_capture)

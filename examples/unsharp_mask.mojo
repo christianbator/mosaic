@@ -11,8 +11,8 @@ from mosaic.visualizer import Visualizer
 
 fn main():
     try:
-        # Step 1: Load an image from a filepath as float64 in RGB for processing
-        var original = Image[DType.float64, ColorSpace.rgb]("data/mandrill.png")
+        # Step 1: Load an image from a filepath as RGB float64 for processing
+        var original = Image[ColorSpace.rgb, DType.float64]("data/mandrill.png")
 
         # Step 2: Create a blurred version of the image
         var blurred = original.gaussian_blurred[Border.reflect](7)
