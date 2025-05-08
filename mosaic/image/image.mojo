@@ -12,7 +12,7 @@ from math import floor, ceil, ceildiv, trunc, Ceilable, CeilDivable, Floorable, 
 
 from mosaic.numeric import Matrix, MatrixSlice, StridedRange, SIMDRange, Number, ScalarNumber
 from mosaic.numeric.fft import fft_dtype
-from mosaic.utility import optimal_simd_width, unroll_factor, fatal_error
+from mosaic.utility import optimal_simd_width, unroll_factor, _assert, fatal_error
 
 from .image_reader import ImageReader
 from .image_writer import ImageWriter
@@ -279,7 +279,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
         return self.channel_slice[channel]().copy[rebound_depth=1]()
 
     fn extract_channel(self, channel: Int) -> Matrix[dtype]:
-        debug_assert[assert_mode="safe"](0 <= channel < color_space.channels(), "Channel must be in color space channel bounds")
+        _assert(0 <= channel < color_space.channels(), "Channel must be in color space channel bounds")
 
         if channel == 0:
             return self.extract_channel[0]()

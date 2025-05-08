@@ -10,7 +10,7 @@ from algorithm import vectorize, parallelize
 from math import cos, sin, pi, floor, ceil, trunc, ceildiv, isclose, Ceilable, CeilDivable, Floorable, Truncable
 from collections import InlineArray
 
-from mosaic.utility import optimal_simd_width, unroll_factor, fatal_error
+from mosaic.utility import optimal_simd_width, unroll_factor, fatal_error, _assert
 
 from .fft import fft, fft_dtype
 
@@ -35,7 +35,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     #
     fn __init__(out self, *, rows: Int, cols: Int):
         constrained[depth > 0]()
-        debug_assert[assert_mode="safe"](rows > 0 and cols > 0, "Rows and cols must be greather than 0")
+        _assert(rows > 0 and cols > 0, "Rows and cols must be greather than 0")
 
         self._rows = rows
         self._cols = cols
@@ -43,7 +43,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
     fn __init__(out self, *, rows: Int, cols: Int, value: ScalarNumber[dtype, complex=complex]):
         constrained[depth > 0]()
-        debug_assert[assert_mode="safe"](rows > 0 and cols > 0, "Rows and cols must be greather than 0")
+        _assert(rows > 0 and cols > 0, "Rows and cols must be greather than 0")
 
         self._rows = rows
         self._cols = cols
@@ -52,7 +52,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
     fn __init__(out self, *, rows: Int, cols: Int, owned values: List[ScalarNumber[dtype, complex=complex]]):
         constrained[depth > 0]()
-        debug_assert[assert_mode="safe"](rows * cols * depth == len(values), "Mismatch in list length for Matrix constructor")
+        _assert(rows * cols * depth == len(values), "Mismatch in list length for Matrix constructor")
 
         self._rows = rows
         self._cols = cols
@@ -60,7 +60,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
     fn __init__(out self, *, rows: Int, cols: Int, owned data: NumericArray[dtype, complex=complex]):
         constrained[depth > 0]()
-        debug_assert[assert_mode="safe"](rows * cols * depth == len(data), "Mismatch in data length for Matrix constructor")
+        _assert(rows * cols * depth == len(data), "Mismatch in data length for Matrix constructor")
 
         self._rows = rows
         self._cols = cols
@@ -69,7 +69,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     # This is an unsafe convenience constructor
     fn __init__(out self, rows: Int, cols: Int, owned data: UnsafePointer[Scalar[dtype]]):
         constrained[depth > 0]()
-        debug_assert[assert_mode="safe"](rows > 0 and cols > 0, "Rows and cols must be greather than 0")
+        _assert(rows > 0 and cols > 0, "Rows and cols must be greather than 0")
 
         self._rows = rows
         self._cols = cols
@@ -505,7 +505,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
     @staticmethod
     fn strided_replication(*, rows: Int, cols: Int, values: List[ScalarNumber[dtype, complex=complex]]) -> Self:
-        debug_assert[assert_mode="safe"](rows * cols == len(values), "Mismatch in list length for Matrix strided replication constructor")
+        _assert(rows * cols == len(values), "Mismatch in list length for Matrix strided replication constructor")
 
         var result = Self(rows=rows, cols=cols)
 
@@ -760,9 +760,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         self.for_each_zipped[mul](rhs)
 
     fn __matmul__(self, rhs: Self) -> Self:
-        debug_assert[assert_mode="safe"](
-            self._cols == rhs._rows, "Dimension mismatch for matrix multiplication: ", self._rows, "x", self._cols, " @ ", rhs._rows, "x", rhs._cols
-        )
+        _assert(self._cols == rhs._rows, "Dimension mismatch for matrix multiplication: ", self._rows, "x", self._cols, " @ ", rhs._rows, "x", rhs._cols)
 
         var result = Self(rows=self._rows, cols=rhs._cols)
 
@@ -798,9 +796,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         return result^
 
     fn __imatmul__(mut self, other: Self):
-        debug_assert[assert_mode="safe"](
-            self._rows == self._cols and self._rows == other._rows and self._cols == other._cols, "Dimension mismatch for in-place matrix multiplication"
-        )
+        _assert(self._rows == self._cols and self._rows == other._rows and self._cols == other._cols, "Dimension mismatch for in-place matrix multiplication")
 
         (self @ other).copy_into(self)
 
@@ -1142,9 +1138,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
             dtype, width, complex=complex
         ]
     ](mut self, other: Self, component: Int):
-        debug_assert[assert_mode="safe"](
-            self._rows == other._rows and self._cols == other._cols, "Cannot perform elementwise transformation on two matrices of different sizes"
-        )
+        _assert(self._rows == other._rows and self._cols == other._cols, "Cannot perform elementwise transformation on two matrices of different sizes")
 
         @parameter
         fn transform_row(row: Int):
@@ -1185,9 +1179,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
             dtype, width, complex=complex
         ]
     ](mut self, other: Self):
-        debug_assert[assert_mode="safe"](
-            self._rows == other._rows and self._cols == other._cols, "Cannot perform elementwise transformation on two matrices of different sizes"
-        )
+        _assert(self._rows == other._rows and self._cols == other._cols, "Cannot perform elementwise transformation on two matrices of different sizes")
 
         @parameter
         fn transform_row(row: Int):
@@ -1231,9 +1223,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     # Geometric Transformations
     #
     fn reshape(mut self, rows: Int, cols: Int):
-        debug_assert[assert_mode="safe"](
-            rows * cols == self.strided_count(), "Cannot reshape Matrix of strided_count = ", self.strided_count(), " to rows = ", rows, ", cols = ", cols
-        )
+        _assert(rows * cols == self.strided_count(), "Cannot reshape Matrix of strided_count = ", self.strided_count(), " to rows = ", rows, ", cols = ", cols)
 
         self._rows = rows
         self._cols = cols
@@ -1426,7 +1416,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         return self.padded(rows=size, cols=size)
 
     fn padded(self, rows: Int, cols: Int) -> Self:
-        debug_assert[assert_mode="safe"](rows >= 0 and cols >= 0, "Must specify rows >= 0 and cols >= 0 for Matrix.padded()")
+        _assert(rows >= 0 and cols >= 0, "Must specify rows >= 0 and cols >= 0 for Matrix.padded()")
 
         var src_data_ptr = self.unsafe_data_ptr()
 
@@ -1448,7 +1438,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         return result^
 
     fn padded_trailing(self, rows: Int, cols: Int) -> Self:
-        debug_assert[assert_mode="safe"](rows >= 0 and cols >= 0, "Must specify rows >= 0 and cols >= 0 for Matrix.trailing_padded()")
+        _assert(rows >= 0 and cols >= 0, "Must specify rows >= 0 and cols >= 0 for Matrix.trailing_padded()")
 
         var src_data_ptr = self.unsafe_data_ptr()
 
@@ -1470,7 +1460,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         return result^
 
     fn horizontally_stacked(self, other: Self) -> Self:
-        debug_assert[assert_mode="safe"](self._rows == other._rows, "Matrices must have same number of rows to stack horizontally")
+        _assert(self._rows == other._rows, "Matrices must have same number of rows to stack horizontally")
 
         var result = Self(rows=self._rows, cols=self._cols + other._cols)
 
@@ -1498,7 +1488,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         return result^
 
     fn vertically_stacked(self, other: Self) -> Self:
-        debug_assert[assert_mode="safe"](self._cols == other._cols, "Matrices must have same number of cols to stack vertically")
+        _assert(self._cols == other._cols, "Matrices must have same number of cols to stack vertically")
 
         var result = Self(rows=self._rows + other._rows, cols=self._cols)
         memcpy(dest=result.unsafe_data_ptr(), src=self.unsafe_data_ptr(), count=self._scalar_count())
