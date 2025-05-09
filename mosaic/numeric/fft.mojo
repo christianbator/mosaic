@@ -5,6 +5,7 @@
 # Created by Christian Bator on 04/01/2025
 #
 
+from os import abort
 from memory import UnsafePointer
 from sys.ffi import _Global, _OwnedDLHandle, _get_dylib_function, c_int
 
@@ -18,7 +19,10 @@ alias _libfft = _Global["libfft", _OwnedDLHandle, _load_libfft]()
 
 
 fn _load_libfft() -> _OwnedDLHandle:
-    return _OwnedDLHandle(dynamic_library_filepath("libmosaic-fft"))
+    try:
+        return _OwnedDLHandle(dynamic_library_filepath("libmosaic-fft"))
+    except:
+        return abort[_OwnedDLHandle]()
 
 
 alias _fft_func_name = "fft_" + String(fft_dtype)

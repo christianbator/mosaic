@@ -5,6 +5,7 @@
 # Created by Christian Bator on 12/14/2024
 #
 
+from os import abort
 from pathlib import Path
 from memory import UnsafePointer
 from algorithm import vectorize, parallelize
@@ -12,7 +13,7 @@ from math import floor, ceil, ceildiv, trunc, Ceilable, CeilDivable, Floorable, 
 
 from mosaic.numeric import Matrix, MatrixSlice, StridedRange, SIMDRange, Number, ScalarNumber
 from mosaic.numeric.fft import fft_dtype
-from mosaic.utility import optimal_simd_width, unroll_factor, _assert, fatal_error
+from mosaic.utility import optimal_simd_width, unroll_factor, _assert
 
 from .image_reader import ImageReader
 from .image_writer import ImageWriter
@@ -288,9 +289,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
         elif channel == 2:
             return self.extract_channel[2]()
         else:
-            fatal_error("Unimplemented runtime extract_channel")
-            while True:
-                pass
+            return abort[Matrix[dtype]]("Unimplemented runtime extract_channel")
 
     fn store_sub_image(mut self, value: Self, y: Int, x: Int) raises:
         self.store_sub_image(value[:, :], y=y, x=x)
@@ -705,9 +704,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
         elif interpolation == Interpolation.bilinear:
             return self._resized_bilinear(height=height, width=width)
         else:
-            fatal_error("Unimplemented interpolation for Image.resized(): ", interpolation)
-            while True:
-                pass
+            return abort[Self]("Unimplemented interpolation for Image.resized(): ", interpolation)
 
     fn _resized_nearest(self, height: Int, width: Int) -> Self:
         var result = Self(height=height, width=width)
@@ -904,7 +901,6 @@ struct Image[color_space: ColorSpace, dtype: DType](
         var half_kernel_height = kernel.rows() // 2
         var half_kernel_width = kernel.cols() // 2
 
-        var kernel_vector = SIMD[dtype, width]()
         var y_offset = SIMD[DType.index, width]()
         var x_offset = SIMD[DType.index, width]()
         var offset = SIMD[DType.index, width]()
@@ -922,7 +918,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
 
         @parameter
         for channel in range(color_space.channels()):
-            kernel_vector = kernel.strided_gather(row=0, col=0, component=channel, offset=width_range, mask=mask).value
+            var kernel_vector = kernel.strided_gather(row=0, col=0, component=channel, offset=width_range, mask=mask).value
 
             @parameter
             fn process_row(y: Int):
@@ -1040,9 +1036,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
 
             return self._strided_load(y=reflected_y, x=reflected_x, channel=channel)
         else:
-            fatal_error("Unimplemented border type in Image._bordered_load()")
-            while True:
-                pass
+            return abort[Scalar[dtype]]("Unimplemented border type in Image._bordered_load()")
 
     #
     # Type Conversion
@@ -1050,7 +1044,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
     fn as_type[new_dtype: DType](self) -> Image[color_space, new_dtype]:
         @parameter
         if new_dtype == dtype:
-            return rebind[UnsafePointer[Image[color_space, new_dtype]]](UnsafePointer.address_of(self)).take_pointee()
+            return rebind[UnsafePointer[Image[color_space, new_dtype]]](UnsafePointer(to=self)).take_pointee()
         else:
             return Image[color_space, new_dtype](self._matrix.as_type[new_dtype]())
 
@@ -1061,14 +1055,14 @@ struct Image[color_space: ColorSpace, dtype: DType](
     fn converted[new_color_space: ColorSpace](self) -> Image[new_color_space, dtype]:
         @parameter
         if new_color_space == color_space:
-            return rebind[UnsafePointer[Image[new_color_space, dtype]]](UnsafePointer.address_of(self)).take_pointee()
+            return rebind[UnsafePointer[Image[new_color_space, dtype]]](UnsafePointer(to=self)).take_pointee()
         else:
             return self.converted_as_type[new_color_space, dtype]()
 
     fn converted_as_type[new_color_space: ColorSpace, new_dtype: DType](self) -> Image[new_color_space, new_dtype]:
         @parameter
         if new_dtype == dtype and new_color_space == color_space:
-            return rebind[UnsafePointer[Image[new_color_space, new_dtype]]](UnsafePointer.address_of(self)).take_pointee()
+            return rebind[UnsafePointer[Image[new_color_space, new_dtype]]](UnsafePointer(to=self)).take_pointee()
         elif new_color_space == color_space:
             return Image[new_color_space, new_dtype](self._matrix.as_type[new_dtype]().rebind[new_color_space.channels()]())
         else:

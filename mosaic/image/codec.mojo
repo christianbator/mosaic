@@ -5,9 +5,10 @@
 # Created by Christian Bator on 05/03/2025
 #
 
+from os import abort
 from sys.ffi import _Global, _OwnedDLHandle
 
-from mosaic.utility import dynamic_library_filepath, fatal_error
+from mosaic.utility import dynamic_library_filepath
 
 
 #
@@ -17,7 +18,10 @@ alias _libcodec = _Global["libcodec", _OwnedDLHandle, _load_libcodec]()
 
 
 fn _load_libcodec() -> _OwnedDLHandle:
-    return _OwnedDLHandle(dynamic_library_filepath("libmosaic-codec"))
+    try:
+        return _OwnedDLHandle(dynamic_library_filepath("libmosaic-codec"))
+    except:
+        return abort[_OwnedDLHandle]()
 
 
 #
@@ -48,7 +52,7 @@ struct ImageFile(EqualityComparable, Stringable, Writable):
         self._raw_value = raw_value
 
         if raw_value not in Self._supported_image_file_types:
-            fatal_error("Unsupported image file type: ", raw_value)
+            abort("Unsupported image file type: ", raw_value)
 
     #
     # Properties
@@ -59,9 +63,7 @@ struct ImageFile(EqualityComparable, Stringable, Writable):
         elif self == Self.jpeg:
             return ".jpeg"
         else:
-            fatal_error("Unimplemented extension() for image file type: ", self._raw_value)
-            while True:
-                pass
+            return abort[String]("Unimplemented extension() for image file type: ", self._raw_value)
 
     fn valid_extensions(self) -> List[String]:
         if self == Self.png:
@@ -69,9 +71,7 @@ struct ImageFile(EqualityComparable, Stringable, Writable):
         elif self == Self.jpeg:
             return List[String](".jpeg", "jpg")
         else:
-            fatal_error("Unimplemented valid_extensions() for image file type: ", self._raw_value)
-            while True:
-                pass
+            return abort[List[String]]("Unimplemented valid_extensions() for image file type: ", self._raw_value)
 
     #
     # EqualityComparable

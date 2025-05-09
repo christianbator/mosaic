@@ -14,7 +14,7 @@ from mosaic.utility import _assert
 #
 # NumericArray
 #
-struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, Sized):
+struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, Sized, Stringable, Writable):
     #
     # Fields
     #
@@ -216,3 +216,18 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](ExplicitlyCopyable, 
     @always_inline
     fn __len__(self) -> Int:
         return self._count
+
+    #
+    # Stringable & Writable
+    #
+    fn __str__(self) -> String:
+        return String.write(self)
+
+    fn write_to[W: Writer](self, mut writer: W):
+        writer.write("[NumericArray: [")
+
+        for i in range(self._count):
+            writer.write(self[i])
+            writer.write(", " if i < self._count - 1 else "")
+
+        writer.write("]]")

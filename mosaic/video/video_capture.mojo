@@ -5,6 +5,7 @@
 # Created by Christian Bator on 02/17/2025
 #
 
+from os import abort
 from memory import Pointer, UnsafePointer
 from sys.ffi import _Global, _OwnedDLHandle, _get_dylib_function, OpaquePointer, c_int, c_char
 
@@ -19,7 +20,10 @@ alias _libvideocapture = _Global["libvideocapture", _OwnedDLHandle, _load_libvid
 
 
 fn _load_libvideocapture() -> _OwnedDLHandle:
-    return _OwnedDLHandle(dynamic_library_filepath("libmosaic-videocapture"))
+    try:
+        return _OwnedDLHandle(dynamic_library_filepath("libmosaic-videocapture"))
+    except:
+        return abort[_OwnedDLHandle]()
 
 
 #
@@ -74,7 +78,7 @@ struct VideoCapture[capture_color_space: ColorSpace](VideoCapturing):
 
         var dimensions = _VideoCaptureDimensions(height=0, width=0)
 
-        if not open(video_capture, color_space=c_int(capture_color_space.raw_value()), dimensions=UnsafePointer.address_of(dimensions)):
+        if not open(video_capture, color_space=c_int(capture_color_space.raw_value()), dimensions=UnsafePointer(to=dimensions)):
             raise ("Failed to open VideoCapture")
 
         # Prepare properties and cache functions
@@ -117,7 +121,7 @@ struct VideoCapture[capture_color_space: ColorSpace](VideoCapturing):
         return self._is_next_frame_available(self._video_capture)
 
     fn next_frame(self) -> Pointer[Image[capture_color_space, DType.uint8], ImmutableAnyOrigin]:
-        return rebind[Pointer[Image[capture_color_space, DType.uint8], ImmutableAnyOrigin]](Pointer.address_of(self._frame_buffer))
+        return rebind[Pointer[Image[capture_color_space, DType.uint8], ImmutableAnyOrigin]](Pointer(to=self._frame_buffer))
 
     fn did_read_next_frame(mut self):
         self._did_read_next_frame(self._video_capture)

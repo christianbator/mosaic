@@ -33,7 +33,7 @@ struct ImageSlice[mut: Bool, //, color_space: ColorSpace, dtype: DType, origin: 
         if y_range.end > image.height() or x_range.end > image.width():
             raise Error("Out of bounds image slice for image ", image, ": y_range: ", y_range, " x_range: ", x_range)
 
-        self._image = Pointer.address_of(image)
+        self._image = Pointer(to=image)
         self._y_range = y_range
         self._x_range = x_range
 

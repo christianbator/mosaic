@@ -5,7 +5,7 @@
 # Created by Christian Bator on 03/20/2025
 #
 
-from mosaic.utility import fatal_error
+from os import abort
 
 
 #
@@ -34,7 +34,7 @@ struct Interpolation(EqualityComparable, Stringable, Writable):
         self._raw_value = raw_value
 
         if raw_value not in [0, 1, 2, 3, 4]:
-            fatal_error("Unsupported interpolation: ", raw_value)
+            abort("Unsupported interpolation: ", raw_value)
 
     #
     # EqualityComparable
@@ -65,6 +65,6 @@ struct Interpolation(EqualityComparable, Stringable, Writable):
         elif self == Interpolation.area:
             writer.write("area")
         else:
-            fatal_error("Unimplemented write_to() for interpolation with raw value: ", self._raw_value)
+            abort("Unimplemented write_to() for interpolation with raw value: ", self._raw_value)
 
         writer.write("]")

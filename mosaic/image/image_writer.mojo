@@ -5,13 +5,13 @@
 # Created by Christian Bator on 12/14/2024
 #
 
-from os import makedirs
+from os import abort, makedirs
 from os.path import dirname
 from pathlib import Path
 from sys.ffi import _get_dylib_function, c_int, c_char
 from memory import UnsafePointer
 
-from mosaic.utility import dynamic_library_filepath, fatal_error
+from mosaic.utility import dynamic_library_filepath
 
 from .codec import _libcodec
 
@@ -101,7 +101,7 @@ struct ImageWriter:
             )
         else:
             result = 0
-            fatal_error("Unimplemented write() for image file type: ", file_type)
+            abort("Unimplemented write() for image file type: ", file_type)
 
         if result != 1:
             raise Error("Failed to save image to file: ", self._path)

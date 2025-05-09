@@ -32,7 +32,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     Boolable,
     Ceilable,
     CeilDivable,
-    CollectionElement,
+    Copyable,
     ExplicitlyCopyable,
     Floatable,
     Floorable,

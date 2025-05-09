@@ -5,7 +5,7 @@
 # Created by Christian Bator on 02/27/2025
 #
 
-from mosaic.utility import fatal_error
+from os import abort
 
 
 #
@@ -32,7 +32,7 @@ struct Border(EqualityComparable, Stringable, Writable):
         self._raw_value = raw_value
 
         if raw_value not in [0, 1, 2]:
-            fatal_error("Unsupported border: ", raw_value)
+            abort("Unsupported border: ", raw_value)
 
     #
     # EqualityComparable
@@ -59,6 +59,6 @@ struct Border(EqualityComparable, Stringable, Writable):
         elif self == Border.reflect:
             writer.write("reflect")
         else:
-            fatal_error("Unimplemented write_to() for border with raw value: ", self._raw_value)
+            abort("Unimplemented write_to() for border with raw value: ", self._raw_value)
 
         writer.write("]")

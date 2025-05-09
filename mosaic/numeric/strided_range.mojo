@@ -5,9 +5,8 @@
 # Created by Christian Bator on 03/15/2025
 #
 
+from os import abort
 from math import ceildiv
-
-from mosaic.utility import fatal_error
 
 
 #
@@ -32,7 +31,7 @@ struct StridedRange(Stringable, Writable):
     @always_inline
     fn __init__(out self, end: Int):
         if not (end >= 0):
-            fatal_error("Failed StridedRange init requirement: 0 <= end")
+            abort("Failed StridedRange init requirement: 0 <= end")
 
         self.start = 0
         self.end = end
@@ -41,7 +40,7 @@ struct StridedRange(Stringable, Writable):
     @always_inline
     fn __init__(out self, start: Int, end: Int):
         if not (0 <= start <= end):
-            fatal_error("Failed StridedRange init requirement: 0 <= start <= end")
+            abort("Failed StridedRange init requirement: 0 <= start <= end")
 
         self.start = start
         self.end = end
@@ -55,7 +54,7 @@ struct StridedRange(Stringable, Writable):
     @always_inline
     fn __init__(out self, start: Int, end: Int, step: Int):
         if not (0 <= start <= end and step > 0):
-            fatal_error("Failed StridedRange init requirement: 0 <= start <= end and step > 0")
+            abort("Failed StridedRange init requirement: 0 <= start <= end and step > 0")
 
         self.start = start
         self.end = end

@@ -33,7 +33,7 @@ requirements:
     - clang==20.1.4
     - lld==20.1.4
   host:
-    - max==25.2.0
+    - max==25.3.0
   run:
     - ${{ pin_compatible('max') }}
 
@@ -50,7 +50,7 @@ about:
   homepage: https://mosaiclib.org
   license: Apache-2.0
   license_file: LICENSE
-  summary: Open source computer vision library in Mojo
+  summary: An open source computer vision library in Mojo
   repository: https://github.com/christianbator/mosaic
   documentation: https://mosaiclib.org/docs
 

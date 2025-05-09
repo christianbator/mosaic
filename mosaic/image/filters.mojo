@@ -5,10 +5,10 @@
 # Created by Christian Bator on 03/14/2025
 #
 
+from os import abort
 from math import pi, exp
 
 from mosaic.numeric import Matrix, Number, ScalarNumber
-from mosaic.utility import fatal_error
 
 
 struct Filters:
@@ -49,7 +49,7 @@ struct Filters:
                 for i in range(size):
                     result.store_full_depth(result.create_full_depth_value(exp(-((i - (size - 1) / 2) ** 2) / (2 * variance))), row=i, col=0)
             except error:
-                fatal_error(error)
+                abort(error)
 
             result.strided_normalize()
 
@@ -83,7 +83,7 @@ struct Filters:
                     for i in range(size):
                         result.store_full_depth(result.create_full_depth_value(exp(-((i - (size - 1) / 2) ** 2) / (2 * variance))), row=i, col=0)
                 except error:
-                    fatal_error(error)
+                    abort(error)
 
                 result.strided_normalize()
 

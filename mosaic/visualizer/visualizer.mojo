@@ -5,6 +5,7 @@
 # Created by Christian Bator on 12/14/2024
 #
 
+from os import abort
 from sys.ffi import _Global, _OwnedDLHandle, _get_dylib_function, c_int, c_char, c_float
 from memory import UnsafePointer
 
@@ -19,7 +20,10 @@ alias _libvisualizer = _Global["libvisualizer", _OwnedDLHandle, _load_libvisuali
 
 
 fn _load_libvisualizer() -> _OwnedDLHandle:
-    return _OwnedDLHandle(dynamic_library_filepath("libmosaic-visualizer"))
+    try:
+        return _OwnedDLHandle(dynamic_library_filepath("libmosaic-visualizer"))
+    except:
+        return abort[_OwnedDLHandle]()
 
 
 #

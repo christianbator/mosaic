@@ -5,12 +5,13 @@
 # Created by Christian Bator on 02/02/2025
 #
 
+from os import abort
 from memory import UnsafePointer, memset_zero, memcpy
 from algorithm import vectorize, parallelize
 from math import cos, sin, pi, floor, ceil, trunc, ceildiv, isclose, Ceilable, CeilDivable, Floorable, Truncable
 from collections import InlineArray
 
-from mosaic.utility import optimal_simd_width, unroll_factor, fatal_error, _assert
+from mosaic.utility import optimal_simd_width, unroll_factor, _assert
 
 from .fft import fft, fft_dtype
 
@@ -1376,7 +1377,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
             self.store_sub_matrix(bottom_right, row=0, col=0)
 
         except error:
-            fatal_error(error)
+            abort(error)
 
     fn shifted_origin_to_center(self) -> Self:
         var result = self.copy()
@@ -1404,7 +1405,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
             self.store_sub_matrix(bottom_right, row=0, col=0)
 
         except error:
-            fatal_error(error)
+            abort(error)
 
     fn shifted_center_to_origin(self) -> Self:
         var result = self.copy()
@@ -1502,7 +1503,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     fn as_type[new_dtype: DType](self) -> Matrix[new_dtype, depth, complex=complex]:
         @parameter
         if new_dtype == dtype:
-            return rebind[UnsafePointer[Matrix[new_dtype, depth, complex=complex]]](UnsafePointer.address_of(self)).take_pointee()
+            return rebind[UnsafePointer[Matrix[new_dtype, depth, complex=complex]]](UnsafePointer(to=self)).take_pointee()
         else:
             var result = Matrix[new_dtype, depth, complex=complex](rows=self._rows, cols=self._cols)
 
@@ -1523,11 +1524,11 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     fn as_complex[new_dtype: DType = dtype](self) -> Matrix[new_dtype, depth, complex=True]:
         @parameter
         if complex and new_dtype == dtype:
-            return rebind[UnsafePointer[Matrix[new_dtype, depth, complex=True]]](UnsafePointer.address_of(self)).take_pointee()
+            return rebind[UnsafePointer[Matrix[new_dtype, depth, complex=True]]](UnsafePointer(to=self)).take_pointee()
         elif complex:
             var result = self.as_type[new_dtype]()
 
-            return rebind[UnsafePointer[Matrix[new_dtype, depth, complex=True]]](UnsafePointer.address_of(result)).take_pointee()
+            return rebind[UnsafePointer[Matrix[new_dtype, depth, complex=True]]](UnsafePointer(to=result)).take_pointee()
         else:
             var result = Matrix[new_dtype, depth, complex=True](rows=self._rows, cols=self._cols)
 
@@ -1548,7 +1549,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     fn rebind[new_depth: Int](self) -> Matrix[dtype, new_depth, complex=complex]:
         constrained[new_depth == depth, "new_depth must be equal to depth for rebind"]()
 
-        return rebind[UnsafePointer[Matrix[dtype, new_depth, complex=complex]]](UnsafePointer.address_of(self)).take_pointee()
+        return rebind[UnsafePointer[Matrix[dtype, new_depth, complex=complex]]](UnsafePointer(to=self)).take_pointee()
 
     #
     # Stringable & Writable

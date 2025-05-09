@@ -39,7 +39,7 @@ struct MatrixSlice[
             "Out of bounds component range for matrix with depth " + String(depth) + ": " + String(depth_range),
         ]()
 
-        self._matrix = Pointer.address_of(matrix)
+        self._matrix = Pointer(to=matrix)
         self._row_range = StridedRange(matrix.rows())
         self._col_range = StridedRange(matrix.cols())
 
@@ -54,7 +54,7 @@ struct MatrixSlice[
                 "Out of bounds matrix slice for matrix with size ", matrix._rows, " x ", matrix._cols, ": row_range: ", row_range, " col_range: ", col_range
             )
 
-        self._matrix = Pointer.address_of(matrix)
+        self._matrix = Pointer(to=matrix)
         self._row_range = row_range
         self._col_range = col_range
 

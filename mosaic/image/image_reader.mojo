@@ -81,7 +81,7 @@ struct ImageReader[color_space: ColorSpace, dtype: DType]:
         var is_valid_info = decode_image_info(
             raw_data=raw_data.unsafe_ptr(),
             raw_data_length=len(raw_data),
-            image_info=UnsafePointer.address_of(image_info),
+            image_info=UnsafePointer(to=image_info),
         )
 
         if not is_valid_info:
