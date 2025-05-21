@@ -924,10 +924,10 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         var result = self.copy()
 
         @parameter
-        fn floor[width: Int](value: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
+        fn _floor[width: Int](value: Number[dtype, width, complex=complex]) -> Number[dtype, width, complex=complex]:
             return floor(value)
 
-        result.for_each[floor]()
+        result.for_each[_floor]()
         return result^
 
     fn __ceil__(self) -> Self:
