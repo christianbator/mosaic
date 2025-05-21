@@ -34,7 +34,7 @@ max = "==25.3.0"
 
 [system-requirements]
 macos = "15.0"
-linux = "6.8"
+linux = "6.6"
 
 [tasks]
 build = { cmd = "build/build.sh", env = { PREFIX = "$CONDA_PREFIX" } }
