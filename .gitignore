@@ -9,8 +9,8 @@
 .DS_Store
 .vscode
 
-# Magic
-.magic
+# Pixi
+.pixi
 
 # XCode
 *.xcodeproj

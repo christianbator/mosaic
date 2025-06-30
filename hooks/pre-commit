@@ -8,7 +8,7 @@
 #
 
 # Run the format command and capture its output
-output=$(magic run format 2>&1)
+output=$(pixi run format 2>&1)
 echo -e "$output\n"
 
 # Look for files that were reformatted in the output: "reformatted <filepath>"

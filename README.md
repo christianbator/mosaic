@@ -49,15 +49,15 @@ It unifies the computer vision workflow into one language that runs on any hardw
 
 ## Installation
 #### Prerequisites
-- [Magic](https://docs.modular.com/magic/) (the Mojo environment and package manager)
+- [Pixi](https://docs.modular.com/mojo/manual/get-started/) (the Mojo environment and package manager)
 
-#### Using the magic cli
+#### Using the pixi cli
 ```bash
-magic add mosaic
+pixi add mosaic
 ```
 
 #### After installation
-The `mojoproject.toml` file should include the Modular community channel and the Mosaic dependency:
+The `pixi.toml` file should include the Modular community channel and the Mosaic dependency:
 ```toml
 [project]
 channels = ["https://repo.prefix.dev/modular-community"]
@@ -72,14 +72,14 @@ Clone the repo and build Mosaic:
 ```bash
 git clone git@github.com:christianbator/mosaic.git
 cd mosaic
-magic run build
+pixi run build
 ```
 
 #### Running an example
 Run an example file from the `examples/` directory like so:
 ```zsh
 cd examples
-magic run mojo load_image.mojo
+pixi run mojo load_image.mojo
 ```
 
 #### Load image
