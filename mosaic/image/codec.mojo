@@ -52,7 +52,7 @@ struct ImageFile(EqualityComparable, Stringable, Writable):
         self._raw_value = raw_value
 
         if raw_value not in Self._supported_image_file_types:
-            abort("Unsupported image file type: ", raw_value)
+            abort("Unsupported image file type: " + raw_value)
 
     #
     # Properties
@@ -63,7 +63,7 @@ struct ImageFile(EqualityComparable, Stringable, Writable):
         elif self == Self.jpeg:
             return ".jpeg"
         else:
-            return abort[String]("Unimplemented extension() for image file type: ", self._raw_value)
+            return abort[String]("Unimplemented extension() for image file type: " + self._raw_value)
 
     fn valid_extensions(self) -> List[String]:
         if self == Self.png:
@@ -71,7 +71,7 @@ struct ImageFile(EqualityComparable, Stringable, Writable):
         elif self == Self.jpeg:
             return List[String](".jpeg", "jpg")
         else:
-            return abort[List[String]]("Unimplemented valid_extensions() for image file type: ", self._raw_value)
+            return abort[List[String]]("Unimplemented valid_extensions() for image file type: " + self._raw_value)
 
     #
     # EqualityComparable

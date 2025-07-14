@@ -1,5 +1,5 @@
 #
-# mojoproject.toml
+# pixi.toml
 # mosaic
 #
 # Created by Christian Bator on 03/11/2025
@@ -30,7 +30,7 @@ channels = [
 ]
 
 [dependencies]
-max = "==25.3.0"
+max = "==25.4.0"
 
 [system-requirements]
 macos = "15.0"

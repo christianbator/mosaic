@@ -1377,7 +1377,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
             self.store_sub_matrix(bottom_right, row=0, col=0)
 
         except error:
-            abort(error)
+            abort(String(error))
 
     fn shifted_origin_to_center(self) -> Self:
         var result = self.copy()
@@ -1405,7 +1405,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
             self.store_sub_matrix(bottom_right, row=0, col=0)
 
         except error:
-            abort(error)
+            abort(String(error))
 
     fn shifted_center_to_origin(self) -> Self:
         var result = self.copy()

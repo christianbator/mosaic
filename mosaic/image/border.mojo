@@ -32,7 +32,7 @@ struct Border(EqualityComparable, Stringable, Writable):
         self._raw_value = raw_value
 
         if raw_value not in [0, 1, 2]:
-            abort("Unsupported border: ", raw_value)
+            abort("Unsupported border: " + String(raw_value))
 
     #
     # EqualityComparable
@@ -59,6 +59,6 @@ struct Border(EqualityComparable, Stringable, Writable):
         elif self == Border.reflect:
             writer.write("reflect")
         else:
-            abort("Unimplemented write_to() for border with raw value: ", self._raw_value)
+            abort("Unimplemented write_to() for border with raw value: " + String(self._raw_value))
 
         writer.write("]")

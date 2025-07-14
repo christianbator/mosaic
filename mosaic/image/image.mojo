@@ -704,7 +704,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
         elif interpolation == Interpolation.bilinear:
             return self._resized_bilinear(height=height, width=width)
         else:
-            return abort[Self]("Unimplemented interpolation for Image.resized(): ", interpolation)
+            return abort[Self]("Unimplemented interpolation for Image.resized(): " + String(interpolation))
 
     fn _resized_nearest(self, height: Int, width: Int) -> Self:
         var result = Self(height=height, width=width)

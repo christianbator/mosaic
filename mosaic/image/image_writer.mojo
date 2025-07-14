@@ -101,7 +101,7 @@ struct ImageWriter:
             )
         else:
             result = 0
-            abort("Unimplemented write() for image file type: ", file_type)
+            abort("Unimplemented write() for image file type: " + String(file_type))
 
         if result != 1:
             raise Error("Failed to save image to file: ", self._path)

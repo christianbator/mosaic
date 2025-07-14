@@ -49,7 +49,7 @@ struct Filters:
                 for i in range(size):
                     result.store_full_depth(result.create_full_depth_value(exp(-((i - (size - 1) / 2) ** 2) / (2 * variance))), row=i, col=0)
             except error:
-                abort(error)
+                abort(String(error))
 
             result.strided_normalize()
 
@@ -83,7 +83,7 @@ struct Filters:
                     for i in range(size):
                         result.store_full_depth(result.create_full_depth_value(exp(-((i - (size - 1) / 2) ** 2) / (2 * variance))), row=i, col=0)
                 except error:
-                    abort(error)
+                    abort(String(error))
 
                 result.strided_normalize()
 

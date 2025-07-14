@@ -15,11 +15,12 @@ package:
   version: ${{ version }}
 
 source:
-  - git: https://github.com/christianbator/mosaic.git
-    rev: main
+  # - git: https://github.com/christianbator/mosaic.git
+  #   rev: main
+  - path: ../
 
 build:
-  number: 3
+  number: 4
   script: build/build.sh
   dynamic_linking:
     missing_dso_allowlist:
@@ -33,7 +34,7 @@ requirements:
     - clang==20.1.4
     - lld==20.1.4
   host:
-    - max==25.3.0
+    - max==25.4.0
   run:
     - ${{ pin_compatible('max') }}
 

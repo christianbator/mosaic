@@ -34,7 +34,7 @@ struct Interpolation(EqualityComparable, Stringable, Writable):
         self._raw_value = raw_value
 
         if raw_value not in [0, 1, 2, 3, 4]:
-            abort("Unsupported interpolation: ", raw_value)
+            abort("Unsupported interpolation: " + String(raw_value))
 
     #
     # EqualityComparable
@@ -65,6 +65,6 @@ struct Interpolation(EqualityComparable, Stringable, Writable):
         elif self == Interpolation.area:
             writer.write("area")
         else:
-            abort("Unimplemented write_to() for interpolation with raw value: ", self._raw_value)
+            abort("Unimplemented write_to() for interpolation with raw value: " + String(self._raw_value))
 
         writer.write("]")

@@ -32,7 +32,7 @@ struct ColorSpace(EqualityComparable, Stringable, Writable):
         self._raw_value = raw_value
 
         if raw_value not in [0, 1]:
-            abort("Unsupported color space raw value: ", raw_value)
+            abort("Unsupported color space raw value: " + String(raw_value))
 
     #
     # Properties
@@ -46,7 +46,7 @@ struct ColorSpace(EqualityComparable, Stringable, Writable):
         elif self == Self.rgb:
             return 3
         else:
-            return abort[Int]("Unimplemented channels() for color space: ", self)
+            return abort[Int]("Unimplemented channels() for color space: " + String(self))
 
     fn is_display_color_space(self) -> Bool:
         return self in [Self.greyscale, Self.rgb]
@@ -74,6 +74,6 @@ struct ColorSpace(EqualityComparable, Stringable, Writable):
         elif self == Self.rgb:
             writer.write("rgb")
         else:
-            abort("Unimplemented write_to() for color space with raw value: ", self._raw_value)
+            abort("Unimplemented write_to() for color space with raw value: " + String(self._raw_value))
 
         writer.write("]")
