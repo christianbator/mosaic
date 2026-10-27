@@ -56,7 +56,8 @@ def test_detect_edges() raises:
         cols=3,
         values=[0, 1, 0, 1, -4, 1, 0, 1, 0],
     )
-    var result = image.filtered[Border.reflect](kernel).as_type[DType.uint8]()
+    # Convert through int64 so negative edge values wrap deterministically (float -> uint8 is undefined when out of range)
+    var result = image.filtered[Border.reflect](kernel).as_type[DType.int64]().as_type[DType.uint8]()
 
     var reference = Image[ColorSpace.greyscale, DType.uint8](expected + "detect_edges.png")
     assert_true(result.matches(reference))
