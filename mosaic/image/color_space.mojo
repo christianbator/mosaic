@@ -5,14 +5,14 @@
 # Created by Christian Bator on 12/21/2024
 #
 
-from os import abort
-from sys.ffi import c_int
+from std.os import abort
+from std.ffi import c_int
 
 
 #
 # ColorSpace
 #
-struct ColorSpace(Equatable, ImplicitlyCopyable, Movable, Stringable, Writable):
+struct ColorSpace(Equatable, ImplicitlyCopyable, Movable, Writable):
     #
     # Supported Color Spaces
     #
@@ -27,7 +27,7 @@ struct ColorSpace(Equatable, ImplicitlyCopyable, Movable, Stringable, Writable):
     #
     # Initialization
     #
-    fn __init__(out self, raw_value: Int):
+    def __init__(out self, raw_value: Int):
         self._raw_value = raw_value
 
         if raw_value not in [0, 1]:
@@ -36,10 +36,10 @@ struct ColorSpace(Equatable, ImplicitlyCopyable, Movable, Stringable, Writable):
     #
     # Properties
     #
-    fn raw_value(self) -> Int:
+    def raw_value(self) -> Int:
         return self._raw_value
 
-    fn channels(self) -> Int:
+    def channels(self) -> Int:
         if self == Self.greyscale:
             return 1
         elif self == Self.rgb:
@@ -47,25 +47,22 @@ struct ColorSpace(Equatable, ImplicitlyCopyable, Movable, Stringable, Writable):
         else:
             abort("Unimplemented channels() for color space: " + String(self))
 
-    fn is_display_color_space(self) -> Bool:
+    def is_display_color_space(self) -> Bool:
         return self in [Self.greyscale, Self.rgb]
 
     #
     # Equatable
     #
-    fn __eq__(self, other: Self) -> Bool:
+    def __eq__(self, other: Self) -> Bool:
         return self._raw_value == other._raw_value
 
-    fn __ne__(self, other: Self) -> Bool:
+    def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
     #
-    # Stringable & Writable
+    # Writable
     #
-    fn __str__(self) -> String:
-        return String.write(self)
-
-    fn write_to[W: Writer](self, mut writer: W):
+    def write_to[W: Writer](self, mut writer: W):
         writer.write("[ColorSpace: ")
 
         if self == Self.greyscale:

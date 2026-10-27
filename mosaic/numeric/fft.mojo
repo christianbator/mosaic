@@ -5,11 +5,12 @@
 # Created by Christian Bator on 04/01/2025
 #
 
-from os import abort
-from memory import UnsafePointer
-from sys.ffi import _Global, OwnedDLHandle, _get_dylib_function, c_int
+from std.os import abort
+from std.ffi import _Global, OwnedDLHandle, _get_dylib_function, c_int
 
 from mosaic.utility import dynamic_library_filepath
+
+from .matrix import Matrix
 
 
 #
@@ -18,7 +19,7 @@ from mosaic.utility import dynamic_library_filepath
 comptime _libfft = _Global["libfft", _load_libfft]()
 
 
-fn _load_libfft() -> OwnedDLHandle:
+def _load_libfft() -> OwnedDLHandle:
     try:
         return OwnedDLHandle(dynamic_library_filepath("libmosaic-fft"))
     except:
@@ -33,35 +34,34 @@ comptime _fft_func_name = "fft_" + String(fft_dtype)
 comptime fft_dtype = DType.float32
 
 
-fn fft[
+def fft[
     dtype: DType, depth: Int, complex: Bool, //, *, inverse: Bool = False
 ](matrix: Matrix[dtype, depth, complex=complex]) -> Matrix[fft_dtype, depth, complex=True]:
     try:
         var fft = _get_dylib_function[
             _libfft,
             _fft_func_name,
-            fn (
+            def(
                 rows: c_int,
                 cols: c_int,
                 components: c_int,
-                data_in: UnsafePointer[Scalar[fft_dtype], MutAnyOrigin],
-                data_out: UnsafePointer[Scalar[fft_dtype], MutAnyOrigin],
+                data_in: Pointer[Scalar[fft_dtype], MutUnsafeAnyOrigin],
+                data_out: Pointer[Scalar[fft_dtype], MutUnsafeAnyOrigin],
                 inverse: Bool,
-            ),
+            ) thin abi("C"),
         ]()
 
         var result = Matrix[fft_dtype, depth, complex=True](rows=matrix.rows(), cols=matrix.cols())
 
-        @parameter
-        if not complex and dtype != fft_dtype:
+        comptime if not complex and dtype != fft_dtype:
             var data_in = matrix.as_complex[fft_dtype]()
 
             fft(
-                rows=matrix.rows(),
-                cols=matrix.cols(),
-                components=matrix.components(),
-                data_in=data_in.unsafe_data_ptr(),
-                data_out=result.unsafe_data_ptr(),
+                rows=c_int(matrix.rows()),
+                cols=c_int(matrix.cols()),
+                components=c_int(matrix.components()),
+                data_in=data_in.unsafe_data_ptr().as_unsafe_any_origin(),
+                data_out=result.unsafe_data_ptr().as_unsafe_any_origin(),
                 inverse=inverse,
             )
 
@@ -71,11 +71,11 @@ fn fft[
             var data_in = matrix.as_complex()
 
             fft(
-                rows=matrix.rows(),
-                cols=matrix.cols(),
-                components=matrix.components(),
-                data_in=data_in.unsafe_data_ptr().bitcast[Scalar[fft_dtype]](),
-                data_out=result.unsafe_data_ptr(),
+                rows=c_int(matrix.rows()),
+                cols=c_int(matrix.cols()),
+                components=c_int(matrix.components()),
+                data_in=data_in.unsafe_data_ptr().unsafe_bitcast[Scalar[fft_dtype]]().as_unsafe_any_origin(),
+                data_out=result.unsafe_data_ptr().as_unsafe_any_origin(),
                 inverse=inverse,
             )
 
@@ -85,11 +85,11 @@ fn fft[
             var data_in = matrix.as_type[fft_dtype]()
 
             fft(
-                rows=matrix.rows(),
-                cols=matrix.cols(),
-                components=matrix.components(),
-                data_in=data_in.unsafe_data_ptr(),
-                data_out=result.unsafe_data_ptr(),
+                rows=c_int(matrix.rows()),
+                cols=c_int(matrix.cols()),
+                components=c_int(matrix.components()),
+                data_in=data_in.unsafe_data_ptr().as_unsafe_any_origin(),
+                data_out=result.unsafe_data_ptr().as_unsafe_any_origin(),
                 inverse=inverse,
             )
 
@@ -97,11 +97,11 @@ fn fft[
 
         else:
             fft(
-                rows=matrix.rows(),
-                cols=matrix.cols(),
-                components=matrix.components(),
-                data_in=matrix.unsafe_data_ptr().bitcast[Scalar[fft_dtype]](),
-                data_out=result.unsafe_data_ptr(),
+                rows=c_int(matrix.rows()),
+                cols=c_int(matrix.cols()),
+                components=c_int(matrix.components()),
+                data_in=matrix.unsafe_data_ptr().unsafe_bitcast[Scalar[fft_dtype]]().as_unsafe_any_origin(),
+                data_out=result.unsafe_data_ptr().as_unsafe_any_origin(),
                 inverse=inverse,
             )
 

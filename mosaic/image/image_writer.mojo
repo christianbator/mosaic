@@ -5,15 +5,16 @@
 # Created by Christian Bator on 12/14/2024
 #
 
-from os import abort, makedirs
-from os.path import dirname
-from pathlib import Path
-from sys.ffi import _get_dylib_function, c_int, c_char
-from memory import UnsafePointer
+from std.os import abort, makedirs
+from std.os.path import dirname
+from std.pathlib import Path
+from std.ffi import _get_dylib_function, c_int, c_char
 
 from mosaic.utility import dynamic_library_filepath
 
-from .codec import _libcodec
+from .codec import _libcodec, ImageFile
+from .image import Image
+from .color_space import ColorSpace
 
 
 #
@@ -28,13 +29,13 @@ struct ImageWriter:
     #
     # Initialization
     #
-    fn __init__(out self, path: Path):
+    def __init__(out self, path: Path):
         self._path = path
 
     #
     # Writing
     #
-    fn write[dtype: DType, //, file_type: ImageFile](self, image: Image[_, dtype]) raises:
+    def write[color_space: ColorSpace, dtype: DType, //, file_type: ImageFile](self, image: Image[color_space, dtype]) raises:
         var path_string: String
         if self._path.suffix() in file_type.valid_extensions():
             path_string = self._path.__fspath__()
@@ -43,38 +44,37 @@ struct ImageWriter:
 
         try:
             var dirname = dirname(self._path)
-            if len(dirname) > 0:
+            if dirname.byte_length() > 0:
                 makedirs(path=dirname, exist_ok=True)
         except:
             raise Error("Failed to create directory for image writing: " + String(self._path))
 
-        var data: UnsafePointer[UInt8, MutAnyOrigin]
-
-        @parameter
-        if dtype == DType.uint8:
-            data = image.unsafe_uint8_ptr()
+        # The image passed to _write() stays alive for the duration of the call, which the raw data pointer relies on
+        comptime if dtype == DType.uint8:
+            self._write[file_type](path_string, rebind[Image[color_space, DType.uint8]](image))
         else:
-            data = image.as_type[DType.uint8]().unsafe_uint8_ptr()
+            self._write[file_type](path_string, image.as_type[DType.uint8]())
 
+    def _write[file_type: ImageFile](self, var path_string: String, image: Image[_, DType.uint8]) raises:
+        var data = image.unsafe_uint8_ptr()
         var result: c_int
 
-        @parameter
-        if file_type == ImageFile.png:
+        comptime if file_type == ImageFile.png:
             var write_image_data_png = _get_dylib_function[
                 _libcodec,
                 "write_image_data_png",
-                fn (
-                    filename: UnsafePointer[c_char, ImmutAnyOrigin],
-                    data: UnsafePointer[UInt8, MutAnyOrigin],
+                def(
+                    filename: Pointer[c_char, ImmUnsafeAnyOrigin],
+                    data: Pointer[UInt8, MutUnsafeAnyOrigin],
                     height: c_int,
                     width: c_int,
                     channels: c_int,
-                ) -> c_int,
+                ) thin abi("C") -> c_int,
             ]()
 
             result = write_image_data_png(
-                filename=path_string.as_c_string_slice().unsafe_ptr(),
-                data=data,
+                filename=path_string.as_c_string_span().ptr().as_unsafe_any_origin(),
+                data=data.as_unsafe_any_origin(),
                 height=c_int(image.height()),
                 width=c_int(image.width()),
                 channels=c_int(image.channels()),
@@ -83,18 +83,18 @@ struct ImageWriter:
             var write_image_data_jpeg = _get_dylib_function[
                 _libcodec,
                 "write_image_data_jpeg",
-                fn (
-                    filename: UnsafePointer[c_char, ImmutAnyOrigin],
-                    data: UnsafePointer[UInt8, MutAnyOrigin],
+                def(
+                    filename: Pointer[c_char, ImmUnsafeAnyOrigin],
+                    data: Pointer[UInt8, MutUnsafeAnyOrigin],
                     height: c_int,
                     width: c_int,
                     channels: c_int,
-                ) -> c_int,
+                ) thin abi("C") -> c_int,
             ]()
 
             result = write_image_data_jpeg(
-                filename=path_string.as_c_string_slice().unsafe_ptr(),
-                data=data,
+                filename=path_string.as_c_string_span().ptr().as_unsafe_any_origin(),
+                data=data.as_unsafe_any_origin(),
                 height=c_int(image.height()),
                 width=c_int(image.width()),
                 channels=c_int(image.channels()),

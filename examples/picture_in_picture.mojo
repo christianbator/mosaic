@@ -9,13 +9,13 @@ from mosaic.image import Image, ColorSpace
 from mosaic.visualizer import Visualizer
 
 
-fn main():
+def main():
     try:
         # Step 1: Load an image from a filepath, specifying the desired color space and data type
         var image = Image[ColorSpace.rgb, DType.uint8]("data/squirrel.jpeg")
 
         # Step 2: Extract a sub-rect from the image using slice notation
-        alias squirrel_head_size = 150
+        comptime squirrel_head_size = 150
 
         var squirrel_head = image[
             120 : 120 + squirrel_head_size,

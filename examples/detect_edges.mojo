@@ -6,11 +6,11 @@
 #
 
 from mosaic.image import Image, ColorSpace, Border
-from mosaic.numeric import Matrix, ScalarNumber
+from mosaic.numeric import Matrix
 from mosaic.visualizer import Visualizer
 
 
-fn main():
+def main():
     try:
         # Step 1: Load an image from a filepath in greyscale float64 for processing
         var image = Image[ColorSpace.greyscale, DType.float64]("data/mandrill.png")
@@ -24,11 +24,11 @@ fn main():
         var kernel = Matrix[DType.float64, ColorSpace.greyscale.channels()](
             rows=3,
             cols=3,
-            values=List[ScalarNumber[DType.float64]](
+            values=[
                 0,  1, 0,
                 1, -4, 1,
                 0,  1, 0
-            )
+            ],
         )
 
         # Step 4: Filter the image with reflected border handling and the custom kernel

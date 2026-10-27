@@ -5,13 +5,13 @@
 # Created by Christian Bator on 02/27/2025
 #
 
-from os import abort
+from std.os import abort
 
 
 #
 # Border
 #
-struct Border(Equatable, ImplicitlyCopyable, Movable, Stringable, Writable):
+struct Border(Equatable, ImplicitlyCopyable, Movable, Writable):
     #
     # Supported Borders
     #
@@ -27,7 +27,7 @@ struct Border(Equatable, ImplicitlyCopyable, Movable, Stringable, Writable):
     #
     # Initialization
     #
-    fn __init__(out self, raw_value: Int):
+    def __init__(out self, raw_value: Int):
         self._raw_value = raw_value
 
         if raw_value not in [0, 1, 2]:
@@ -36,19 +36,16 @@ struct Border(Equatable, ImplicitlyCopyable, Movable, Stringable, Writable):
     #
     # Equatable
     #
-    fn __eq__(self, other: Self) -> Bool:
+    def __eq__(self, other: Self) -> Bool:
         return self._raw_value == other._raw_value
 
-    fn __ne__(self, other: Self) -> Bool:
+    def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
     #
-    # Stringable & Writable
+    # Writable
     #
-    fn __str__(self) -> String:
-        return String.write(self)
-
-    fn write_to[W: Writer](self, mut writer: W):
+    def write_to[W: Writer](self, mut writer: W):
         writer.write("[Border: ")
 
         if self == Border.zero:

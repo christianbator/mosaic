@@ -6,8 +6,7 @@
 #
 
 
-@parameter
-fn SIMDRange[width: Int, *, start: Int = 0, stride: Int = 1]() -> SIMD[DType.int, width]:
+def SIMDRange[width: Int, *, start: Int = 0, stride: Int = 1]() -> SIMD[DType.int, width]:
     var result = SIMD[DType.int, width]()
     for i in range(width):
         result[i] = start + i * stride

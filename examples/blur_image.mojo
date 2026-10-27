@@ -9,7 +9,7 @@ from mosaic.image import Image, ColorSpace, Border
 from mosaic.visualizer import Visualizer
 
 
-fn main():
+def main():
     try:
         # Step 1: Load an image from a filepath as float64 for processing
         var image = Image[ColorSpace.rgb, DType.float64]("data/mandrill.png")

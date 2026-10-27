@@ -5,9 +5,8 @@
 # Created by Christian Bator on 12/14/2024
 #
 
-from os import abort
-from sys.ffi import _Global, OwnedDLHandle, _get_dylib_function, c_int, c_char, c_float
-from memory import UnsafePointer
+from std.os import abort
+from std.ffi import _Global, OwnedDLHandle, _get_dylib_function, c_int, c_char, c_float
 
 from mosaic.utility import dynamic_library_filepath
 from mosaic.image import Image, ImageSlice, ColorSpace
@@ -18,7 +17,7 @@ from mosaic.image import Image, ImageSlice, ColorSpace
 comptime _libvisualizer = _Global["libvisualizer", _load_libvisualizer]()
 
 
-fn _load_libvisualizer() -> OwnedDLHandle:
+def _load_libvisualizer() -> OwnedDLHandle:
     try:
         return OwnedDLHandle(dynamic_library_filepath("libmosaic-visualizer"))
     except:
@@ -38,16 +37,15 @@ struct Visualizer:
     # ImageSlice
     #
     @staticmethod
-    fn show(image_slice: ImageSlice, window_title: String):
+    def show(image_slice: ImageSlice, window_title: String):
         Self.show(image=image_slice.deep_copy(), window_title=window_title)
 
     #
     # Image
     #
     @staticmethod
-    fn show[dtype: DType, color_space: ColorSpace, //](image: Image[color_space, dtype], window_title: String):
-        @parameter
-        if color_space.is_display_color_space() and dtype == Self.display_dtype:
+    def show[dtype: DType, color_space: ColorSpace, //](image: Image[color_space, dtype], window_title: String):
+        comptime if color_space.is_display_color_space() and dtype == Self.display_dtype:
             Self._show(image=image, window_title=window_title)
         elif color_space.is_display_color_space():
             Self._show(
@@ -61,26 +59,26 @@ struct Visualizer:
             )
 
     @staticmethod
-    fn _show[dtype: DType, color_space: ColorSpace, //](image: Image[color_space, dtype], var window_title: String):
+    def _show[dtype: DType, color_space: ColorSpace, //](image: Image[color_space, dtype], var window_title: String):
         try:
             var show = _get_dylib_function[
                 _libvisualizer,
                 "show",
-                fn (
-                    data: UnsafePointer[UInt8, MutAnyOrigin],
+                def(
+                    data: Pointer[UInt8, MutUnsafeAnyOrigin],
                     height: c_int,
                     width: c_int,
                     channels: c_int,
-                    window_title: UnsafePointer[c_char, ImmutAnyOrigin],
-                ) -> None,
+                    window_title: Pointer[c_char, ImmUnsafeAnyOrigin],
+                ) thin abi("C") -> None,
             ]()
 
             show(
-                data=image.unsafe_uint8_ptr(),
+                data=image.unsafe_uint8_ptr().as_unsafe_any_origin(),
                 height=c_int(image.height()),
                 width=c_int(image.width()),
                 channels=c_int(image.channels()),
-                window_title=window_title.as_c_string_slice().unsafe_ptr(),
+                window_title=window_title.as_c_string_span().ptr().as_unsafe_any_origin(),
             )
         except:
             abort()
@@ -89,13 +87,13 @@ struct Visualizer:
     # Run Loop
     #
     @staticmethod
-    fn wait():
+    def wait():
         _ = Self.wait(c_float.MAX_FINITE)
 
     @staticmethod
-    fn wait(timeout: Float32) -> Bool:
+    def wait(timeout: Float32) -> Bool:
         try:
-            var wait = _get_dylib_function[_libvisualizer, "wait", fn (timeout: c_float) -> Bool]()
+            var wait = _get_dylib_function[_libvisualizer, "wait", def(timeout: c_float) thin abi("C") -> Bool]()
 
             return wait(c_float(timeout))
         except:

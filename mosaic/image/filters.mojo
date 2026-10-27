@@ -5,39 +5,30 @@
 # Created by Christian Bator on 03/14/2025
 #
 
-from os import abort
-from math import pi, exp
+from std.os import abort
+from std.math import pi, exp
 
 from mosaic.numeric import Matrix, Number
 
 
 struct Filters:
     @staticmethod
-    fn box_kernel_1d[dtype: DType, depth: Int = 1, complex: Bool = False](size: Int) -> Matrix[dtype, depth, complex=complex]:
-        constrained[
-            dtype.is_floating_point(),
-            "box_kernel_1d() is only available for floating point dtypes",
-        ]()
+    def box_kernel_1d[dtype: DType, depth: Int = 1, complex: Bool = False](size: Int) -> Matrix[dtype, depth, complex=complex]:
+        comptime assert dtype.is_floating_point(), "box_kernel_1d() is only available for floating point dtypes"
 
-        return Matrix[dtype, depth, complex=complex](rows=size, cols=1, value=(1 / size).cast[dtype]())
+        return Matrix[dtype, depth, complex=complex](rows=size, cols=1, value=(1 / Float64(size)).cast[dtype]())
 
     @staticmethod
-    fn box_kernel_2d[dtype: DType, depth: Int = 1, complex: Bool = False](size: Int) -> Matrix[dtype, depth, complex=complex]:
-        constrained[
-            dtype.is_floating_point(),
-            "box_kernel_2d() is only available for floating point dtypes",
-        ]()
+    def box_kernel_2d[dtype: DType, depth: Int = 1, complex: Bool = False](size: Int) -> Matrix[dtype, depth, complex=complex]:
+        comptime assert dtype.is_floating_point(), "box_kernel_2d() is only available for floating point dtypes"
 
-        return Matrix[dtype, depth, complex=complex](rows=size, cols=size, value=(1 / (size * size)).cast[dtype]())
+        return Matrix[dtype, depth, complex=complex](rows=size, cols=size, value=(1 / Float64(size * size)).cast[dtype]())
 
     @staticmethod
-    fn gaussian_kernel_1d[
+    def gaussian_kernel_1d[
         dtype: DType, depth: Int = 1, complex: Bool = False
     ](size: Int, std_dev: Optional[Float64] = None) -> Matrix[dtype, depth, complex=complex]:
-        constrained[
-            dtype.is_floating_point(),
-            "gaussian_kernel_1d() is only available for floating point dtypes",
-        ]()
+        comptime assert dtype.is_floating_point(), "gaussian_kernel_1d() is only available for floating point dtypes"
 
         if size == 1:
             return Matrix[dtype, depth, complex=complex].strided_replication(rows=size, cols=1, values=[1.0])
@@ -48,7 +39,7 @@ struct Filters:
             try:
                 for i in range(size):
                     result.store_full_depth(
-                        result.create_full_depth_value(exp(-((i - (size - 1) / 2) ** 2) / (2 * variance))), row=i, col=0
+                        result.create_full_depth_value(exp(-((Float64(i) - Float64(size - 1) / 2) ** 2) / (2 * variance))), row=i, col=0
                     )
             except error:
                 abort(String(error))
@@ -85,12 +76,12 @@ struct Filters:
                 )
             else:
                 var result = Matrix[DType.float64, depth, complex=complex](rows=size, cols=1)
-                var variance = (0.3 * ((size - 1) * 0.5 - 1.0) + 0.8) ** 2
+                var variance = (0.3 * (Float64(size - 1) * 0.5 - 1.0) + 0.8) ** 2
 
                 try:
                     for i in range(size):
                         result.store_full_depth(
-                            result.create_full_depth_value(exp(-((i - (size - 1) / 2) ** 2) / (2 * variance))), row=i, col=0
+                            result.create_full_depth_value(exp(-((Float64(i) - Float64(size - 1) / 2) ** 2) / (2 * variance))), row=i, col=0
                         )
                 except error:
                     abort(String(error))
@@ -100,13 +91,10 @@ struct Filters:
                 return result.as_type[dtype]()
 
     @staticmethod
-    fn gaussian_kernel_2d[
+    def gaussian_kernel_2d[
         dtype: DType, depth: Int = 1, complex: Bool = False
     ](size: Int, std_dev: Optional[Float64] = None) -> Matrix[dtype, depth, complex=complex]:
-        constrained[
-            dtype.is_floating_point(),
-            "gaussian_kernel_2d() is only available for floating point dtypes",
-        ]()
+        comptime assert dtype.is_floating_point(), "gaussian_kernel_2d() is only available for floating point dtypes"
 
         var kernel = Self.gaussian_kernel_1d[dtype, depth, complex](size=size, std_dev=std_dev)
 

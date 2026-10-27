@@ -113,7 +113,7 @@ fi
 if $build_mosaic; then
     echo -e "> Building ${cyan}mosaic${reset} ..."
 
-    mojo package mosaic -o $mojo_package_dir/mosaic.mojopkg
+    mojo precompile mosaic -o $mojo_package_dir/mosaic.mojoc
 fi
 
 #

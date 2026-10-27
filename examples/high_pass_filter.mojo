@@ -9,7 +9,7 @@ from mosaic.image import Image, ColorSpace
 from mosaic.visualizer import Visualizer
 
 
-fn main():
+def main():
     try:
         # Step 1: Load an image from a filepath, specifying the desired color space and data type
         var image = Image[ColorSpace.greyscale, DType.uint8]("data/camera.png")
@@ -21,7 +21,7 @@ fn main():
         var high_pass_spectrum = spectrum.shifted_origin_to_center()
 
         # Step 4: Zero out the center of the high pass spectrum to discard low frequencies
-        alias filter_size = 64
+        comptime filter_size = 64
 
         var start_row = (spectrum.rows() - filter_size) // 2
         var start_col = (spectrum.cols() - filter_size) // 2

@@ -5,15 +5,13 @@
 # Created by Christian Bator on 02/02/2025
 #
 
-from os import abort
-from sys import simd_width_of
-from sys.info import CompilationTarget
+from std.os import abort
+from std.sys import simd_width_of
+from std.sys.info import CompilationTarget
 
 
-@parameter
-fn optimal_simd_width[dtype: DType]() -> Int:
-    @parameter
-    if CompilationTarget.is_macos():
+def optimal_simd_width[dtype: DType]() -> Int:
+    comptime if CompilationTarget.is_macos():
         return 4 * simd_width_of[dtype]()
     else:
         return 2 * simd_width_of[dtype]()
@@ -22,8 +20,7 @@ fn optimal_simd_width[dtype: DType]() -> Int:
 comptime unroll_factor = 4
 
 
-@parameter
-fn dynamic_library_filepath(name: String) -> String:
+def dynamic_library_filepath(name: String) -> String:
     if CompilationTarget.is_linux():
         return name + ".so"
     elif CompilationTarget.is_macos():

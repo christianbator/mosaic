@@ -9,7 +9,7 @@ from mosaic.image import Image, ColorSpace
 from mosaic.visualizer import Visualizer
 
 
-fn main():
+def main():
     try:
         # Step 1: Load an image from a filepath, specifying the desired color space and data type
         var image = Image[ColorSpace.greyscale, DType.uint8]("data/camera.png")

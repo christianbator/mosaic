@@ -5,17 +5,17 @@
 # Created by Christian Bator on 03/11/2025
 #
 
-[project]
+[workspace]
 # These should match rattler-build/recipe.yaml > context
-version = "0.1.0"
+version = "0.2.0"
 
 # These should match rattler-build/recipe.yaml > about
-homepage = "https://brainwave.sh/mosaic"
+homepage = "https://github.com/christianbator/mosaic"
 license = "Apache-2.0"
 license-file = "LICENSE"
 description = "An image processing library in Mojo" # This is "summary" in recipe.yaml
-repository = "https://github.com/brainwave-sh/mosaic"
-documentation = "https://brainwave.sh/mosaic"
+repository = "https://github.com/christianbator/mosaic"
+documentation = "https://github.com/christianbator/mosaic"
 
 # These should match rattler-build/recipe.yaml > extra
 name = "mosaic"
@@ -25,13 +25,15 @@ authors = ["Christian Bator <christian@bator.co>"]
 readme = "README.md"
 platforms = ["osx-arm64", "linux-aarch64", "linux-64"]
 channels = [
-    "https://prefix.dev/max",
+    "https://conda.modular.com/max",
     "conda-forge"
 ]
 
 [dependencies]
-mojo = ">=0.26.1,<0.27"
-clangxx = ">=22.1.0,<23"
+mojo-compiler = ">=1.0,<2.0"
+max-core = ">=26.7.0,<27"
+mblack = ">=26.7.0,<27"
+clangxx = ">=22.1.0,<23.0"
 
 [system-requirements]
 macos = "15.0"
@@ -55,4 +57,4 @@ cmd = """ bash -c '
 """
 
 [tasks.package]
-cmd = "rattler-build build --recipe rattler-build/recipe.yaml -c https://prefix.dev/max -c conda-forge"
+cmd = "rattler-build build --recipe rattler-build/recipe.yaml -c https://conda.modular.com/max -c conda-forge"

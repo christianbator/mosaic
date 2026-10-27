@@ -5,8 +5,8 @@
 # Created by Christian Bator on 05/03/2025
 #
 
-from os import abort
-from sys.ffi import _Global, OwnedDLHandle
+from std.os import abort
+from std.ffi import _Global, OwnedDLHandle
 
 from mosaic.utility import dynamic_library_filepath
 
@@ -17,7 +17,7 @@ from mosaic.utility import dynamic_library_filepath
 comptime _libcodec = _Global["libcodec", _load_libcodec]()
 
 
-fn _load_libcodec() -> OwnedDLHandle:
+def _load_libcodec() -> OwnedDLHandle:
     try:
         return OwnedDLHandle(dynamic_library_filepath("libmosaic-codec"))
     except:
@@ -27,7 +27,7 @@ fn _load_libcodec() -> OwnedDLHandle:
 #
 # ImageFile
 #
-struct ImageFile(Equatable, ImplicitlyCopyable, Movable, Stringable, Writable):
+struct ImageFile(Equatable, ImplicitlyCopyable, Movable, Writable):
     #
     # Supported File Types
     #
@@ -47,7 +47,7 @@ struct ImageFile(Equatable, ImplicitlyCopyable, Movable, Stringable, Writable):
     #
     # Initialization
     #
-    fn __init__(out self, raw_value: String):
+    def __init__(out self, raw_value: String):
         self._raw_value = raw_value
 
         if raw_value not in materialize[Self._supported_image_file_types]():
@@ -56,7 +56,7 @@ struct ImageFile(Equatable, ImplicitlyCopyable, Movable, Stringable, Writable):
     #
     # Properties
     #
-    fn extension(self) -> String:
+    def extension(self) -> String:
         if self == Self.png:
             return ".png"
         elif self == Self.jpeg:
@@ -64,7 +64,7 @@ struct ImageFile(Equatable, ImplicitlyCopyable, Movable, Stringable, Writable):
         else:
             abort("Unimplemented extension() for image file type: " + self._raw_value)
 
-    fn valid_extensions(self) -> List[String]:
+    def valid_extensions(self) -> List[String]:
         if self == Self.png:
             return [".png"]
         elif self == Self.jpeg:
@@ -75,17 +75,14 @@ struct ImageFile(Equatable, ImplicitlyCopyable, Movable, Stringable, Writable):
     #
     # Equatable
     #
-    fn __eq__(self, other: Self) -> Bool:
+    def __eq__(self, other: Self) -> Bool:
         return self._raw_value == other._raw_value
 
-    fn __ne__(self, other: Self) -> Bool:
+    def __ne__(self, other: Self) -> Bool:
         return not (self == other)
 
     #
-    # Stringable & Writable
+    # Writable
     #
-    fn __str__(self) -> String:
-        return String.write(self)
-
-    fn write_to[W: Writer](self, mut writer: W):
+    def write_to[W: Writer](self, mut writer: W):
         writer.write("[ImageFile: ", self._raw_value, "]")

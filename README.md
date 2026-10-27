@@ -5,8 +5,8 @@
     An image processing library in Mojo
     
   ![Language Badge](https://img.shields.io/badge/language-mojo-orange)
-  ![GitHub License Badge](https://img.shields.io/github/license/brainwave-sh/mosaic)
-  ![CodeQL](https://github.com/brainwave-sh/mosaic/workflows/CodeQL/badge.svg)
+  ![GitHub License Badge](https://img.shields.io/github/license/christianbator/mosaic)
+  ![CodeQL](https://github.com/christianbator/mosaic/workflows/CodeQL/badge.svg)
   </p>
 </div>
 
@@ -14,7 +14,6 @@
   <a href="#overview">Overview</a> •
   <a href="#installation">Installation</a> •
   <a href="#examples">Examples</a> •
-  <a href="#documentation">Documentation</a> •
   <a href="#acknowledgements">Acknowledgements</a>
 </p>
 
@@ -48,7 +47,7 @@ It can unify image processing workflows into one language that runs on any hardw
 
 ## Installation
 #### Prerequisites
-- [Pixi](https://docs.modular.com/mojo/manual/get-started/) (the Mojo environment and package manager)
+- [Pixi](https://mojolang.org/docs/manual/get-started/) (the Mojo environment and package manager)
 
 #### Using the pixi cli
 ```bash
@@ -69,7 +68,7 @@ mosaic-mojo = "*"
 #### Prerequisites
 Clone the repo and build Mosaic:
 ```bash
-git clone git@github.com:brainwave-sh/mosaic.git
+git clone git@github.com:christianbator/mosaic.git
 cd mosaic
 pixi run build
 ```
@@ -205,9 +204,6 @@ pixi run mojo load_image.mojo
 <div align="center">
   <img src="assets/examples/high-pass-filter.png" width="768">
 </div>
-
-## Documentation
-Docs are available at [brainwave.sh/mosaic](https://brainwave.sh/mosaic)
 
 ## Acknowledgements
 Mosaic makes use of vendored libraries to help with image codecs and FFTs, many thanks to:

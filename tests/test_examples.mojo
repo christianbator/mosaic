@@ -5,7 +5,7 @@
 # Created by Christian Bator on 03/01/2026
 #
 
-from testing import assert_true, assert_equal, TestSuite
+from std.testing import assert_true, assert_equal, TestSuite
 
 from mosaic.image import Image, ImageFile, ColorSpace, Border, Interpolation
 from mosaic.numeric import Matrix
@@ -14,7 +14,7 @@ comptime input = "tests/data/input/"
 comptime expected = "tests/data/output/"
 
 
-fn test_blur_image() raises:
+def test_blur_image() raises:
     var image = Image[ColorSpace.rgb, DType.float64](input + "mandrill.png")
     image.gaussian_blur[Border.reflect](size=9)
     var result = image.as_type[DType.uint8]()
@@ -23,7 +23,7 @@ fn test_blur_image() raises:
     assert_true(result.matches(reference))
 
 
-fn test_convert_as_type() raises:
+def test_convert_as_type() raises:
     var image = Image[ColorSpace.rgb, DType.float64](input + "mandrill.png")
     var result = image.converted_as_type[ColorSpace.greyscale, DType.uint8]()
 
@@ -31,7 +31,7 @@ fn test_convert_as_type() raises:
     assert_true(result.matches(reference))
 
 
-fn test_convert_color_space() raises:
+def test_convert_color_space() raises:
     var image = Image[ColorSpace.rgb, DType.uint8](input + "mandrill.png")
     var result = image.converted[ColorSpace.greyscale]()
 
@@ -39,7 +39,7 @@ fn test_convert_color_space() raises:
     assert_true(result.matches(reference))
 
 
-fn test_convert_type() raises:
+def test_convert_type() raises:
     var image = Image[ColorSpace.rgb, DType.uint8](input + "mandrill.png")
     var result = image.as_type[DType.float64]().as_type[DType.uint8]()
 
@@ -47,7 +47,7 @@ fn test_convert_type() raises:
     assert_true(result.matches(reference))
 
 
-fn test_detect_edges() raises:
+def test_detect_edges() raises:
     var image = Image[ColorSpace.greyscale, DType.float64](input + "mandrill.png")
     image.gaussian_blur[Border.reflect](7)
 
@@ -62,7 +62,7 @@ fn test_detect_edges() raises:
     assert_true(result.matches(reference))
 
 
-fn test_extract_channel() raises:
+def test_extract_channel() raises:
     var image = Image[ColorSpace.rgb, DType.uint8](input + "squirrel.jpeg")
     var green = image.extract_channel[1]()
     var result = Image[ColorSpace.rgb, DType.uint8].with_single_channel_data[1](green)
@@ -71,7 +71,7 @@ fn test_extract_channel() raises:
     assert_true(result.matches(reference))
 
 
-fn test_flip_image() raises:
+def test_flip_image() raises:
     var image = Image[ColorSpace.rgb, DType.uint8](input + "mandrill.png")
     var result = image.flipped_vertically()
 
@@ -79,7 +79,7 @@ fn test_flip_image() raises:
     assert_true(result.matches(reference))
 
 
-fn test_fourier_transform() raises:
+def test_fourier_transform() raises:
     var image = Image[ColorSpace.greyscale, DType.uint8](input + "camera.png")
     var spectrum = image.spectrum()
     spectrum.shift_origin_to_center()
@@ -92,7 +92,7 @@ fn test_fourier_transform() raises:
     assert_true(result.matches(reference))
 
 
-fn test_high_pass_filter() raises:
+def test_high_pass_filter() raises:
     var image = Image[ColorSpace.greyscale, DType.uint8](input + "camera.png")
     var spectrum = image.spectrum()
     var hp_spectrum = spectrum.shifted_origin_to_center()
@@ -115,7 +115,7 @@ fn test_high_pass_filter() raises:
     assert_true(result.matches(reference))
 
 
-fn test_inverse_fourier_transform() raises:
+def test_inverse_fourier_transform() raises:
     var image = Image[ColorSpace.greyscale, DType.uint8](input + "camera.png")
     var spectrum = image.spectrum()
     var recreated = Image[ColorSpace.greyscale, DType.uint8].from_spectrum(spectrum, lower_bound=0, upper_bound=255)
@@ -128,7 +128,7 @@ fn test_inverse_fourier_transform() raises:
     assert_true(result.matches(reference))
 
 
-fn test_pad_image() raises:
+def test_pad_image() raises:
     var image = Image[ColorSpace.rgb, DType.uint8](input + "mandrill.png")
     var result = image.padded[Border.zero](height=44, width=44)
 
@@ -136,7 +136,7 @@ fn test_pad_image() raises:
     assert_true(result.matches(reference))
 
 
-fn test_picture_in_picture() raises:
+def test_picture_in_picture() raises:
     var image = Image[ColorSpace.rgb, DType.uint8](input + "squirrel.jpeg")
 
     comptime squirrel_head_size = 150
@@ -148,7 +148,7 @@ fn test_picture_in_picture() raises:
     assert_true(image.matches(reference))
 
 
-fn test_resize_image() raises:
+def test_resize_image() raises:
     var image = Image[ColorSpace.rgb, DType.uint8](input + "mandrill.png")
     var result = image.resized[Interpolation.bilinear](height=256, width=512)
 
@@ -156,7 +156,7 @@ fn test_resize_image() raises:
     assert_true(result.matches(reference))
 
 
-fn test_rotate_image() raises:
+def test_rotate_image() raises:
     var image = Image[ColorSpace.rgb, DType.uint8](input + "mandrill.png")
     var result = image.rotated_90[clockwise=True]()
 
@@ -164,15 +164,15 @@ fn test_rotate_image() raises:
     assert_true(result.matches(reference))
 
 
-fn test_scale_image() raises:
+def test_scale_image() raises:
     var image = Image[ColorSpace.rgb, DType.uint8](input + "mandrill.png")
-    var result = image.scaled[interpolation = Interpolation.bilinear](0.5)
+    var result = image.scaled[interpolation=Interpolation.bilinear](0.5)
 
     var reference = Image[ColorSpace.rgb, DType.uint8](expected + "scale_image.png")
     assert_true(result.matches(reference))
 
 
-fn test_slice_image() raises:
+def test_slice_image() raises:
     var image = Image[ColorSpace.rgb, DType.uint8](input + "mandrill.png")
     var result = image[: image.height() // 2, :].deep_copy()
 
@@ -180,7 +180,7 @@ fn test_slice_image() raises:
     assert_true(result.matches(reference))
 
 
-fn test_unsharp_mask() raises:
+def test_unsharp_mask() raises:
     var original = Image[ColorSpace.rgb, DType.float64](input + "mandrill.png")
     var blurred = original.gaussian_blurred[Border.reflect](7)
     var mask = original - blurred
@@ -192,5 +192,5 @@ fn test_unsharp_mask() raises:
     assert_true(result.matches(reference))
 
 
-fn main() raises:
+def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

@@ -9,7 +9,7 @@ from mosaic.image import Image, ColorSpace
 from mosaic.visualizer import Visualizer
 
 
-fn main():
+def main():
     try:
         # Step 1: Load an image from a filepath into any data type and color space representation
         #         (the specified data type and color space don't have to match the image file).

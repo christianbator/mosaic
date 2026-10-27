@@ -9,7 +9,7 @@ from mosaic.image import Image, ColorSpace, Interpolation
 from mosaic.visualizer import Visualizer
 
 
-fn main():
+def main():
     try:
         # Step 1: Load an image from a filepath, specifying the desired color space and data type
         var image = Image[ColorSpace.rgb, DType.uint8]("data/mandrill.png")

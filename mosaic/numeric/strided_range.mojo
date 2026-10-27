@@ -5,14 +5,14 @@
 # Created by Christian Bator on 03/15/2025
 #
 
-from os import abort
-from math import ceildiv
+from std.os import abort
+from std.math import ceildiv
 
 
 #
 # StridedRange
 #
-struct StridedRange(ImplicitlyCopyable, Movable, Stringable, Writable):
+struct StridedRange(ImplicitlyCopyable, Movable, Writable):
     #
     # Fields
     #
@@ -21,14 +21,14 @@ struct StridedRange(ImplicitlyCopyable, Movable, Stringable, Writable):
     var step: Int
 
     @always_inline
-    fn count(self) -> Int:
+    def count(self) -> Int:
         return ceildiv(self.end - self.start, self.step)
 
     #
     # Initialization
     #
     @always_inline
-    fn __init__(out self, end: Int):
+    def __init__(out self, end: Int):
         if not (end >= 0):
             abort("Failed StridedRange init requirement: 0 <= end")
 
@@ -37,7 +37,7 @@ struct StridedRange(ImplicitlyCopyable, Movable, Stringable, Writable):
         self.step = 1
 
     @always_inline
-    fn __init__(out self, start: Int, end: Int):
+    def __init__(out self, start: Int, end: Int):
         if not (0 <= start <= end):
             abort("Failed StridedRange init requirement: 0 <= start <= end")
 
@@ -47,11 +47,11 @@ struct StridedRange(ImplicitlyCopyable, Movable, Stringable, Writable):
 
     @always_inline
     @implicit
-    fn __init__(out self, tuple: Tuple[Int, Int]):
+    def __init__(out self, tuple: Tuple[Int, Int]):
         self = Self(start=tuple[0], end=tuple[1])
 
     @always_inline
-    fn __init__(out self, start: Int, end: Int, step: Int):
+    def __init__(out self, start: Int, end: Int, step: Int):
         if not (0 <= start <= end and step > 0):
             abort("Failed StridedRange init requirement: 0 <= start <= end and step > 0")
 
@@ -61,11 +61,11 @@ struct StridedRange(ImplicitlyCopyable, Movable, Stringable, Writable):
 
     @always_inline
     @implicit
-    fn __init__(out self, tuple: Tuple[Int, Int, Int]):
+    def __init__(out self, tuple: Tuple[Int, Int, Int]):
         self = Self(start=tuple[0], end=tuple[1], step=tuple[2])
 
     @always_inline
-    fn __init__(
+    def __init__(
         out self,
         slice: Slice,
         default_start: Int,
@@ -79,10 +79,7 @@ struct StridedRange(ImplicitlyCopyable, Movable, Stringable, Writable):
         )
 
     #
-    # Stringable & Writable
+    # Writable
     #
-    fn __str__(self) -> String:
-        return String.write(self)
-
-    fn write_to[W: Writer](self, mut writer: W):
+    def write_to[W: Writer](self, mut writer: W):
         writer.write("[StridedRange: (", self.start, ", ", self.end, ", ", self.step, ")]")

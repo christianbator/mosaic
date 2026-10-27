@@ -5,32 +5,31 @@
 # Created by Christian Bator on 03/11/2025
 #
 
-from pathlib import Path
-from sys.ffi import _get_dylib_function, c_int
-from memory import UnsafePointer
+from std.pathlib import Path
+from std.ffi import _get_dylib_function, c_int
+from std.memory.alloc import unsafe_alloc
 
 from mosaic.utility import dynamic_library_filepath
 
 from .codec import _libcodec
+from .image import Image
+from .color_space import ColorSpace
 
 
 #
 # ImageInfo
 #
-struct ImageInfo(ImplicitlyCopyable, Movable, Stringable, Writable):
+struct ImageInfo(ImplicitlyCopyable, Movable, Writable):
     var height: c_int
     var width: c_int
     var bit_depth: c_int
 
-    fn __init__(out self):
+    def __init__(out self):
         self.height = 0
         self.width = 0
         self.bit_depth = 0
 
-    fn __str__(self) -> String:
-        return String.write(self)
-
-    fn write_to[W: Writer](self, mut writer: W):
+    def write_to[W: Writer](self, mut writer: W):
         writer.write(
             "[ImageInfo: height = ",
             self.height,
@@ -54,13 +53,13 @@ struct ImageReader[color_space: ColorSpace, dtype: DType]:
     #
     # Initialization
     #
-    fn __init__(out self, path: Path):
+    def __init__(out self, path: Path):
         self._path = path
 
     #
     # Reading
     #
-    fn read(self) raises -> Image[Self.color_space, Self.dtype]:
+    def read(self) raises -> Image[Self.color_space, Self.dtype]:
         # Read raw file data
         var raw_data = self._path.read_bytes()
 
@@ -70,17 +69,17 @@ struct ImageReader[color_space: ColorSpace, dtype: DType]:
         var decode_image_info = _get_dylib_function[
             _libcodec,
             "decode_image_info",
-            fn (
-                raw_data: UnsafePointer[UInt8, MutAnyOrigin],
+            def(
+                raw_data: Pointer[UInt8, MutUnsafeAnyOrigin],
                 raw_data_length: c_int,
-                image_info: UnsafePointer[ImageInfo, MutAnyOrigin],
-            ) -> c_int,
+                image_info: Pointer[ImageInfo, MutUnsafeAnyOrigin],
+            ) thin abi("C") -> c_int,
         ]()
 
         var is_valid_info = decode_image_info(
-            raw_data=raw_data.unsafe_ptr(),
-            raw_data_length=len(raw_data),
-            image_info=UnsafePointer(to=image_info),
+            raw_data=raw_data.unsafe_ptr().as_unsafe_any_origin(),
+            raw_data_length=c_int(len(raw_data)),
+            image_info=Pointer(to=image_info).as_unsafe_any_origin(),
         )
 
         if not is_valid_info:
@@ -98,32 +97,31 @@ struct ImageReader[color_space: ColorSpace, dtype: DType]:
         # 8-bit images
         #
         if image_info.bit_depth == 8:
-            var image_data = alloc[UInt8](num_elements)
+            var image_data = unsafe_alloc[UInt8](num_elements)
 
             var decode_image_data_uint8 = _get_dylib_function[
                 _libcodec,
                 "decode_image_data_uint8",
-                fn (
-                    raw_data: UnsafePointer[UInt8, MutAnyOrigin],
+                def(
+                    raw_data: Pointer[UInt8, MutUnsafeAnyOrigin],
                     raw_data_length: c_int,
                     desired_channels: c_int,
-                    image_data: UnsafePointer[UInt8, MutAnyOrigin],
-                ) -> c_int,
+                    image_data: Pointer[UInt8, MutUnsafeAnyOrigin],
+                ) thin abi("C") -> c_int,
             ]()
 
             is_valid_data = decode_image_data_uint8(
-                raw_data=raw_data.unsafe_ptr(),
-                raw_data_length=len(raw_data),
-                desired_channels=Self.color_space.channels(),
-                image_data=image_data,
+                raw_data=raw_data.unsafe_ptr().as_unsafe_any_origin(),
+                raw_data_length=c_int(len(raw_data)),
+                desired_channels=c_int(Self.color_space.channels()),
+                image_data=image_data.as_unsafe_any_origin(),
             )
 
-            @parameter
-            if Self.dtype == DType.uint8:
+            comptime if Self.dtype == DType.uint8:
                 image = Image[Self.color_space, Self.dtype](
                     height=height,
                     width=width,
-                    data=image_data.bitcast[Scalar[Self.dtype]](),
+                    data=image_data.unsafe_bitcast[Scalar[Self.dtype]](),
                 )
             else:
                 image = Image[Self.color_space, DType.uint8](height=height, width=width, data=image_data).as_type[Self.dtype]()
@@ -132,32 +130,31 @@ struct ImageReader[color_space: ColorSpace, dtype: DType]:
         # 16-bit images
         #
         elif image_info.bit_depth == 16:
-            var image_data = alloc[UInt16](num_elements)
+            var image_data = unsafe_alloc[UInt16](num_elements)
 
             var decode_image_data_uint16 = _get_dylib_function[
                 _libcodec,
                 "decode_image_data_uint16",
-                fn (
-                    raw_data: UnsafePointer[UInt8, MutAnyOrigin],
+                def(
+                    raw_data: Pointer[UInt8, MutUnsafeAnyOrigin],
                     raw_data_length: c_int,
                     desired_channels: c_int,
-                    image_data: UnsafePointer[UInt16, MutAnyOrigin],
-                ) -> c_int,
+                    image_data: Pointer[UInt16, MutUnsafeAnyOrigin],
+                ) thin abi("C") -> c_int,
             ]()
 
             is_valid_data = decode_image_data_uint16(
-                raw_data=raw_data.unsafe_ptr(),
-                raw_data_length=len(raw_data),
-                desired_channels=Self.color_space.channels(),
-                image_data=image_data,
+                raw_data=raw_data.unsafe_ptr().as_unsafe_any_origin(),
+                raw_data_length=c_int(len(raw_data)),
+                desired_channels=c_int(Self.color_space.channels()),
+                image_data=image_data.as_unsafe_any_origin(),
             )
 
-            @parameter
-            if Self.dtype == DType.uint16:
+            comptime if Self.dtype == DType.uint16:
                 image = Image[Self.color_space, Self.dtype](
                     height=height,
                     width=width,
-                    data=image_data.bitcast[Scalar[Self.dtype]](),
+                    data=image_data.unsafe_bitcast[Scalar[Self.dtype]](),
                 )
             else:
                 image = Image[Self.color_space, DType.uint16](height=height, width=width, data=image_data).as_type[Self.dtype]()
@@ -166,32 +163,31 @@ struct ImageReader[color_space: ColorSpace, dtype: DType]:
         # HDR (32-bit float) images
         #
         elif image_info.bit_depth == 32:
-            var image_data = alloc[Float32](num_elements)
+            var image_data = unsafe_alloc[Float32](num_elements)
 
             var decode_image_data_float32 = _get_dylib_function[
                 _libcodec,
                 "decode_image_data_float32",
-                fn (
-                    raw_data: UnsafePointer[UInt8, MutAnyOrigin],
+                def(
+                    raw_data: Pointer[UInt8, MutUnsafeAnyOrigin],
                     raw_data_length: c_int,
                     desired_channels: c_int,
-                    image_data: UnsafePointer[Float32, MutAnyOrigin],
-                ) -> c_int,
+                    image_data: Pointer[Float32, MutUnsafeAnyOrigin],
+                ) thin abi("C") -> c_int,
             ]()
 
             is_valid_data = decode_image_data_float32(
-                raw_data=raw_data.unsafe_ptr(),
-                raw_data_length=len(raw_data),
-                desired_channels=Self.color_space.channels(),
-                image_data=image_data,
+                raw_data=raw_data.unsafe_ptr().as_unsafe_any_origin(),
+                raw_data_length=c_int(len(raw_data)),
+                desired_channels=c_int(Self.color_space.channels()),
+                image_data=image_data.as_unsafe_any_origin(),
             )
 
-            @parameter
-            if Self.dtype == DType.float32:
+            comptime if Self.dtype == DType.float32:
                 image = Image[Self.color_space, Self.dtype](
                     height=height,
                     width=width,
-                    data=image_data.bitcast[Scalar[Self.dtype]](),
+                    data=image_data.unsafe_bitcast[Scalar[Self.dtype]](),
                 )
             else:
                 image = Image[Self.color_space, DType.float32](height=height, width=width, data=image_data).as_type[Self.dtype]()
