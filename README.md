@@ -50,18 +50,26 @@ It can unify image processing workflows into one language that runs on any hardw
 - [Pixi](https://mojolang.org/docs/manual/get-started/) (the Mojo environment and package manager)
 
 #### Using the pixi cli
+Add the Modular channels to `pixi.toml`:
+```toml
+[workspace]
+channels = [
+  "https://conda.modular.com/max",
+  "https://repo.prefix.dev/modular-community",
+  "conda-forge",
+]
+```
+
+Add Mosaic with `pixi add`:
 ```bash
 pixi add mosaic-mojo
 ```
 
 #### After installation
-The `pixi.toml` file should include the Modular community channel and the Mosaic dependency:
+The `pixi.toml` file should include the Mosaic dependency:
 ```toml
-[project]
-channels = ["https://repo.prefix.dev/modular-community"]
-
 [dependencies]
-mosaic-mojo = "*"
+mosaic-mojo = "x.x.x"
 ```
 
 ## Examples
