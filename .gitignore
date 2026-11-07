@@ -11,9 +11,6 @@
 # Rattler-build
 /output/
 
-# Modular
-modular/
-
 # Claude
 .claude/
 
