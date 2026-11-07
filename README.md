@@ -13,6 +13,7 @@
 <p align="center">
   <a href="#overview">Overview</a> •
   <a href="#installation">Installation</a> •
+  <a href="#quickstart">Quickstart</a> •
   <a href="#examples">Examples</a> •
   <a href="#acknowledgements">Acknowledgements</a>
 </p>
@@ -21,7 +22,7 @@
 #### Description
 Mosaic is a cross-platform (macOS and linux) image processing library for prototyping and production.
 
-By transparently leveraging hardware acceleration, Mosaic is built specifically for heterogenous compute: CPUs, GPUs, and more in the future.
+By transparently leveraging hardware acceleration, Mosaic is built specifically for heterogeneous compute: CPUs, GPUs, and more in the future.
 
 It can unify image processing workflows into one language that runs on any hardware.
 
@@ -70,6 +71,31 @@ The `pixi.toml` file should include the Mosaic dependency:
 ```toml
 [dependencies]
 mosaic-mojo = "x.x.x"
+```
+
+## Quickstart
+Load, process, and visualize an image in a few lines with comptime safety and SIMD acceleration:
+```mojo
+from mosaic.image import Image, ImageFile, ColorSpace, Border, Interpolation
+from mosaic.visualizer import Visualizer
+
+def main() raises:
+    # Load an RGB image as float64 (color space and data type are compile-time parameters)
+    var image = Image[ColorSpace.rgb, DType.float64]("examples/data/mandrill.png")
+
+    # Scale to double size with bilinear interpolation
+    var scaled = image.scaled[Interpolation.bilinear](2.0)
+
+    # Blur with a 9x9 Gaussian kernel and reflected borders
+    scaled.gaussian_blur[Border.reflect](size=9)
+
+    # Convert to 8-bit greyscale and save as a PNG
+    var result = scaled.converted_as_type[ColorSpace.greyscale, DType.uint8]()
+    result.save[ImageFile.png]("mandrill-processed")
+
+    # Show the result in the native visualizer (macOS)
+    Visualizer.show(result, window_title="Processed")
+    Visualizer.wait()
 ```
 
 ## Examples

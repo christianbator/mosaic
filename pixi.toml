@@ -35,10 +35,6 @@ max-core = ">=26.7.0,<27"
 mblack = ">=26.7.0,<27"
 clangxx = ">=22.1.0,<23.0"
 
-[system-requirements]
-macos = "15.0"
-linux = "5.15"
-
 [tasks.build]
 env = { PREFIX = "$CONDA_PREFIX" }
 args = [ { arg = "libraries", default = "" } ]
