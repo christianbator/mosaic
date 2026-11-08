@@ -8,9 +8,10 @@
 from std.os import abort
 from std.pathlib import Path
 from std.algorithm import vectorize
+from std.bit import next_power_of_two
 from max.algorithm import parallelize
-from std.math import floor, ceil, ceildiv, trunc, Ceilable, CeilDivable, Floorable, Truncable
-from std.sys.info import bit_width_of
+from std.math import floor, ceil, ceildiv, trunc, exp, isfinite, Ceilable, CeilDivable, Floorable, Truncable
+from std.sys.info import bit_width_of, simd_width_of
 
 from mosaic.numeric import Matrix, MatrixSlice, StridedRange, SIMDRange, Number, ScalarNumber
 from mosaic.numeric.fft import fft_dtype
@@ -193,6 +194,9 @@ struct Image[color_space: ColorSpace, dtype: DType](
     def unsafe_uint8_ptr(self) -> Pointer[UInt8, MutUntrackedOrigin]:
         return self._matrix.unsafe_uint8_ptr()
 
+    #
+    # Lifetime Management
+    #
     def keep(self):
         pass
 
@@ -691,15 +695,15 @@ struct Image[color_space: ColorSpace, dtype: DType](
 
         self._matrix.for_each_zipped(number_transformer, other._matrix)
 
-    def invert(mut self):
-        comptime assert Self.dtype == DType.uint8, "invert() is only available for UInt8 images, since inversion is ambiguous otherwise"
+    def invert(mut self) where Self.dtype == DType.uint8:
+        # invert() is only available for UInt8 images, since inversion is ambiguous otherwise
 
         def transformer[width: Int](value: SIMD[Self.dtype, width]) {imm} -> SIMD[Self.dtype, width]:
-            return 255 - value
+            return Scalar[Self.dtype].MAX_FINITE - value
 
         self.for_each(transformer)
 
-    def inverted(self) -> Self:
+    def inverted(self) -> Self where Self.dtype == DType.uint8:
         var result = self.copy()
         result.invert()
 
@@ -763,7 +767,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
                             row=y * self.height() // height,
                             col=x * self.width() // width,
                             component=channel,
-                            offset=SIMDRange[simd_width]() * self.width() // width,
+                            offset=(SIMDRange[simd_width]() + x) * self.width() // width - x * self.width() // width,
                             mask=SIMD[DType.bool, simd_width](fill=True),
                         ).value,
                         y=y,
@@ -783,14 +787,17 @@ struct Image[color_space: ColorSpace, dtype: DType](
         comptime for channel in range(Self.color_space.channels()):
 
             def process_row(y: Int) {mut result, imm}:
-                var fractional_y = Float64(y * self.height()) / Float64(height)
+                # Half-pixel centers: map destination pixel centers onto source pixel centers
+                var fractional_y = max((Float64(y) + 0.5) * Float64(self.height()) / Float64(height) - 0.5, 0)
                 var y1 = Int(floor(fractional_y))
                 var y2 = min(y1 + 1, self.height() - 1)
 
                 def process_col[
                     simd_width: Int
                 ](x: Int) {mut result, imm self, imm height, imm width, imm fractional_y, imm y1, imm y2, imm y}:
-                    var fractional_x = (Float64(x) + SIMDRange[simd_width]().cast[DType.float64]()) * Float64(self.width()) / Float64(width)
+                    var fractional_x = max(
+                        (Float64(x) + SIMDRange[simd_width]().cast[DType.float64]() + 0.5) * Float64(self.width()) / Float64(width) - 0.5, 0
+                    )
                     var x1 = floor(fractional_x).cast[DType.int]()
                     var x2 = (x1 + 1).clamp(0, self.width() - 1)
                     var x_in_bounds = (x2 - x1).cast[DType.bool]()
@@ -826,6 +833,10 @@ struct Image[color_space: ColorSpace, dtype: DType](
                         )
 
                         value = (Float64(y2) - fractional_y) * top_intermediate + (fractional_y - Float64(y1)) * bottom_intermediate
+
+                    # Round half up instead of truncating (round() rounds half to even, OpenCV rounds half up)
+                    comptime if Self.dtype.is_integral():
+                        value = floor(value + 0.5)
 
                     result._strided_store(value.cast[Self.dtype](), y=y, x=x, channel=channel)
 
@@ -900,8 +911,131 @@ struct Image[color_space: ColorSpace, dtype: DType](
     def gaussian_blurred[border: Border](self, size: Int, std_dev: Optional[Float64] = None) raises -> Self:
         return self.filtered[border](Filters.gaussian_kernel_2d[Self.dtype, Self.color_space.channels()](size=size, std_dev=std_dev))
 
+    def bilateral_filter[
+        border: Border
+    ](mut self, radius: Int, color_std_dev: Float64, space_std_dev: Float64) raises where Self.dtype == DType.uint8:
+        self.bilateral_filtered[border](radius, color_std_dev, space_std_dev).copy_into(self)
+
+    def bilateral_filtered[
+        border: Border
+    ](self, radius: Int, color_std_dev: Float64, space_std_dev: Float64) raises -> Self where Self.dtype == DType.uint8:
+        if radius < 0:
+            raise Error("Bilateral filter radius must not be negative")
+
+        # Written as not (> 0) so NaN is rejected too
+        if not (color_std_dev > 0) or not (space_std_dev > 0):
+            raise Error("Bilateral filter standard deviations must be positive")
+
+        var color_coeff: Float32 = Float32(-0.5 / (color_std_dev**2))
+        var space_coeff: Float32 = Float32(-0.5 / (space_std_dev**2))
+
+        # Standard deviations below about 4e-20 overflow the coefficients to -inf, making the weight at distance 0 NaN
+        if not isfinite(color_coeff) or not isfinite(space_coeff):
+            raise Error("Bilateral filter standard deviations are too small")
+
+        var result = Self(height=self.height(), width=self.width())
+
+        # Window offsets inside the circle of the given radius (dy, dx, spatial weight)
+        var offsets = List[Tuple[Int, Int, Float32]]()
+
+        for dy in range(-radius, radius + 1):
+            for dx in range(-radius, radius + 1):
+                var distance_squared = dy**2 + dx**2
+
+                if distance_squared <= radius**2:
+                    offsets.append((dy, dx, exp(space_coeff * Float32(distance_squared))))
+
+        # Color weights for every possible color distance (sum of absolute channel differences, 0 to 255 per channel)
+        var color_weights = List[Float32](capacity=Self.color_space.channels() * 256)
+
+        for color_distance in range(Self.color_space.channels() * 256):
+            color_weights.append(exp(color_coeff * Float32(color_distance**2)))
+
+        # One SIMD lane per channel, rounded up to a power of two (greyscale: 1, rgb: 4)
+        comptime channel_size = next_power_of_two(Self.color_space.channels())
+
+        # Adjacent output pixels processed together by the vectorized path (two registers per vector measured fastest,
+        # since this loop keeps about a dozen vectors live at once)
+        comptime pixel_width = 2 * simd_width_of[DType.float32]()
+
+        def process_row(y: Int) {mut result, imm}:
+            # Scalar path: one pixel at a time, with bordered loads (handles pixels near the image edges)
+            def filter_pixel(x: Int) {mut result, imm}:
+                var center = SIMD[DType.float32, channel_size](0)
+
+                comptime for channel in range(Self.color_space.channels()):
+                    center[channel] = self._strided_load(y=y, x=x, channel=channel).cast[DType.float32]()
+
+                var sums = SIMD[DType.float32, channel_size](0)
+                var weight_sum = Float32(0)
+
+                for offset in offsets:
+                    var neighbor = SIMD[DType.float32, channel_size](0)
+
+                    comptime for channel in range(Self.color_space.channels()):
+                        neighbor[channel] = self._bordered_load[border](y=y + offset[0], x=x + offset[1], channel=channel).cast[
+                            DType.float32
+                        ]()
+
+                    var color_distance = Int(abs(neighbor - center).reduce_add())
+                    var weight = offset[2] * color_weights[color_distance]
+
+                    weight_sum += weight
+                    sums = neighbor.fma(weight, sums)
+
+                var filtered_pixel = round(sums * (1 / weight_sum))
+
+                comptime for channel in range(Self.color_space.channels()):
+                    result._strided_store(filtered_pixel[channel].cast[Self.dtype](), y=y, x=x, channel=channel)
+
+            # Vectorized path: `width` adjacent pixels at once, one SIMD lane per pixel
+            def filter_pixels[width: Int](x: Int) {mut result, imm}:
+                # Edge blocks: part of the window falls outside the image, so use the bordered scalar path
+                var is_interior = y >= radius and y + radius < self.height() and x >= radius and x + width - 1 + radius < self.width()
+
+                if not is_interior:
+                    for lane in range(width):
+                        filter_pixel(x + lane)
+                    return
+
+                # Interior blocks: one vector per channel, holding that channel for all `width` pixels
+                var centers = Array[SIMD[DType.float32, width], Self.color_space.channels()](uninitialized=True)
+
+                comptime for channel in range(Self.color_space.channels()):
+                    centers[channel] = self._strided_load[width](y=y, x=x, channel=channel).cast[DType.float32]()
+
+                var sums = Array[SIMD[DType.float32, width], Self.color_space.channels()](fill=SIMD[DType.float32, width](0))
+                var weight_sums = SIMD[DType.float32, width](0)
+
+                for offset in offsets:
+                    var neighbors = Array[SIMD[DType.float32, width], Self.color_space.channels()](uninitialized=True)
+                    var color_distances = SIMD[DType.float32, width](0)
+
+                    comptime for channel in range(Self.color_space.channels()):
+                        neighbors[channel] = self._strided_load[width](y=y + offset[0], x=x + offset[1], channel=channel).cast[
+                            DType.float32
+                        ]()
+                        color_distances += abs(neighbors[channel] - centers[channel])
+
+                    var weights = offset[2] * color_weights.unsafe_ptr().unsafe_gather(color_distances.cast[DType.int32]())
+                    weight_sums += weights
+
+                    comptime for channel in range(Self.color_space.channels()):
+                        sums[channel] = neighbors[channel].fma(weights, sums[channel])
+
+                var inverse_weight_sums = 1 / weight_sums
+
+                comptime for channel in range(Self.color_space.channels()):
+                    result._strided_store(round(sums[channel] * inverse_weight_sums).cast[Self.dtype](), y=y, x=x, channel=channel)
+
+            vectorize[pixel_width](self.width(), filter_pixels)
+
+        parallelize(process_row, self.height())
+
+        return result^
+
     #
-    # Filtering
+    # General Filtering
     #
     def filter[border: Border](mut self, kernel: Matrix[Self.dtype, Self.color_space.channels()]) raises:
         self.filtered[border](kernel).copy_into(self)
@@ -1046,34 +1180,10 @@ struct Image[color_space: ColorSpace, dtype: DType](
 
     @always_inline
     def _bordered_load[border: Border](self, y: Int, x: Int, channel: Int) -> Scalar[Self.dtype]:
-        comptime if border == Border.zero:
-            if y >= 0 and y < self.height() and x >= 0 and x < self.width():
-                return self._strided_load(y=y, x=x, channel=channel)
-            else:
-                return Scalar[Self.dtype](0)
-        elif border == Border.wrap:
-            return self._strided_load(y=y % self.height(), x=x % self.width(), channel=channel)
-        elif border == Border.reflect:
-            var reflected_y: Int
-            var reflected_x: Int
+        def load(y: Int, x: Int, channel: Int) {imm self} -> Scalar[Self.dtype]:
+            return self._strided_load(y=y, x=x, channel=channel)
 
-            if y < 0:
-                reflected_y = abs(y)
-            elif y >= self.height():
-                reflected_y = 2 * (self.height() - 1) - y
-            else:
-                reflected_y = y
-
-            if x < 0:
-                reflected_x = abs(x)
-            elif x >= self.width():
-                reflected_x = 2 * (self.width() - 1) - x
-            else:
-                reflected_x = x
-
-            return self._strided_load(y=reflected_y, x=reflected_x, channel=channel)
-        else:
-            abort("Unimplemented border type in Image._bordered_load()")
+        return Border.load[border](load, y=y, x=x, channel=channel, height=self.height(), width=self.width())
 
     #
     # Type Conversion

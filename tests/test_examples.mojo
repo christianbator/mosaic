@@ -153,8 +153,9 @@ def test_resize_image() raises:
     var image = Image[ColorSpace.rgb, DType.uint8](input + "mandrill.png")
     var result = image.resized[Interpolation.bilinear](height=256, width=512)
 
+    # Reference is OpenCV's INTER_LINEAR_EXACT
     var reference = Image[ColorSpace.rgb, DType.uint8](expected + "resize_image.png")
-    assert_true(result.matches(reference))
+    assert_true(result.matches(reference, tolerance=0))
 
 
 def test_rotate_image() raises:
@@ -169,8 +170,9 @@ def test_scale_image() raises:
     var image = Image[ColorSpace.rgb, DType.uint8](input + "mandrill.png")
     var result = image.scaled[interpolation=Interpolation.bilinear](0.5)
 
+    # Reference is OpenCV's INTER_LINEAR_EXACT
     var reference = Image[ColorSpace.rgb, DType.uint8](expected + "scale_image.png")
-    assert_true(result.matches(reference))
+    assert_true(result.matches(reference, tolerance=0))
 
 
 def test_slice_image() raises:

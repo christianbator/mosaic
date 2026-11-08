@@ -5,6 +5,9 @@
 # Created by Christian Bator on 03/11/2025
 #
 
+#
+# Workspace 
+#
 [workspace]
 # These should match rattler-build/recipe.yaml > context
 version = "0.2.0"
@@ -29,12 +32,17 @@ channels = [
     "conda-forge"
 ]
 
+#
+# Dependencies 
+#
 [dependencies]
-mojo-compiler = ">=1.0,<2.0"
+mojo = ">=1.0,<2"
 max-core = ">=26.7.0,<27"
-mblack = ">=26.7.0,<27"
-clangxx = ">=22.1.0,<23.0"
+clangxx = ">=22.1.0,<23"
 
+#
+# Tasks 
+#
 [tasks.build]
 env = { PREFIX = "$CONDA_PREFIX" }
 args = [ { arg = "libraries", default = "" } ]
@@ -54,3 +62,51 @@ cmd = """ bash -c '
 
 [tasks.package]
 cmd = "rattler-build build --recipe rattler-build/recipe.yaml -c https://conda.modular.com/max -c conda-forge"
+
+#
+# Benchmarks
+#
+[environments]
+benchmark = ["benchmark"]
+
+[feature.benchmark.dependencies]
+numpy = ">=2.5,<3"
+altair = ">=6.3,<7"
+
+# The PyPI build includes OpenCL (OpenCV's GPU path on macOS), the conda-forge build does not
+[feature.benchmark.pypi-dependencies]
+opencv-python-headless = ">=5.0,<6"
+vl-convert-python = ">=1.9,<2"
+
+[feature.benchmark.tasks.download-benchmark-data]
+cmd = "benchmark/scripts/download_data.sh"
+
+[feature.benchmark.tasks.prepare-benchmark-input]
+depends-on = ["download-benchmark-data"]
+inputs = ["benchmark/data/*", "benchmark/scripts/prepare_input.py"]
+outputs = ["benchmark/input/*.png"]
+cmd = "python benchmark/scripts/prepare_input.py"
+
+[feature.benchmark.tasks.benchmark-opencv]
+depends-on = ["prepare-benchmark-input"]
+args = [ { arg = "name" } ]
+cmd = "python benchmark/{{ name }}.py"
+
+# Mojo imports the mosaic package installed in the environment (not the source tree), so rebuild it first
+[feature.benchmark.tasks.benchmark-mosaic]
+depends-on = ["prepare-benchmark-input", { task = "build", args = ["libmosaic-codec mosaic"], environment = "benchmark" }]
+args = [ { arg = "name" } ]
+cmd = "mojo run benchmark/{{ name }}.mojo"
+
+[feature.benchmark.tasks.plot-benchmark]
+args = [ { arg = "name" } ]
+cmd = "python benchmark/scripts/plot_results.py {{ name }}"
+
+# Runs both benchmarks in order (mosaic compares against OpenCV's output), then plots the results
+[feature.benchmark.tasks.benchmark]
+args = [ { arg = "name" } ]
+depends-on = [
+    { task = "benchmark-opencv", args = ["{{ name }}"] },
+    { task = "benchmark-mosaic", args = ["{{ name }}"] },
+]
+cmd = "python benchmark/scripts/plot_results.py {{ name }}"

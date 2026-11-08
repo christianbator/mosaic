@@ -382,6 +382,9 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     def unsafe_uint8_ptr(self) -> Pointer[UInt8, MutUntrackedOrigin]:
         return self._data.unsafe_uint8_ptr()
 
+    #
+    # Lifetime Management
+    #
     def keep(self):
         pass
 

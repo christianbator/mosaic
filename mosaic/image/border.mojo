@@ -34,6 +34,49 @@ struct Border(Equatable, ImplicitlyCopyable, Movable, Writable):
             abort("Unsupported border: " + String(raw_value))
 
     #
+    # Bordered Loading
+    #
+    @staticmethod
+    @always_inline
+    def load[
+        dtype: DType, Loader: def(Int, Int, Int) -> Scalar[dtype], //, border: Border
+    ](loader: Loader, y: Int, x: Int, channel: Int, height: Int, width: Int) -> Scalar[dtype]:
+        comptime if border == Border.zero:
+            if y >= 0 and y < height and x >= 0 and x < width:
+                return loader(y, x, channel)
+            else:
+                return Scalar[dtype](0)
+        elif border == Border.wrap:
+            return loader(Self.wrapped(y, height), Self.wrapped(x, width), channel)
+        elif border == Border.reflect:
+            return loader(Self.reflected(y, height), Self.reflected(x, width), channel)
+        else:
+            abort("Unimplemented border type in Border.load()")
+
+    #
+    # Index Mapping
+    #
+    @staticmethod
+    @always_inline
+    def wrapped(index: Int, size: Int) -> Int:
+        return index % size
+
+    @staticmethod
+    @always_inline
+    def reflected(index: Int, size: Int) -> Int:
+        # Fast path for indices in bounds
+        if UInt(index) < UInt(size):
+            return index
+
+        if size == 1:
+            return 0
+
+        var period = 2 * (size - 1)
+        var folded = abs(index) % period
+
+        return folded if folded < size else period - folded
+
+    #
     # Equatable
     #
     def __eq__(self, other: Self) -> Bool:
