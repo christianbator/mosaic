@@ -946,9 +946,10 @@ struct Image[color_space: ColorSpace, dtype: DType](
                     offsets.append((dy, dx, exp(space_coeff * Float32(distance_squared))))
 
         # Color weights for every possible color distance (sum of absolute channel differences, 0 to 255 per channel)
-        var color_weights = List[Float32](capacity=Self.color_space.channels() * 256)
+        comptime color_distance_count = Self.color_space.channels() * Int(Scalar[Self.dtype].MAX_FINITE) + 1
+        var color_weights = List[Float32](capacity=color_distance_count)
 
-        for color_distance in range(Self.color_space.channels() * 256):
+        for color_distance in range(color_distance_count):
             color_weights.append(exp(color_coeff * Float32(color_distance**2)))
 
         # One SIMD lane per channel, rounded up to a power of two (greyscale: 1, rgb: 4)
@@ -1178,6 +1179,9 @@ struct Image[color_space: ColorSpace, dtype: DType](
 
         return result^
 
+    #
+    # Filter Utilities
+    #
     @always_inline
     def _bordered_load[border: Border](self, y: Int, x: Int, channel: Int) -> Scalar[Self.dtype]:
         def load(y: Int, x: Int, channel: Int) {imm self} -> Scalar[Self.dtype]:

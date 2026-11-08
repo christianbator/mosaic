@@ -5,7 +5,8 @@
 # Created by Christian Bator on 11/08/2026
 #
 
-from std.math import ceildiv
+from std.math import ceildiv, isfinite, exp
+from std.bit import next_power_of_two
 from max.gpu import global_idx
 from max.gpu.host import DeviceContext, DeviceBuffer
 from layout import ComptimeInt, Idx, TileTensor, row_major, RowMajorLayout
@@ -13,6 +14,7 @@ from layout import ComptimeInt, Idx, TileTensor, row_major, RowMajorLayout
 from mosaic.numeric import Size
 
 from .image import Image
+from .border import Border
 from .color_space import ColorSpace
 
 
@@ -23,13 +25,14 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
     #
     # Fields
     #
-    comptime Layout = RowMajorLayout[Int, Int, ComptimeInt[Self.color_space.channels()]]
-    comptime Tensor = TileTensor[Self.dtype, Self.Layout, MutUntrackedOrigin]
-    comptime HostImage = Image[Self.color_space, Self.dtype]
+    comptime _Layout = RowMajorLayout[Int, Int, ComptimeInt[Self.color_space.channels()]]
+    comptime _Tensor = TileTensor[Self.dtype, Self._Layout, MutUntrackedOrigin]
+    comptime _HostImage = Image[Self.color_space, Self.dtype]
+    comptime _tile_size = Size(width=16, height=16)
 
     var _context: DeviceContext
     var _buffer: DeviceBuffer[Self.dtype]
-    var _tensor: Self.Tensor
+    var _tensor: Self._Tensor
 
     #
     # Initialization
@@ -37,12 +40,12 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
     def __init__(out self, height: Int, width: Int, ctx: DeviceContext) raises:
         self._context = ctx
         self._buffer = self._context.enqueue_create_buffer[Self.dtype](height * width * Self.color_space.channels())
-        self._tensor = Self.Tensor(self._buffer.unsafe_ptr().unsafe_origin_cast[MutUntrackedOrigin](), Self._layout(height, width))
+        self._tensor = Self._Tensor(self._buffer.unsafe_ptr().unsafe_origin_cast[MutUntrackedOrigin](), Self._layout(height, width))
 
-    def __init__(out self, image: Self.HostImage, ctx: DeviceContext) raises:
+    def __init__(out self, image: Self._HostImage, ctx: DeviceContext) raises:
         self._context = ctx
         self._buffer = self._context.enqueue_create_buffer[Self.dtype](image.samples())
-        self._tensor = Self.Tensor(
+        self._tensor = Self._Tensor(
             self._buffer.unsafe_ptr().unsafe_origin_cast[MutUntrackedOrigin](), Self._layout(image.height(), image.width())
         )
 
@@ -51,7 +54,7 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
         self.synchronize()
 
     @staticmethod
-    def _layout(height: Int, width: Int) -> Self.Layout:
+    def _layout(height: Int, width: Int) -> Self._Layout:
         return row_major(height, width, Idx[Self.color_space.channels()])
 
     #
@@ -69,6 +72,12 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
         return Self.color_space.channels()
 
     #
+    # Copying
+    #
+    def copy_into(self, mut other: Self) raises:
+        self._buffer.enqueue_copy_to(other._buffer)
+
+    #
     # Lifetime Management
     #
     def keep(self):
@@ -81,8 +90,8 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
     def synchronize(self) raises:
         self._context.synchronize()
 
-    def to_host(self) raises -> Self.HostImage:
-        var result = Self.HostImage(self.height(), self.width())
+    def to_host(self) raises -> Self._HostImage:
+        var result = Self._HostImage(self.height(), self.width())
 
         self._buffer.enqueue_copy_to(result.unsafe_data_ptr())
         self.synchronize()
@@ -101,19 +110,17 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
 
         return result^
 
-    def _enqueue_invert(self, result: Self.Tensor) raises:
-        comptime tile_size = Size(width=16, height=16)
-
+    def _enqueue_invert(self, result: Self._Tensor) raises:
         self._context.enqueue_function[Self._invert](
             self._tensor,
             Scalar[Self.dtype].MAX_FINITE,
             result,
-            grid_dim=(ceildiv(self.width(), tile_size.width), ceildiv(self.height(), tile_size.height)),
-            block_dim=(tile_size.width, tile_size.height),
+            grid_dim=(ceildiv(self.width(), Self._tile_size.width), ceildiv(self.height(), Self._tile_size.height)),
+            block_dim=(Self._tile_size.width, Self._tile_size.height),
         )
 
     @staticmethod
-    def _invert(source: Self.Tensor, scalar: Scalar[Self.dtype], result: Self.Tensor):
+    def _invert(source: Self._Tensor, scalar: Scalar[Self.dtype], result: Self._Tensor):
         var y = global_idx.y
         var x = global_idx.x
 
@@ -126,8 +133,121 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
     #
     # Common Filters
     #
-    # def bilateral_filter[border: Border](mut self, radius: Int, color_std_dev: Float64, space_std_dev: Float64) raises:
-    #     self.bilateral_filtered[border](radius, color_std_dev, space_std_dev).copy_into(self)
+    def bilateral_filter[
+        border: Border
+    ](mut self, radius: Int, color_std_dev: Float64, space_std_dev: Float64) raises where Self.dtype == DType.uint8:
+        self.bilateral_filtered[border](radius, color_std_dev, space_std_dev).copy_into(self)
 
-    # def bilateral_filtered[border: Border](self, radius: Int, color_std_dev: Float64, space_std_dev: Float64) raises -> Self:
-    #     var result = Self(height=self.height(), width=self.width())
+    def bilateral_filtered[
+        border: Border
+    ](self, radius: Int, color_std_dev: Float64, space_std_dev: Float64) raises -> Self where Self.dtype == DType.uint8:
+        if radius < 0:
+            raise Error("Bilateral filter radius must not be negative")
+
+        # Written as not (> 0) so NaN is rejected too
+        if not (color_std_dev > 0) or not (space_std_dev > 0):
+            raise Error("Bilateral filter standard deviations must be positive")
+
+        var color_coeff: Float32 = Float32(-0.5 / (color_std_dev**2))
+        var space_coeff: Float32 = Float32(-0.5 / (space_std_dev**2))
+
+        # Very small standard deviations overflow the coefficients to -inf, making the weight at distance 0 NaN
+        if not isfinite(color_coeff) or not isfinite(space_coeff):
+            raise Error("Bilateral filter standard deviations are too small")
+
+        var result = Self(self.height(), self.width(), self._context)
+
+        # Window offsets inside the circle of the given radius, packed as (dy, dx) pairs, with a spatial weight for each
+        # Sized for the full square window, since the number of points inside the circle isn't known up front
+        var side = 2 * radius + 1
+        var space_offsets = self._context.enqueue_create_buffer[DType.int32](2 * side**2)
+        var space_weights = self._context.enqueue_create_buffer[DType.float32](side**2)
+        var space_count = 0
+
+        with space_offsets.map_to_host() as host_offsets, space_weights.map_to_host() as host_space_weights:
+            for dy in range(-radius, radius + 1):
+                for dx in range(-radius, radius + 1):
+                    var distance_squared = dy**2 + dx**2
+
+                    if distance_squared <= radius**2:
+                        host_offsets[2 * space_count] = Int32(dy)
+                        host_offsets[2 * space_count + 1] = Int32(dx)
+                        host_space_weights[space_count] = exp(space_coeff * Float32(distance_squared))
+                        space_count += 1
+
+        # Color weights for every possible color distance (sum of absolute channel differences, 0 to 255 per channel)
+        comptime color_distance_count = Self.color_space.channels() * Int(Scalar[Self.dtype].MAX_FINITE) + 1
+        var color_weights = self._context.enqueue_create_buffer[DType.float32](color_distance_count)
+
+        with color_weights.map_to_host() as host_color_weights:
+            for color_distance in range(color_distance_count):
+                host_color_weights[color_distance] = exp(color_coeff * Float32(color_distance**2))
+
+        self._context.enqueue_function[Self._bilateral_filter[border]](
+            self._tensor,
+            space_offsets,
+            space_weights,
+            Int32(space_count),
+            color_weights,
+            result._tensor,
+            grid_dim=(ceildiv(self.width(), Self._tile_size.width), ceildiv(self.height(), Self._tile_size.height)),
+            block_dim=(Self._tile_size.width, Self._tile_size.height),
+        )
+
+        return result^
+
+    @staticmethod
+    def _bilateral_filter[
+        border: Border
+    ](
+        source: Self._Tensor,
+        space_offsets: Pointer[Int32, ImmutAnyOrigin],
+        space_weights: Pointer[Float32, ImmutAnyOrigin],
+        space_count: Int32,
+        color_weights: Pointer[Float32, ImmutAnyOrigin],
+        result: Self._Tensor,
+    ) where (Self.dtype == DType.uint8):
+        var y = global_idx.y
+        var x = global_idx.x
+
+        if y >= Int(source.dim[0]()) or x >= Int(source.dim[1]()):
+            return
+
+        comptime channel_size = next_power_of_two(Self.color_space.channels())
+        var center = SIMD[DType.float32, channel_size](0)
+
+        comptime for channel in range(Self.color_space.channels()):
+            center[channel] = source[y, x, channel].cast[DType.float32]()
+
+        var sums = SIMD[DType.float32, channel_size](0)
+        var weight_sum = Float32(0)
+
+        for index in range(space_count):
+            var neighbor = SIMD[DType.float32, channel_size](0)
+
+            comptime for channel in range(Self.color_space.channels()):
+                neighbor[channel] = Self._bordered_load[border](
+                    source, y + Int(space_offsets[unsafe_offset=2 * index]), x + Int(space_offsets[unsafe_offset=2 * index + 1]), channel
+                ).cast[DType.float32]()
+
+            var color_distance = Int(abs(neighbor - center).reduce_add())
+            var weight = space_weights[unsafe_offset=index] * color_weights[unsafe_offset=color_distance]
+
+            weight_sum += weight
+            sums = neighbor.fma(weight, sums)
+
+        var filtered_pixel = round(sums * (1 / weight_sum))
+
+        comptime for channel in range(Self.color_space.channels()):
+            result[y, x, channel] = filtered_pixel[channel].cast[Self.dtype]()
+
+    #
+    # Filter Utilities
+    #
+    @staticmethod
+    @always_inline
+    def _bordered_load[border: Border](source: Self._Tensor, y: Int, x: Int, channel: Int) -> Scalar[Self.dtype]:
+        def load(y: Int, x: Int, channel: Int) {imm source} -> Scalar[Self.dtype]:
+            return source[y, x, channel]
+
+        return Border.load[border](load, y=y, x=x, channel=channel, height=Int(source.dim[0]()), width=Int(source.dim[1]()))
