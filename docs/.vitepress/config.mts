@@ -46,6 +46,13 @@ export default defineConfig({
         },
       ],
       "/api/": [{ text: "API Reference", link: "/api/" }, ...apiSidebar],
+      // Add each write-up here as it's published, newest first
+      "/writeups/": [
+        {
+          text: "Write-ups",
+          items: [{ text: "All Write-ups", link: "/writeups/" }],
+        },
+      ],
     },
 
     socialLinks: [{ icon: "github", link: "https://github.com/christianbator/mosaic" }],

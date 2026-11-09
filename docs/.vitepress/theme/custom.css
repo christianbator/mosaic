@@ -11,6 +11,50 @@
  */
 
 /*
+ * Nav bar: the same layout on every page, so it stays in place between pages with and without a sidebar.
+ * By default only pages with a sidebar give the title the sidebar's width, which moves the search box and menu.
+ * These are the default theme's rules for those pages (VPNavBar.vue), applied to every page.
+ */
+@media (min-width: 960px) {
+  :root .VPNavBar .wrapper {
+    padding: 0;
+  }
+
+  :root .VPNavBar .container {
+    max-width: 100%;
+  }
+
+  :root .VPNavBar .container > .title {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 2;
+    padding: 0 32px;
+    width: var(--vp-sidebar-width);
+    height: var(--vp-nav-height);
+  }
+
+  :root .VPNavBar .container > .content {
+    position: relative;
+    z-index: 1;
+    padding-right: 32px;
+    padding-left: var(--vp-sidebar-width);
+  }
+}
+
+@media (min-width: 1440px) {
+  :root .VPNavBar .container > .title {
+    padding-left: max(32px, calc((100% - (var(--vp-layout-max-width) - 64px)) / 2));
+    width: calc((100% - (var(--vp-layout-max-width) - 64px)) / 2 + var(--vp-sidebar-width) - 32px);
+  }
+
+  :root .VPNavBar .container > .content {
+    padding-right: calc((100vw - var(--vp-layout-max-width)) / 2 + 32px);
+    padding-left: calc((100vw - var(--vp-layout-max-width)) / 2 + var(--vp-sidebar-width));
+  }
+}
+
+/*
  * Nav bar logo: the wordmark on pages with a sidebar, the icon alone elsewhere
  */
 :root .VPNavBarTitle .nav-icon {
@@ -89,15 +133,6 @@
   :root .VPContent .VPDoc .content {
     padding-left: 24px;
     padding-right: 24px;
-  }
-
-  /* Pages without a sidebar, like the write-ups, get a wider column than the default theme's 752px */
-  :root .VPContent .VPDoc:not(.has-sidebar) .container {
-    max-width: 1280px;
-  }
-
-  :root .VPContent .VPDoc:not(.has-sidebar) .content {
-    max-width: 1040px;
   }
 }
 
