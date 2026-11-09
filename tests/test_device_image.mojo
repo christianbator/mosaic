@@ -26,7 +26,9 @@ def test_device_memory() raises:
     # Device memory, as on a discrete GPU, instead of host memory on unified memory
     var context = DeviceContext()
     var image = Image[ColorSpace.rgb, DType.uint8](input + "mandrill.png")
-    var device_image = DeviceImage[ColorSpace.rgb, DType.uint8](image.height(), image.width(), context, _host_memory=False)
+    var device_image = DeviceImage[ColorSpace.rgb, DType.uint8](
+        image.height(), image.width(), context, _host_memory=False
+    )
     DeviceImage(image, context).copy_into(device_image)
     var result = device_image.to_host()
 
@@ -51,7 +53,9 @@ def test_bilateral_filter() raises:
     var image = Image[ColorSpace.rgb, DType.uint8](input + "mandrill.png")
     var cpu_result = image.bilateral_filtered[Border.reflect](radius=7, color_std_dev=80, space_std_dev=80)
     var gpu_result = (
-        DeviceImage(image, DeviceContext()).bilateral_filtered[Border.reflect](radius=7, color_std_dev=80, space_std_dev=80).to_host()
+        DeviceImage(image, DeviceContext())
+        .bilateral_filtered[Border.reflect](radius=7, color_std_dev=80, space_std_dev=80)
+        .to_host()
     )
 
     var reference = Image[ColorSpace.rgb, DType.uint8](expected + "bilateral_filter.png")
@@ -64,7 +68,9 @@ def test_bilateral_filter_edges() raises:
     var image = Image[ColorSpace.greyscale, DType.uint8](input + "camera.png")[:, :250].deep_copy()
     var cpu_result = image.bilateral_filtered[Border.zero](radius=4, color_std_dev=30, space_std_dev=4)
     var gpu_result = (
-        DeviceImage(image, DeviceContext()).bilateral_filtered[Border.zero](radius=4, color_std_dev=30, space_std_dev=4).to_host()
+        DeviceImage(image, DeviceContext())
+        .bilateral_filtered[Border.zero](radius=4, color_std_dev=30, space_std_dev=4)
+        .to_host()
     )
 
     assert_true(gpu_result.matches(cpu_result, tolerance=0))

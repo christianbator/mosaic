@@ -49,7 +49,7 @@ args = [ { arg = "libraries", default = "" } ]
 cmd = "build/build.sh {{ libraries }}"
 
 [tasks.format]
-cmd = "mojo format --line-length 140 mosaic tests"
+cmd = "mojo format --line-length 120 mosaic tests"
 
 [tasks.test]
 depends-on = ["build"]

@@ -13,16 +13,22 @@ from mosaic.numeric import Matrix, Number
 
 struct Filters:
     @staticmethod
-    def box_kernel_1d[dtype: DType, depth: Int = 1, complex: Bool = False](size: Int) -> Matrix[dtype, depth, complex=complex]:
+    def box_kernel_1d[
+        dtype: DType, depth: Int = 1, complex: Bool = False
+    ](size: Int) -> Matrix[dtype, depth, complex=complex]:
         comptime assert dtype.is_floating_point(), "box_kernel_1d() is only available for floating point dtypes"
 
         return Matrix[dtype, depth, complex=complex](rows=size, cols=1, value=(1 / Float64(size)).cast[dtype]())
 
     @staticmethod
-    def box_kernel_2d[dtype: DType, depth: Int = 1, complex: Bool = False](size: Int) -> Matrix[dtype, depth, complex=complex]:
+    def box_kernel_2d[
+        dtype: DType, depth: Int = 1, complex: Bool = False
+    ](size: Int) -> Matrix[dtype, depth, complex=complex]:
         comptime assert dtype.is_floating_point(), "box_kernel_2d() is only available for floating point dtypes"
 
-        return Matrix[dtype, depth, complex=complex](rows=size, cols=size, value=(1 / Float64(size * size)).cast[dtype]())
+        return Matrix[dtype, depth, complex=complex](
+            rows=size, cols=size, value=(1 / Float64(size * size)).cast[dtype]()
+        )
 
     @staticmethod
     def gaussian_kernel_1d[
@@ -39,7 +45,11 @@ struct Filters:
             try:
                 for i in range(size):
                     result.store_full_depth(
-                        result.create_full_depth_value(exp(-((Float64(i) - Float64(size - 1) / 2) ** 2) / (2 * variance))), row=i, col=0
+                        result.create_full_depth_value(
+                            exp(-((Float64(i) - Float64(size - 1) / 2) ** 2) / (2 * variance))
+                        ),
+                        row=i,
+                        col=0,
                     )
             except error:
                 abort(String(error))
@@ -49,7 +59,9 @@ struct Filters:
             return result.as_type[dtype]()
         else:
             if size == 3:
-                return Matrix[dtype, depth, complex=complex].strided_replication(rows=size, cols=1, values=[0.250, 0.500, 0.250])
+                return Matrix[dtype, depth, complex=complex].strided_replication(
+                    rows=size, cols=1, values=[0.250, 0.500, 0.250]
+                )
             elif size == 5:
                 return Matrix[dtype, depth, complex=complex].strided_replication(
                     rows=size, cols=1, values=[0.062500, 0.250000, 0.375000, 0.250000, 0.062500]
@@ -81,7 +93,11 @@ struct Filters:
                 try:
                     for i in range(size):
                         result.store_full_depth(
-                            result.create_full_depth_value(exp(-((Float64(i) - Float64(size - 1) / 2) ** 2) / (2 * variance))), row=i, col=0
+                            result.create_full_depth_value(
+                                exp(-((Float64(i) - Float64(size - 1) / 2) ** 2) / (2 * variance))
+                            ),
+                            row=i,
+                            col=0,
                         )
                 except error:
                     abort(String(error))

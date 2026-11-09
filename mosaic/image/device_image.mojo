@@ -76,7 +76,9 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
             self._buffer = self._context.enqueue_create_buffer[Self.dtype](count)
 
         # The device address of the memory, which differs from the host address for host memory
-        self._tensor = Self._Tensor(self._buffer.unsafe_ptr().unsafe_origin_cast[MutUntrackedOrigin](), Self._layout(height, width))
+        self._tensor = Self._Tensor(
+            self._buffer.unsafe_ptr().unsafe_origin_cast[MutUntrackedOrigin](), Self._layout(height, width)
+        )
 
     def __init__(out self, image: Self._HostImage, ctx: DeviceContext) raises:
         self = Self(image.height(), image.width(), ctx)
@@ -219,7 +221,12 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
         comptime pixels_per_thread = Self._bilateral_pixels_per_thread
         # The padded image never leaves the device, so it uses device memory, whose free is ordered after the kernels
         # without waiting for them
-        var padded = Self(self.height() + 2 * radius, self.width() + 2 * radius + pixels_per_thread - 1, self._context, _host_memory=False)
+        var padded = Self(
+            self.height() + 2 * radius,
+            self.width() + 2 * radius + pixels_per_thread - 1,
+            self._context,
+            _host_memory=False,
+        )
 
         self._context.enqueue_function[Self._pad[border]](
             self._tensor,
@@ -310,7 +317,9 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
         comptime Pixel = SIMD[DType.float32, channel_size]
 
         # The first center pixel in the padded image, which every neighbor of every pixel is a fixed linear offset from
-        var center_ptr = padded.ptr.unsafe_offset(((y + Int(radius)) * Int(padded.dim[1]()) + x + Int(radius)) * channels)
+        var center_ptr = padded.ptr.unsafe_offset(
+            ((y + Int(radius)) * Int(padded.dim[1]()) + x + Int(radius)) * channels
+        )
         var centers = Array[Pixel, pixels](fill=Pixel(0))
 
         comptime for pixel in range(pixels):
@@ -328,7 +337,9 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
                 var neighbor = Pixel(0)
 
                 comptime for channel in range(channels):
-                    neighbor[channel] = center_ptr[unsafe_offset=offset + pixel * channels + channel].cast[DType.float32]()
+                    neighbor[channel] = center_ptr[unsafe_offset=offset + pixel * channels + channel].cast[
+                        DType.float32
+                    ]()
 
                 # Float to Int32, since converting to the 64-bit Int is emulated on the GPU and costs as much as the rest of the loop
                 var color_distance = abs(neighbor - centers[pixel]).reduce_add().cast[DType.int32]()
@@ -353,4 +364,6 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
         def load(y: Int, x: Int, channel: Int) {imm source} -> Scalar[Self.dtype]:
             return source[y, x, channel]
 
-        return Border.load[border](load, y=y, x=x, channel=channel, height=Int(source.dim[0]()), width=Int(source.dim[1]()))
+        return Border.load[border](
+            load, y=y, x=x, channel=channel, height=Int(source.dim[0]()), width=Int(source.dim[1]())
+        )

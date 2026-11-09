@@ -162,7 +162,9 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
         self = Self(real=tuple[0], imaginary=tuple[1])
 
     @staticmethod
-    def from_bits[int_type: DType, //](value: SIMD[int_type, Self.Value.length]) -> Number[Self.dtype, Self.width, complex=Self.complex]:
+    def from_bits[
+        int_type: DType, //
+    ](value: SIMD[int_type, Self.Value.length]) -> Number[Self.dtype, Self.width, complex=Self.complex]:
         return Self(Self.Value(from_bits=value))
 
     @staticmethod
@@ -195,7 +197,9 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     @always_inline
     def __getitem__(self, index: Int) -> ScalarNumber[Self.dtype, complex=Self.complex]:
         comptime if Self.complex:
-            return ScalarNumber[Self.dtype, complex=Self.complex](real=self.value[index], imaginary=self.value[index + 1])
+            return ScalarNumber[Self.dtype, complex=Self.complex](
+                real=self.value[index], imaginary=self.value[index + 1]
+            )
         else:
             return ScalarNumber[Self.dtype, complex=Self.complex](self.value[index])
 
@@ -535,7 +539,9 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     # Numeric Methods
     #
     @always_inline
-    def to_bits[int_dtype: DType = _integral_type_of[Self.dtype]()](self) -> Number[int_dtype, Self.width, complex=Self.complex]:
+    def to_bits[
+        int_dtype: DType = _integral_type_of[Self.dtype]()
+    ](self) -> Number[int_dtype, Self.width, complex=Self.complex]:
         return Number[int_dtype, Self.width, complex=Self.complex](self.value.to_bits())
 
     # @staticmethod
@@ -552,11 +558,17 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     #     return self.value.as_bytes()
 
     def clamp(
-        self, lower_bound: Number[Self.dtype, Self.width, complex=False], upper_bound: Number[Self.dtype, Self.width, complex=False]
+        self,
+        lower_bound: Number[Self.dtype, Self.width, complex=False],
+        upper_bound: Number[Self.dtype, Self.width, complex=False],
     ) -> Self:
         comptime assert not Self.complex, "clamp() is only available for non-complex numbers"
 
-        return Self(self.value.clamp(lower_bound=rebind[Self.Value](lower_bound.value), upper_bound=rebind[Self.Value](upper_bound.value)))
+        return Self(
+            self.value.clamp(
+                lower_bound=rebind[Self.Value](lower_bound.value), upper_bound=rebind[Self.Value](upper_bound.value)
+            )
+        )
 
     @always_inline
     def fma(self, multiplier: Self, accumulator: Self) -> Self:
@@ -577,7 +589,10 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     @always_inline
     def shuffle[*mask: SIMDLength](self, other: Self) -> Self:
         comptime if Self.complex:
-            return Self(real=self.real().shuffle[*mask](other.real()), imaginary=self.imaginary().shuffle[*mask](other.imaginary()))
+            return Self(
+                real=self.real().shuffle[*mask](other.real()),
+                imaginary=self.imaginary().shuffle[*mask](other.imaginary()),
+            )
         else:
             return Self(self.value.shuffle[*mask](other.value))
 
@@ -588,11 +603,16 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     @always_inline
     def shuffle[mask: IndexList[Self.width, element_type=_]](self, other: Self) -> Self:
         comptime if Self.complex:
-            return Self(real=self.real().shuffle[mask=mask](other.real()), imaginary=self.imaginary().shuffle[mask=mask](other.imaginary()))
+            return Self(
+                real=self.real().shuffle[mask=mask](other.real()),
+                imaginary=self.imaginary().shuffle[mask=mask](other.imaginary()),
+            )
         else:
             return Self(
                 rebind[Self.Value](
-                    rebind[SIMD[Self.dtype, Self.width]](self.value).shuffle[mask=mask](rebind[SIMD[Self.dtype, Self.width]](other.value))
+                    rebind[SIMD[Self.dtype, Self.width]](self.value).shuffle[mask=mask](
+                        rebind[SIMD[Self.dtype, Self.width]](other.value)
+                    )
                 )
             )
 
@@ -600,7 +620,9 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     def slice[output_width: Int, /, *, offset: Int = 0](self) -> Number[Self.dtype, output_width, complex=Self.complex]:
         return Number[Self.dtype, output_width, complex=Self.complex](
             rebind[Number[Self.dtype, output_width, complex=Self.complex].Value](
-                self.value.slice[2 * output_width if Self.complex else output_width, offset=2 * offset if Self.complex else offset]()
+                self.value.slice[
+                    2 * output_width if Self.complex else output_width, offset=2 * offset if Self.complex else offset
+                ]()
             )
         )
 
@@ -622,13 +644,18 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
             )
         else:
             return Number[Self.dtype, 2 * Self.width, complex=Self.complex](
-                rebind[Number[Self.dtype, 2 * Self.width, complex=Self.complex].Value](self.value.interleave(other.value))
+                rebind[Number[Self.dtype, 2 * Self.width, complex=Self.complex].Value](
+                    self.value.interleave(other.value)
+                )
             )
 
     @always_inline
     def split(
         self,
-    ) -> Tuple[Number[Self.dtype, Self.width // 2, complex=Self.complex], Number[Self.dtype, Self.width // 2, complex=Self.complex]]:
+    ) -> Tuple[
+        Number[Self.dtype, Self.width // 2, complex=Self.complex],
+        Number[Self.dtype, Self.width // 2, complex=Self.complex],
+    ]:
         var split = self.value.split()
 
         return (
@@ -643,7 +670,10 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     @always_inline
     def deinterleave(
         self,
-    ) -> Tuple[Number[Self.dtype, Self.width // 2, complex=Self.complex], Number[Self.dtype, Self.width // 2, complex=Self.complex]]:
+    ) -> Tuple[
+        Number[Self.dtype, Self.width // 2, complex=Self.complex],
+        Number[Self.dtype, Self.width // 2, complex=Self.complex],
+    ]:
         comptime if Self.complex:
             var real = self.real().deinterleave()
             var imaginary = self.imaginary().deinterleave()
@@ -752,9 +782,13 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     def select[
         dtype_out: DType, complex_out: Bool, //
     ](
-        self, true_case: Number[dtype_out, Self.width, complex=complex_out], false_case: Number[dtype_out, Self.width, complex=complex_out]
+        self,
+        true_case: Number[dtype_out, Self.width, complex=complex_out],
+        false_case: Number[dtype_out, Self.width, complex=complex_out],
     ) -> Number[dtype_out, Self.width, complex=complex_out]:
-        comptime assert Self.dtype == DType.bool and not Self.complex, "select() is only available for bool, non-complex numbers"
+        comptime assert (
+            Self.dtype == DType.bool and not Self.complex
+        ), "select() is only available for bool, non-complex numbers"
 
         var value = rebind[SIMD[DType.bool, Self.width]](self.value)
 
@@ -838,7 +872,8 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
             return rebind[Number[new_dtype, Self.width, complex=True]](self.cast[new_dtype]())
         else:
             return Number[new_dtype, Self.width, complex=True](
-                real=rebind[Number[new_dtype, Self.width, complex=False].Value](self.value.cast[new_dtype]()), imaginary=0
+                real=rebind[Number[new_dtype, Self.width, complex=False].Value](self.value.cast[new_dtype]()),
+                imaginary=0,
             )
 
     #

@@ -35,7 +35,9 @@ struct ImageWriter:
     #
     # Writing
     #
-    def write[color_space: ColorSpace, dtype: DType, //, file_type: ImageFile](self, image: Image[color_space, dtype]) raises:
+    def write[
+        color_space: ColorSpace, dtype: DType, //, file_type: ImageFile
+    ](self, image: Image[color_space, dtype]) raises:
         var path_string: String
         if self._path.suffix() in file_type.valid_extensions():
             path_string = self._path.__fspath__()

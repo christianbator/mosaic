@@ -52,7 +52,9 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](Copyable, Sized, Wri
         self._count = len(values)
         self._data = values.unsafe_take_allocation().unsafe_leak().unsafe_bitcast[Scalar[Self.dtype]]()
 
-    def __init__(out self, var data: Pointer[ScalarNumber[Self.dtype, complex=Self.complex], MutUntrackedOrigin], count: Int):
+    def __init__(
+        out self, var data: Pointer[ScalarNumber[Self.dtype, complex=Self.complex], MutUntrackedOrigin], count: Int
+    ):
         _assert(count > 0, "Count must be greater than 0")
 
         self._data = data.unsafe_bitcast[Scalar[Self.dtype]]()
@@ -79,7 +81,9 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](Copyable, Sized, Wri
 
         for i in range(count):
             comptime if Self.complex:
-                result.store(ScalarNumber[Self.dtype, complex=Self.complex](real=Scalar[Self.dtype](i), imaginary=0), index=i)
+                result.store(
+                    ScalarNumber[Self.dtype, complex=Self.complex](real=Scalar[Self.dtype](i), imaginary=0), index=i
+                )
             else:
                 result.store(ScalarNumber[Self.dtype, complex=Self.complex](i), index=i)
 
@@ -87,12 +91,20 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](Copyable, Sized, Wri
 
     @staticmethod
     def random(
-        *, count: Int, min: Scalar[Self.dtype] = Scalar[Self.dtype].MIN_FINITE, max: Scalar[Self.dtype] = Scalar[Self.dtype].MAX_FINITE
+        *,
+        count: Int,
+        min: Scalar[Self.dtype] = Scalar[Self.dtype].MIN_FINITE,
+        max: Scalar[Self.dtype] = Scalar[Self.dtype].MAX_FINITE,
     ) -> Self:
         _assert(count > 0, "Count must be greater than 0")
 
         var result = Self(count=count)
-        rand(result.unsafe_data_ptr(), result._scalar_count(), min=min.cast[DType.float64](), max=max.cast[DType.float64]())
+        rand(
+            result.unsafe_data_ptr(),
+            result._scalar_count(),
+            min=min.cast[DType.float64](),
+            max=max.cast[DType.float64](),
+        )
 
         return result^
 
@@ -127,7 +139,9 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](Copyable, Sized, Wri
             )
         else:
             return Number[Self.dtype, width, complex=Self.complex](
-                rebind[Number[Self.dtype, width, complex=Self.complex].Value](self._data.unsafe_offset(index).unsafe_load[width=width]())
+                rebind[Number[Self.dtype, width, complex=Self.complex].Value](
+                    self._data.unsafe_offset(index).unsafe_load[width=width]()
+                )
             )
 
     @always_inline
@@ -152,7 +166,9 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](Copyable, Sized, Wri
             )
 
     @always_inline
-    def strided_store[width: Int, //](mut self, value: Number[Self.dtype, width, complex=Self.complex], index: Int, stride: Int):
+    def strided_store[
+        width: Int, //
+    ](mut self, value: Number[Self.dtype, width, complex=Self.complex], index: Int, stride: Int):
         comptime if Self.complex:
             self._data.unsafe_offset(index * 2).unsafe_strided_store(value.real(), stride=stride * 2)
             self._data.unsafe_offset(index * 2 + 1).unsafe_strided_store(value.imaginary(), stride=stride * 2)
@@ -162,7 +178,9 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](Copyable, Sized, Wri
     @always_inline
     def gather[
         width: Int, //
-    ](self, index: Int, offset: SIMD[DType.int, width], mask: SIMD[DType.bool, width]) -> Number[Self.dtype, width, complex=Self.complex]:
+    ](self, index: Int, offset: SIMD[DType.int, width], mask: SIMD[DType.bool, width]) -> Number[
+        Self.dtype, width, complex=Self.complex
+    ]:
         comptime if Self.complex:
             return Number[Self.dtype, width, complex=Self.complex](
                 rebind[Number[Self.dtype, width, complex=Self.complex].Value](
@@ -196,7 +214,9 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](Copyable, Sized, Wri
                 mask=mask.interleave(mask),
             )
         else:
-            self._data.unsafe_offset(index).unsafe_scatter(offset=offset, val=rebind[SIMD[Self.dtype, width]](value.value), mask=mask)
+            self._data.unsafe_offset(index).unsafe_scatter(
+                offset=offset, val=rebind[SIMD[Self.dtype, width]](value.value), mask=mask
+            )
 
     #
     # Unsafe Access
@@ -217,7 +237,13 @@ struct NumericArray[dtype: DType, *, complex: Bool = False](Copyable, Sized, Wri
         unsafe_memcpy(dest=self.unsafe_data_ptr(), src=copy.unsafe_data_ptr(), count=copy._scalar_count())
 
     def copy_into(self, mut other: Self):
-        _assert(len(self) == len(other), "Invalid destination size provided to NumericArray copy_into(), ", len(other), " != ", len(self))
+        _assert(
+            len(self) == len(other),
+            "Invalid destination size provided to NumericArray copy_into(), ",
+            len(other),
+            " != ",
+            len(self),
+        )
 
         unsafe_memcpy(dest=other.unsafe_data_ptr(), src=self.unsafe_data_ptr(), count=self._scalar_count())
 
