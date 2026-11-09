@@ -10,6 +10,10 @@
 context:
   version: "0.3.0"
 
+  # Mojo's minimum system versions (https://mojolang.org/docs/requirements), which should match pixi.toml > platforms
+  macos: "15.0"
+  glibc: "2.34"
+
 package:
   name: mosaic-mojo
   version: ${{ version }}
@@ -42,12 +46,23 @@ requirements:
     - if: osx
       then:
         - ${{ pin_compatible('libcxx') }}
+  run_constraints:
+    - if: osx
+      then:
+        - __osx >=${{ macos }}
+    - if: linux
+      then:
+        - __glibc >=${{ glibc }}
 
 tests:
-  - script: |
-      for test_file in tests/test_*.mojo; do
-        mojo run ${test_file} || exit 1
-      done
+  - script:
+      env:
+        # rattler-build defaults to 11.0, and Mojo links its Metal kernels for this target, which fails below macOS 15
+        MACOSX_DEPLOYMENT_TARGET: ${{ macos }}
+      content: |
+        for test_file in tests/test_*.mojo; do
+          mojo run ${test_file} || exit 1
+        done
     requirements:
       run:
         - mojo-compiler>=1.0,<2.0

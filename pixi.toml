@@ -24,9 +24,16 @@ documentation = "https://christianbator.github.io/mosaic"
 name = "mosaic"
 authors = ["Christian Bator <christian@bator.co>"]
 
+# The minimum macOS and glibc versions are Mojo's (https://mojolang.org/docs/requirements),
+# and should match rattler-build/recipe.yaml > context
+platforms = [
+    { platform = "osx-arm64", macos = "15.0" },
+    { platform = "linux-aarch64", glibc = "2.34" },
+    { platform = "linux-64", glibc = "2.34" },
+]
+
 # These are only defined here
 readme = "README.md"
-platforms = ["osx-arm64", "linux-aarch64", "linux-64"]
 channels = [
     "https://conda.modular.com/max",
     "conda-forge"
