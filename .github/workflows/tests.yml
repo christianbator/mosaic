@@ -1,0 +1,32 @@
+#
+# tests.yml
+# mosaic
+#
+# Created by Christian Bator on 11/08/2026
+#
+
+name: Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer push to the same branch replaces a run in progress
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # GitHub's runners have no GPU, so the DeviceImage tests skip themselves (see tests/test_device_image.mojo)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+      - name: Set up pixi
+        uses: prefix-dev/setup-pixi@v0.11.2
+        with:
+          cache: true
+      - name: Run tests
+        run: pixi run test

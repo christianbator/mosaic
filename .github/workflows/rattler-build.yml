@@ -23,10 +23,10 @@ jobs:
             target-platform: linux-64
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Build package
-        uses: prefix-dev/rattler-build-action@v0.2.33
+        uses: prefix-dev/rattler-build-action@v0.2.39
         with:
           recipe-path: rattler-build/recipe.yaml
-          build-args: --target-platform ${{ matrix.target-platform }} -c https://prefix.dev/max -c conda-forge
+          build-args: --target-platform ${{ matrix.target-platform }} -c https://conda.modular.com/max -c conda-forge
           artifact-name: mosaic-${{ matrix.target-platform }}

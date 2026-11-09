@@ -6,6 +6,7 @@
     
   ![Language Badge](https://img.shields.io/badge/language-mojo-orange)
   ![GitHub License Badge](https://img.shields.io/github/license/christianbator/mosaic)
+  ![Tests](https://github.com/christianbator/mosaic/workflows/Tests/badge.svg)
   ![CodeQL](https://github.com/christianbator/mosaic/workflows/CodeQL/badge.svg)
   </p>
 </div>

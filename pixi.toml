@@ -10,7 +10,7 @@
 #
 [workspace]
 # These should match rattler-build/recipe.yaml > context
-version = "0.2.0"
+version = "0.3.0"
 
 # These should match rattler-build/recipe.yaml > about
 homepage = "https://github.com/christianbator/mosaic"
