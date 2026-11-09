@@ -5,6 +5,8 @@
 # Created by Christian Bator on 02/02/2025
 #
 
+"""Matrices of real or complex numbers."""
+
 from std.os import abort
 from std.memory import unsafe_memset_zero, unsafe_memcpy
 from std.memory.alloc import unsafe_alloc
@@ -27,12 +29,15 @@ from .strided_range import StridedRange
 struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     Absable, CeilDivable, Ceilable, Copyable, Equatable, Floorable, Movable, Roundable, Truncable, Writable
 ):
+    """A row-major matrix of real or complex numbers with `depth` interleaved components per element."""
+
     #
     # Fields
     #
     comptime optimal_simd_width = optimal_simd_width[Self.dtype]() // 2 if Self.complex else optimal_simd_width[
         Self.dtype
     ]()
+    """The SIMD width matrix operations use."""
 
     var _rows: Int
     var _cols: Int
@@ -42,6 +47,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     # Initialization
     #
     def __init__(out self, *, rows: Int, cols: Int):
+        """Creates a `rows`×`cols` matrix of zeros."""
         comptime assert Self.depth > 0
         _assert(rows > 0 and cols > 0, "Rows and cols must be greater than 0")
 
@@ -50,6 +56,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         self._data = NumericArray[Self.dtype, complex=Self.complex](count=rows * cols * Self.depth)
 
     def __init__(out self, *, rows: Int, cols: Int, value: ScalarNumber[Self.dtype, complex=Self.complex]):
+        """Creates a `rows`×`cols` matrix with every component set to `value`."""
         comptime assert Self.depth > 0
         _assert(rows > 0 and cols > 0, "Rows and cols must be greater than 0")
 
@@ -59,6 +66,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         self.fill(value)
 
     def __init__(out self, *, rows: Int, cols: Int, var values: List[ScalarNumber[Self.dtype, complex=Self.complex]]):
+        """Creates a `rows`×`cols` matrix from `values`, in row-major order with interleaved components."""
         comptime assert Self.depth > 0
         _assert(rows * cols * Self.depth == len(values), "Mismatch in list length for Matrix constructor")
 
@@ -69,6 +77,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         )
 
     def __init__(out self, *, rows: Int, cols: Int, var data: NumericArray[Self.dtype, complex=Self.complex]):
+        """Creates a `rows`×`cols` matrix that takes ownership of `data`."""
         comptime assert Self.depth > 0
         _assert(rows * cols * Self.depth == len(data), "Mismatch in data length for Matrix constructor")
 
@@ -78,6 +87,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
     # This is an unsafe convenience constructor
     def __init__(out self, rows: Int, cols: Int, var data: Pointer[Scalar[Self.dtype], MutUntrackedOrigin]):
+        """Creates a `rows`×`cols` matrix that takes ownership of the scalars at `data`."""
         comptime assert Self.depth > 0
         _assert(rows > 0 and cols > 0, "Rows and cols must be greater than 0")
 
@@ -86,12 +96,14 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         self._data = NumericArray[Self.dtype, complex=Self.complex](data, count=rows * cols * Self.depth)
 
     def __init__(out self, *, deinit move: Self):
+        """Moves a matrix."""
         self._rows = move._rows
         self._cols = move._cols
         self._data = move._data^
 
     @staticmethod
     def ascending(*, rows: Int, cols: Int) -> Self:
+        """Returns a matrix whose components count up from 0 in memory order."""
         return Self(
             rows=rows,
             cols=cols,
@@ -106,10 +118,13 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         min: Scalar[Self.dtype] = Scalar[Self.dtype].MIN_FINITE,
         max: Scalar[Self.dtype] = Scalar[Self.dtype].MAX_FINITE,
     ) -> Self:
+        """Returns a matrix of uniformly random numbers between `min` and `max`."""
         return Self(
             rows=rows,
             cols=cols,
-            data=NumericArray[Self.dtype, complex=Self.complex].random(count=rows * cols * Self.depth),
+            data=NumericArray[Self.dtype, complex=Self.complex].random(
+                count=rows * cols * Self.depth, min=min, max=max
+            ),
         )
 
     #
@@ -117,22 +132,27 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     #
     @always_inline
     def rows(self) -> Int:
+        """The number of rows."""
         return self._rows
 
     @always_inline
     def cols(self) -> Int:
+        """The number of columns."""
         return self._cols
 
     @always_inline
     def components(self) -> Int:
+        """The number of components per element."""
         return Self.depth
 
     @always_inline
     def count(self) -> Int:
+        """The total number of components, `rows * cols * depth`."""
         return self._rows * self._cols * Self.depth
 
     @always_inline
     def strided_count(self) -> Int:
+        """The number of elements, `rows * cols`."""
         return self._rows * self._cols
 
     @always_inline
@@ -155,34 +175,40 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     def __getitem__(
         self, row: Int, col: Int
     ) raises -> ScalarNumber[Self.dtype, complex=Self.complex] where Self.depth == 1:
+        """Returns the number at `row`, `col` of a single-component matrix."""
         return self[row, col, 0]
 
     @always_inline
     def __getitem__(self, row: Int, col: Int, component: Int) raises -> ScalarNumber[Self.dtype, complex=Self.complex]:
+        """Returns the given component of the number at `row`, `col`."""
         return self.strided_load(row=row, col=col, component=component)
 
     @always_inline
     def __setitem__(
         mut self, row: Int, col: Int, value: ScalarNumber[Self.dtype, complex=Self.complex]
     ) raises where Self.depth == 1:
+        """Sets the number at `row`, `col` of a single-component matrix."""
         self[row, col, 0] = value
 
     @always_inline
     def __setitem__(
         mut self, row: Int, col: Int, component: Int, value: ScalarNumber[Self.dtype, complex=Self.complex]
     ) raises:
+        """Sets the given component of the number at `row`, `col`."""
         self.strided_store(value, row=row, col=col, component=component)
 
     @always_inline
     def strided_load[
         width: Int = 1
     ](self, row: Int, col: Int) raises -> Number[Self.dtype, width, complex=Self.complex] where Self.depth == 1:
+        """Loads `width` consecutive elements along the row of a single-component matrix."""
         return self.strided_load[width](row=row, col=col, component=0)
 
     @always_inline
     def strided_load[
         width: Int = 1
     ](self, row: Int, col: Int, component: Int) raises -> Number[Self.dtype, width, complex=Self.complex]:
+        """Loads one component of `width` consecutive elements along the row."""
         return self._data.strided_load[width](
             index=self.index(row=row, col=col, component=component), stride=Self.depth
         )
@@ -198,12 +224,14 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     ) raises where (
         Self.depth == 1
     ):
+        """Stores the lanes of `value` in consecutive elements along the row of a single-component matrix."""
         self.strided_store(value, row=row, col=col, component=0)
 
     @always_inline
     def strided_store[
         width: Int, //
     ](mut self, value: Number[Self.dtype, width, complex=Self.complex], row: Int, col: Int, component: Int) raises:
+        """Stores the lanes of `value` in one component of consecutive elements along the row."""
         self._data.strided_store(value, index=self.index(row=row, col=col, component=component), stride=Self.depth)
 
     @always_inline
@@ -217,6 +245,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         offset: SIMD[DType.int, width],
         mask: SIMD[DType.bool, width],
     ) -> Number[Self.dtype, width, complex=Self.complex]:
+        """Loads the components at flat offsets `offset` from `row`, `col`, `component` where `mask` is set."""
         return self._data.gather(index=self.index(row=row, col=col, component=component), offset=offset, mask=mask)
 
     @always_inline
@@ -230,6 +259,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         offset: SIMD[DType.int, width],
         mask: SIMD[DType.bool, width],
     ) -> Number[Self.dtype, width, complex=Self.complex]:
+        """Loads one component of the elements `offset` columns from `row`, `col` where `mask` is set."""
         return self.gather(row=row, col=col, component=component, offset=Self.depth * offset, mask=mask)
 
     @always_inline
@@ -244,6 +274,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         offset: SIMD[DType.int, width],
         mask: SIMD[DType.bool, width],
     ):
+        """Stores `value` at flat offsets `offset` from `row`, `col`, `component` where `mask` is set."""
         self._data.scatter(value, index=self.index(row=row, col=col, component=component), offset=offset, mask=mask)
 
     @always_inline
@@ -258,11 +289,13 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         offset: SIMD[DType.int, width],
         mask: SIMD[DType.bool, width],
     ):
+        """Stores `value` in one component of the elements `offset` columns from `row`, `col` where `mask` is set."""
         self.scatter(value, row=row, col=col, component=component, offset=Self.depth * offset, mask=mask)
 
     def load_full_depth(
         self, row: Int, col: Int
     ) raises -> Array[ScalarNumber[Self.dtype, complex=Self.complex], Self.depth]:
+        """Returns every component of the element at `row`, `col`."""
         var result = Array[ScalarNumber[Self.dtype, complex=Self.complex], Self.depth](uninitialized=True)
 
         comptime for component in range(Self.depth):
@@ -273,12 +306,14 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     def store_full_depth(
         mut self, value: Array[ScalarNumber[Self.dtype, complex=Self.complex], Self.depth], row: Int, col: Int
     ) raises:
+        """Sets every component of the element at `row`, `col`."""
         comptime for component in range(Self.depth):
             self.strided_store(value[component], row=row, col=col, component=component)
 
     def create_full_depth_value(
         self, value: ScalarNumber[Self.dtype, complex=Self.complex]
     ) -> Array[ScalarNumber[Self.dtype, complex=Self.complex], Self.depth]:
+        """Returns an element value with every component set to `value`."""
         var result = Array[ScalarNumber[Self.dtype, complex=Self.complex], Self.depth](uninitialized=True)
 
         comptime for component in range(Self.depth):
@@ -289,6 +324,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     def create_full_depth_value(
         self, *values: ScalarNumber[Self.dtype, complex=Self.complex]
     ) -> Array[ScalarNumber[Self.dtype, complex=Self.complex], Self.depth]:
+        """Returns an element value from one value per component."""
         # TODO: Make this a compile-time check when possible
         debug_assert(
             Self.depth == len(values), "Mismatch in the number of values in the full depth value variadic constructor"
@@ -307,6 +343,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         ) -> None,
         //,
     ](self, handler: HandlerType):
+        """Calls `handler` on SIMD-wide runs of every component, in parallel over rows."""
         comptime for component in range(Self.depth):
 
             def visit_row(row: Int) {imm}:
@@ -328,6 +365,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     def strided_iterate_indices[
         HandlerType: def[width: Int](row: Int, col: Int, component: Int) -> None, //
     ](self, handler: HandlerType):
+        """Calls `handler` with the indices of SIMD-wide runs of every component, in parallel over rows."""
         comptime for component in range(Self.depth):
 
             def visit_row(row: Int) {imm}:
@@ -342,6 +380,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
             parallelize(visit_row, self._rows)
 
     def real(self) -> Matrix[Self.dtype, Self.depth, complex=False] where Self.complex:
+        """Returns the real parts."""
         var result = Matrix[Self.dtype, Self.depth, complex=False](rows=self._rows, cols=self._cols)
 
         def take_real_value[
@@ -356,6 +395,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         return result^
 
     def imaginary(self) -> Matrix[Self.dtype, Self.depth, complex=False] where Self.complex:
+        """Returns the imaginary parts."""
         var result = Matrix[Self.dtype, Self.depth, complex=False](rows=self._rows, cols=self._cols)
 
         def take_imaginary_value[
@@ -425,16 +465,19 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     #
     @always_inline
     def unsafe_data_ptr(self) -> Pointer[Scalar[Self.dtype], MutUntrackedOrigin]:
+        """Returns a pointer to the matrix's scalars, which is valid only while the matrix is alive."""
         return self._data.unsafe_data_ptr()
 
     @always_inline
     def unsafe_uint8_ptr(self) -> Pointer[UInt8, MutUntrackedOrigin]:
+        """Returns a byte pointer to the matrix's scalars, which is valid only while the matrix is alive."""
         return self._data.unsafe_uint8_ptr()
 
     #
     # Lifetime Management
     #
     def keep(self):
+        """Keeps the matrix alive until this call, for code that uses its unsafe pointers."""
         pass
 
     #
@@ -442,25 +485,31 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     #
     @always_inline
     def index(self, row: Int, col: Int, component: Int) -> Int:
+        """The flat index of the component at `row`, `col`, `component`."""
         return (row * self._cols + col) * Self.depth + component
 
     @always_inline
     def flattened_index(self, row: Int, offset: Int) -> Int:
+        """The flat index `offset` scalars into `row`."""
         return row * self._cols * Self.depth + offset
 
     @always_inline
     def row_end_index(self) -> Int:
+        """The index of the last row."""
         return self._rows - 1
 
     @always_inline
     def col_end_index(self) -> Int:
+        """The index of the last column."""
         return self._cols - 1
 
     def component_end_index(self) -> Int:
+        """The index of the last component."""
         return Self.depth - 1
 
     @always_inline
     def end_index(self) -> Int:
+        """The flat index of the last component."""
         return self.count() - 1
 
     #
@@ -472,6 +521,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     ](ref[origin] self, row: Int, col_slice: Slice) raises -> MatrixSlice[
         StridedRange(Self.depth), Self.dtype, Self.depth, Self.complex, origin
     ]:
+        """Returns a view of `row` across the columns in `col_slice`."""
         return self[row : row + 1, col_slice]
 
     @always_inline
@@ -480,6 +530,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     ](ref[origin] self, row_slice: Slice, col: Int) raises -> MatrixSlice[
         StridedRange(Self.depth), Self.dtype, Self.depth, Self.complex, origin
     ]:
+        """Returns a view of `col` across the rows in `row_slice`."""
         return self[row_slice, col : col + 1]
 
     @always_inline
@@ -488,6 +539,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     ](ref[origin] self, row_slice: Slice, col_slice: Slice) raises -> MatrixSlice[
         StridedRange(Self.depth), Self.dtype, Self.depth, Self.complex, origin
     ]:
+        """Returns a view of the rows and columns in `row_slice` and `col_slice`."""
         return self.slice(
             row_range=StridedRange(
                 slice=row_slice,
@@ -509,6 +561,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     ](ref[origin] self, row_range: StridedRange) raises -> MatrixSlice[
         StridedRange(Self.depth), Self.dtype, Self.depth, Self.complex, origin
     ]:
+        """Returns a view of the rows in `row_range`."""
         return self.slice(row_range=row_range, col_range=StridedRange(self._cols))
 
     @always_inline
@@ -517,6 +570,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     ](ref[origin] self, *, col_range: StridedRange) raises -> MatrixSlice[
         StridedRange(Self.depth), Self.dtype, Self.depth, Self.complex, origin
     ]:
+        """Returns a view of the columns in `col_range`."""
         return self.slice(row_range=StridedRange(self._rows), col_range=col_range)
 
     @always_inline
@@ -525,6 +579,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     ](ref[origin] self, row_range: StridedRange, col_range: StridedRange) raises -> MatrixSlice[
         StridedRange(Self.depth), Self.dtype, Self.depth, Self.complex, origin
     ]:
+        """Returns a view of the rows and columns in `row_range` and `col_range`."""
         return MatrixSlice[StridedRange(Self.depth), Self.dtype, Self.depth, Self.complex, origin](
             self, row_range=row_range, col_range=col_range
         )
@@ -535,6 +590,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     ](ref[origin] self) -> MatrixSlice[
         StridedRange(component, component + 1), Self.dtype, Self.depth, Self.complex, origin
     ]:
+        """Returns a view of one component."""
         return MatrixSlice[StridedRange(component, component + 1), Self.dtype, Self.depth, Self.complex, origin](self)
 
     @always_inline
@@ -543,6 +599,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     ](ref[origin] self, row_range: StridedRange) raises -> MatrixSlice[
         StridedRange(component, component + 1), Self.dtype, Self.depth, Self.complex, origin
     ]:
+        """Returns a view of one component over the rows in `row_range`."""
         return self.strided_slice[StridedRange(component, component + 1)](row_range)
 
     @always_inline
@@ -551,6 +608,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     ](ref[origin] self, *, col_range: StridedRange) raises -> MatrixSlice[
         StridedRange(component, component + 1), Self.dtype, Self.depth, Self.complex, origin
     ]:
+        """Returns a view of one component over the columns in `col_range`."""
         return self.strided_slice[StridedRange(component, component + 1)](col_range=col_range)
 
     @always_inline
@@ -559,12 +617,14 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     ](ref[origin] self, row_range: StridedRange, col_range: StridedRange) raises -> MatrixSlice[
         StridedRange(component, component + 1), Self.dtype, Self.depth, Self.complex, origin
     ]:
+        """Returns a view of one component over the rows and columns in `row_range` and `col_range`."""
         return self.strided_slice[StridedRange(component, component + 1)](row_range=row_range, col_range=col_range)
 
     @always_inline
     def strided_slice[
         mut: Bool, origin: Origin[mut=mut], //, component_range: StridedRange
     ](ref[origin] self) -> MatrixSlice[component_range, Self.dtype, Self.depth, Self.complex, origin]:
+        """Returns a view of the components in `component_range`."""
         return MatrixSlice[component_range, Self.dtype, Self.depth, Self.complex, origin](self)
 
     @always_inline
@@ -573,6 +633,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     ](ref[origin] self, row_range: StridedRange) raises -> MatrixSlice[
         component_range, Self.dtype, Self.depth, Self.complex, origin
     ]:
+        """Returns a view of the components in `component_range` over the rows in `row_range`."""
         return self.strided_slice[component_range](row_range=row_range, col_range=StridedRange(self._cols))
 
     @always_inline
@@ -581,6 +642,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     ](ref[origin] self, *, col_range: StridedRange) raises -> MatrixSlice[
         component_range, Self.dtype, Self.depth, Self.complex, origin
     ]:
+        """Returns a view of the components in `component_range` over the columns in `col_range`."""
         return self.strided_slice[component_range](row_range=StridedRange(self._rows), col_range=col_range)
 
     @always_inline
@@ -589,11 +651,13 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     ](ref[origin] self, row_range: StridedRange, col_range: StridedRange) raises -> MatrixSlice[
         component_range, Self.dtype, Self.depth, Self.complex, origin
     ]:
+        """Returns a view of the components in `component_range` over the given rows and columns."""
         return MatrixSlice[component_range, Self.dtype, Self.depth, Self.complex, origin](
             self, row_range=row_range, col_range=col_range
         )
 
     def store_sub_matrix(mut self, value: Self, row: Int, col: Int, component: Int = 0) raises:
+        """Copies `value` into this matrix with its top left at `row`, `col`, `component`."""
         self.store_sub_matrix(value[:, :], row=row, col=col, component=component)
 
     def store_sub_matrix[
@@ -605,6 +669,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         col: Int,
         component: Int = 0,
     ) raises:
+        """Copies `matrix_slice` into this matrix with its top left at `row`, `col`, `component`."""
         if (
             (component + component_range.count()) > Self.depth
             or (matrix_slice.row_range().end > self._rows)
@@ -636,6 +701,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     def strided_replication[
         new_depth: Int
     ](self) -> Matrix[Self.dtype, new_depth, complex=Self.complex] where Self.depth == 1:
+        """Returns a copy with each element's single component repeated across `new_depth` components."""
         comptime assert new_depth > Self.depth, "Strided replication requires a desired depth > 1"
 
         var result = Matrix[Self.dtype, new_depth, complex=Self.complex](rows=self._rows, cols=self._cols)
@@ -654,6 +720,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     def strided_replication(
         *, rows: Int, cols: Int, values: List[ScalarNumber[Self.dtype, complex=Self.complex]]
     ) -> Self:
+        """Returns a matrix whose elements repeat each of `values` across every component."""
         _assert(rows * cols == len(values), "Mismatch in list length for Matrix strided replication constructor")
 
         var result = Self(rows=rows, cols=cols)
@@ -669,6 +736,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     def copied_to_component[
         component: Int, new_depth: Int
     ](self) -> Matrix[Self.dtype, new_depth, complex=Self.complex] where Self.depth == 1:
+        """Returns a matrix with this matrix in `component` and zeros in the other components."""
         comptime assert 0 <= component < new_depth, "Component must be within range of depth for copied_to_component()"
 
         var result = Matrix[Self.dtype, new_depth, complex=Self.complex](rows=self._rows, cols=self._cols)
@@ -689,9 +757,11 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     # Copyable
     #
     def __init__(out self, *, copy: Self):
+        """Creates a deep copy."""
         self = Self(rows=copy._rows, cols=copy._cols, data=copy._data.copy())
 
     def copy_into(self, mut other: Self):
+        """Copies the elements into `other`, which must have the same size."""
         # This is bounds checked by NumericArray
         self._data.copy_into(other._data)
 
@@ -716,6 +786,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         return not (self == other)
 
     def matches(self, other: Self, tolerance: Int = 1) -> Bool:
+        """Whether every component is within `tolerance` of the corresponding component in `other`."""
         if self.count() != other.count():
             return False
 
@@ -1255,6 +1326,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         return result^
 
     def norm(self) -> Matrix[Self.dtype, Self.depth, complex=False] where Self.complex:
+        """The magnitude of each complex number."""
         var result = Matrix[Self.dtype, Self.depth, complex=False](rows=self._rows, cols=self._cols)
 
         def transform_row(row: Int) {mut result, imm}:
@@ -1275,6 +1347,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     # Numeric Methods
     #
     def log(self) -> Self where Self.dtype.is_floating_point():
+        """The natural logarithm of each component."""
         var result = self.copy()
 
         def log[
@@ -1288,6 +1361,8 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         return result^
 
     def clamp(mut self, lower_bound: ScalarNumber[Self.dtype], upper_bound: ScalarNumber[Self.dtype]):
+        """Clamps each component to `[lower_bound, upper_bound]`."""
+
         def transformer[
             width: Int
         ](value: Number[Self.dtype, width, complex=Self.complex]) {imm} -> Number[
@@ -1298,12 +1373,14 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         self.for_each(transformer)
 
     def clamped(self, lower_bound: ScalarNumber[Self.dtype], upper_bound: ScalarNumber[Self.dtype]) -> Self:
+        """Returns a copy with each component clamped to `[lower_bound, upper_bound]`."""
         var result = self.copy()
         result.clamp(lower_bound=lower_bound, upper_bound=upper_bound)
 
         return result^
 
     def strided_sum(self, component: Int) -> ScalarNumber[Self.dtype, complex=Self.complex]:
+        """The sum of one component over every element."""
         var result = ScalarNumber[Self.dtype, complex=Self.complex](0)
 
         for row in range(self._rows):
@@ -1316,9 +1393,11 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         return result
 
     def strided_average(self, component: Int) -> ScalarNumber[DType.float64, complex=Self.complex]:
+        """The average of one component over every element."""
         return self.strided_sum(component).cast[DType.float64]() / Float64(self.strided_count())
 
     def strided_min(self, component: Int) -> ScalarNumber[Self.dtype, complex=Self.complex] where not Self.complex:
+        """The minimum of one component over every element."""
         var result = Scalar[Self.dtype].MAX_FINITE
 
         for row in range(self._rows):
@@ -1333,6 +1412,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         return result
 
     def strided_max(self, component: Int) -> ScalarNumber[Self.dtype, complex=Self.complex] where not Self.complex:
+        """The maximum of one component over every element."""
         var result = Scalar[Self.dtype].MIN_FINITE
 
         for row in range(self._rows):
@@ -1347,6 +1427,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         return result
 
     def strided_normalize(mut self):
+        """Divides each component by its sum over every element, so each component sums to 1."""
         comptime for component in range(Self.depth):
             var strided_sum = self.strided_sum(component)
 
@@ -1360,6 +1441,8 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
             self.strided_for_each(normalize, component)
 
     def strided_fill(mut self, value: ScalarNumber[Self.dtype, complex=Self.complex], component: Int):
+        """Sets one component of every element to `value`."""
+
         def fill_row(row: Int) {mut self, imm}:
             def fill_cols[width: Int](col: Int) {mut self, imm value, imm row, imm component}:
                 self._strided_store(
@@ -1371,6 +1454,8 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         parallelize(fill_row, self._rows)
 
     def fill(mut self, value: ScalarNumber[Self.dtype, complex=Self.complex]):
+        """Sets every component to `value`."""
+
         def fill_row(row: Int) {mut self, imm}:
             def fill_flattened_elements[width: Int](flattened_element: Int) {mut self, imm value, imm row}:
                 self._store(
@@ -1390,6 +1475,8 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         ],
         //,
     ](mut self, transformer: TransformerType, component: Int):
+        """Replaces one component of every element with `transformer` applied to it."""
+
         def transform_row(row: Int) {mut self, imm}:
             def transform_col[width: Int](col: Int) {mut self, imm transformer, imm row, imm component}:
                 self._strided_store(
@@ -1412,6 +1499,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         ) -> Number[Self.dtype, width, complex=Self.complex],
         //,
     ](mut self, transformer: TransformerType, other: Self, component: Int):
+        """Replaces one component of every element with `transformer` of it and the same component of `other`."""
         _assert(
             self._rows == other._rows and self._cols == other._cols,
             "Cannot perform elementwise transformation on two matrices of different sizes",
@@ -1439,6 +1527,8 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         ],
         //,
     ](mut self, transformer: TransformerType):
+        """Replaces every component with `transformer` applied to it."""
+
         def transform_row(row: Int) {mut self, imm}:
             def transform_flattened_elements[width: Int](flattened_element: Int) {mut self, imm transformer, imm row}:
                 var index = self.flattened_index(row=row, offset=flattened_element)
@@ -1457,6 +1547,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         ) -> Number[Self.dtype, width, complex=Self.complex],
         //,
     ](mut self, transformer: TransformerType, other: Self):
+        """Replaces every component with `transformer` applied to it and the corresponding component of `other`."""
         _assert(
             self._rows == other._rows and self._cols == other._cols,
             "Cannot perform elementwise transformation on two matrices of different sizes",
@@ -1483,6 +1574,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         min: ScalarNumber[Self.dtype, complex=Self.complex],
         max: ScalarNumber[Self.dtype, complex=Self.complex],
     ) where not Self.complex:
+        """Linearly maps each component so its minimum becomes `min` and its maximum becomes `max`."""
         comptime for component in range(Self.depth):
             var current_min = self.strided_min(component)
             var current_max = self.strided_max(component)
@@ -1500,18 +1592,21 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     def mapped_to_range(
         self, min: ScalarNumber[Self.dtype, complex=Self.complex], max: ScalarNumber[Self.dtype, complex=Self.complex]
     ) -> Self where not Self.complex:
+        """Returns a copy with each component linearly mapped to `[min, max]`."""
         var result = self.copy()
         result.map_to_range(min, max)
 
         return result^
 
     def fourier_transform[*, inverse: Bool = False](self) -> Matrix[fft_dtype, Self.depth, complex=True]:
+        """Returns the 2-D discrete Fourier transform of each component, or its inverse."""
         return fft[inverse=inverse](self)
 
     #
     # Geometric Transformations
     #
     def reshape(mut self, rows: Int, cols: Int):
+        """Changes the shape to `rows`×`cols` without moving any data."""
         _assert(
             rows * cols == self.strided_count(),
             "Cannot reshape Matrix of strided_count = ",
@@ -1526,12 +1621,14 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         self._cols = cols
 
     def reshaped(self, rows: Int, cols: Int) -> Self:
+        """Returns a copy with the shape `rows`×`cols`."""
         var result = self.copy()
         result.reshape(rows=rows, cols=cols)
 
         return result^
 
     def transpose(mut self):
+        """Transposes the matrix."""
         if self._rows == self._cols:
             # Iterate over upper triangle of square matrix and swap elements
             def iterate_over_row(row: Int) {mut self, imm}:
@@ -1556,6 +1653,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
             parallelize(tranpose_row, self._rows)
 
     def transposed(self) -> Self:
+        """Returns the transpose."""
         # Create a copy of the original
         var copy = self.copy()
 
@@ -1575,6 +1673,8 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         return copy^
 
     def flip_horizontally(mut self):
+        """Mirrors the columns."""
+
         def process_row(row: Int) {mut self, imm}:
             for col in range(self._cols // 2):
                 var original_value = self._load_full_depth(row=row, col=col)
@@ -1584,12 +1684,15 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         parallelize(process_row, self._rows)
 
     def flipped_horizontally(self) -> Self:
+        """Returns a copy with the columns mirrored."""
         var result = self.copy()
         result.flip_horizontally()
 
         return result^
 
     def flip_vertically(mut self):
+        """Mirrors the rows."""
+
         def process_row(row: Int) {mut self, imm}:
             for col in range(self._cols):
                 var original_value = self._load_full_depth(row=row, col=col)
@@ -1599,12 +1702,14 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         parallelize(process_row, self._rows // 2)
 
     def flipped_vertically(self) -> Self:
+        """Returns a copy with the rows mirrored."""
         var result = self.copy()
         result.flip_vertically()
 
         return result^
 
     def rotate_90[*, clockwise: Bool](mut self):
+        """Rotates by 90 degrees, clockwise or counterclockwise."""
         self.transpose()
 
         comptime if clockwise:
@@ -1613,6 +1718,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
             self.flip_vertically()
 
     def rotated_90[*, clockwise: Bool](self) -> Self:
+        """Returns a copy rotated by 90 degrees, clockwise or counterclockwise."""
         var result = self.transposed()
 
         comptime if clockwise:
@@ -1623,6 +1729,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         return result^
 
     def rotate_180(mut self):
+        """Rotates by 180 degrees."""
         var row_range = ceildiv(self._rows, 2)
 
         def process_row(row: Int) {mut self, imm}:
@@ -1644,12 +1751,14 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         parallelize(process_row, row_range)
 
     def rotated_180(self) -> Self:
+        """Returns a copy rotated by 180 degrees."""
         var result = self.copy()
         result.rotate_180()
 
         return result^
 
     def shift_origin_to_center(mut self):
+        """Swaps the quadrants so the origin moves to the center, like NumPy's `fftshift`."""
         try:
             var half_rows = self._rows // 2
             var half_cols = self._cols // 2
@@ -1672,12 +1781,14 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
             abort(String(error))
 
     def shifted_origin_to_center(self) -> Self:
+        """Returns a copy with the origin moved to the center, like NumPy's `fftshift`."""
         var result = self.copy()
         result.shift_origin_to_center()
 
         return result^
 
     def shift_center_to_origin(mut self):
+        """Swaps the quadrants so the center moves to the origin, like NumPy's `ifftshift`."""
         try:
             var half_rows = self._rows // 2
             var half_cols = self._cols // 2
@@ -1700,15 +1811,18 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
             abort(String(error))
 
     def shifted_center_to_origin(self) -> Self:
+        """Returns a copy with the center moved to the origin, like NumPy's `ifftshift`."""
         var result = self.copy()
         result.shift_center_to_origin()
 
         return result^
 
     def padded(self, size: Int) -> Self:
+        """Returns a copy with `size` rows and columns of zeros added on every side."""
         return self.padded(rows=size, cols=size)
 
     def padded(self, rows: Int, cols: Int) -> Self:
+        """Returns a copy with `rows` rows of zeros above and below and `cols` columns on the left and right."""
         _assert(rows >= 0 and cols >= 0, "Must specify rows >= 0 and cols >= 0 for Matrix.padded()")
 
         var src_data_ptr = self.unsafe_data_ptr()
@@ -1736,6 +1850,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         return result^
 
     def padded_trailing(self, rows: Int, cols: Int) -> Self:
+        """Returns a copy with `rows` rows of zeros added below and `cols` columns on the right."""
         _assert(rows >= 0 and cols >= 0, "Must specify rows >= 0 and cols >= 0 for Matrix.trailing_padded()")
 
         var src_data_ptr = self.unsafe_data_ptr()
@@ -1761,6 +1876,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         return result^
 
     def horizontally_stacked(self, other: Self) -> Self:
+        """Returns this matrix with `other` placed to its right."""
         _assert(self._rows == other._rows, "Matrices must have same number of rows to stack horizontally")
 
         var result = Self(rows=self._rows, cols=self._cols + other._cols)
@@ -1788,6 +1904,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
         return result^
 
     def vertically_stacked(self, other: Self) -> Self:
+        """Returns this matrix with `other` placed below it."""
         _assert(self._cols == other._cols, "Matrices must have same number of cols to stack vertically")
 
         var result = Self(rows=self._rows + other._rows, cols=self._cols)
@@ -1804,6 +1921,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     # Type Conversion
     #
     def as_type[new_dtype: DType](self) -> Matrix[new_dtype, Self.depth, complex=Self.complex]:
+        """Returns a copy with every component converted to `new_dtype`."""
         comptime if new_dtype == Self.dtype:
             return rebind[Matrix[new_dtype, Self.depth, complex=Self.complex]](self).copy()
         else:
@@ -1824,6 +1942,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
             return result^
 
     def as_complex[new_dtype: DType = Self.dtype](self) -> Matrix[new_dtype, Self.depth, complex=True]:
+        """Returns a complex copy, with zero imaginary parts if not already complex."""
         comptime if Self.complex and new_dtype == Self.dtype:
             return rebind[Matrix[new_dtype, Self.depth, complex=True]](self).copy()
         elif Self.complex:
@@ -1848,6 +1967,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
             return result^
 
     def rebind[new_depth: Int](self) -> Matrix[Self.dtype, new_depth, complex=Self.complex]:
+        """Returns a copy typed with `new_depth` components, which must equal `depth`."""
         comptime assert new_depth == Self.depth, "new_depth must be equal to depth for rebind"
 
         return rebind[Matrix[Self.dtype, new_depth, complex=Self.complex]](self).copy()
@@ -1856,6 +1976,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     # Writable
     #
     def write_to[W: Writer](self, mut writer: W):
+        """Writes the matrix's shape and elements."""
         writer.write("[Matrix:\n  [\n")
 
         for row in range(self._rows):

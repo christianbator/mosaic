@@ -1,0 +1,109 @@
+/*
+ * custom.css
+ * mosaic
+ *
+ * Created by Christian Bator on 11/08/2026
+ */
+
+/*
+ * The default theme's component styles are scoped with an attribute selector, like .VPDoc[data-v-...],
+ * which raises their specificity. The overrides below start with :root (and .VPContent or .VPHero) to outrank them.
+ */
+
+/*
+ * Nav bar logo: the wordmark on pages with a sidebar, the icon alone elsewhere
+ */
+:root .VPNavBarTitle .nav-icon {
+  height: var(--vp-nav-logo-height);
+}
+
+:root .VPNavBarTitle .nav-wordmark {
+  height: 28px;
+}
+
+:root .VPNavBarTitle.has-sidebar .nav-icon,
+:root .VPNavBarTitle:not(.has-sidebar) .nav-wordmark {
+  display: none;
+}
+
+/*
+ * Home page: the logo, tagline and buttons centered
+ */
+:root .VPHero .main {
+  margin: 0 auto;
+  text-align: center;
+}
+
+:root .VPHero .hero-logo,
+:root .VPHero .tagline {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+:root .VPHero .actions {
+  justify-content: center;
+}
+
+:root .VPHero .hero-logo {
+  width: 220px;
+  margin-bottom: 16px;
+}
+
+@media (min-width: 640px) {
+  :root .VPHero .hero-logo {
+    width: 270px;
+  }
+}
+
+@media (min-width: 960px) {
+  :root .VPHero .hero-logo {
+    width: 320px;
+    margin-bottom: 24px;
+  }
+}
+
+/*
+ * Doc pages: the full window width beside the sidebar, since Mojo signatures are long
+ */
+:root {
+  /*
+   * The default theme centers the layout in this width. The full window up to 1680px, then centered with margins.
+   * 1680px fits a 120 character line of 14px code (the line length of `pixi run format`) beside the sidebar and outline:
+   * 272 (sidebar) + 48 (page padding) + 48 (content padding) + 48 (code padding) + 256 (outline) + 120 × 8.4.
+   * It has to be min() with 100vw rather than a fixed width: the theme's sidebar and content offsets assume
+   * the window is at least this wide from 1440px up, and shrink the sidebar otherwise.
+   */
+  --vp-layout-max-width: min(100vw, 1680px);
+}
+
+:root .VPContent .VPDoc.has-sidebar .content-container {
+  max-width: none;
+}
+
+@media (min-width: 960px) {
+  :root .VPContent .VPDoc {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  :root .VPContent .VPDoc .content {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  /* Pages without a sidebar, like the write-ups, get a wider column than the default theme's 752px */
+  :root .VPContent .VPDoc:not(.has-sidebar) .container {
+    max-width: 1280px;
+  }
+
+  :root .VPContent .VPDoc:not(.has-sidebar) .content {
+    max-width: 1040px;
+  }
+}
+
+/* The "On this page" outline only appears once there's room for it beside full-width code */
+@media (min-width: 1280px) and (max-width: 1679px) {
+  :root .VPContent .VPDoc .aside {
+    display: none;
+  }
+}

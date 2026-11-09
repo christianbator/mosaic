@@ -63,7 +63,7 @@ about:
   license_file: LICENSE
   summary: An image processing library in Mojo
   repository: https://github.com/christianbator/mosaic
-  documentation: https://github.com/christianbator/mosaic
+  documentation: https://christianbator.github.io/mosaic
 
 extra:
   project_name: Mosaic

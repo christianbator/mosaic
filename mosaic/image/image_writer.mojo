@@ -5,6 +5,8 @@
 # Created by Christian Bator on 12/14/2024
 #
 
+"""Writing images to files."""
+
 from std.os import abort, makedirs
 from std.os.path import dirname
 from std.pathlib import Path
@@ -21,6 +23,8 @@ from .color_space import ColorSpace
 # ImageWriter
 #
 struct ImageWriter:
+    """Writes images to a path."""
+
     #
     # Fields
     #
@@ -30,6 +34,7 @@ struct ImageWriter:
     # Initialization
     #
     def __init__(out self, path: Path):
+        """Creates a writer for `path`."""
         self._path = path
 
     #
@@ -38,6 +43,7 @@ struct ImageWriter:
     def write[
         color_space: ColorSpace, dtype: DType, //, file_type: ImageFile
     ](self, image: Image[color_space, dtype]) raises:
+        """Writes `image` as `file_type`, adding the extension if missing and creating parent directories."""
         var path_string: String
         if self._path.suffix() in file_type.valid_extensions():
             path_string = self._path.__fspath__()

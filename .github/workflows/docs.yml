@@ -1,0 +1,65 @@
+#
+# docs.yml
+# mosaic
+#
+# Created by Christian Bator on 11/08/2026
+#
+
+name: Docs
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "mosaic/**"
+      - "pixi.toml"
+      - "pixi.lock"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time, without cancelling one that's in progress
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          # Full history, for the last updated dates on each page
+          fetch-depth: 0
+      - name: Set up pixi
+        uses: prefix-dev/setup-pixi@v0.11.2
+        with:
+          cache: true
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v6
+      - name: Build docs
+        # base_path is empty with a custom domain and /mosaic otherwise
+        env:
+          DOCS_BASE: ${{ steps.pages.outputs.base_path }}/
+        run: pixi run docs-build
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/.vitepress/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

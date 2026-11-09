@@ -15,6 +15,7 @@
   <a href="#installation">Installation</a> •
   <a href="#quickstart">Quickstart</a> •
   <a href="#examples">Examples</a> •
+  <a href="https://christianbator.github.io/mosaic">Documentation</a> •
   <a href="#acknowledgements">Acknowledgements</a>
 </p>
 
@@ -44,7 +45,7 @@ It can unify image processing workflows into one language that runs on any hardw
   - Native image rendering
 - Hardware acceleration
   - Parallelization and SIMD on CPUs
-  - GPU acceleration when available (coming soon)
+  - GPU acceleration when available
 
 ## Installation
 #### Prerequisites

@@ -5,6 +5,8 @@
 # Created by Christian Bator on 03/11/2025
 #
 
+"""Reading images from files."""
+
 from std.pathlib import Path
 from std.ffi import _get_dylib_function, c_int
 from std.memory.alloc import unsafe_alloc
@@ -20,16 +22,23 @@ from .color_space import ColorSpace
 # ImageInfo
 #
 struct ImageInfo(ImplicitlyCopyable, Movable, Writable):
+    """The dimensions and bit depth stored in an image file."""
+
     var height: c_int
+    """The height in pixels."""
     var width: c_int
+    """The width in pixels."""
     var bit_depth: c_int
+    """The bits per sample."""
 
     def __init__(out self):
+        """Creates zeroed image info."""
         self.height = 0
         self.width = 0
         self.bit_depth = 0
 
     def write_to[W: Writer](self, mut writer: W):
+        """Writes the image info."""
         writer.write(
             "[ImageInfo: height = ",
             self.height,
@@ -45,6 +54,8 @@ struct ImageInfo(ImplicitlyCopyable, Movable, Writable):
 # ImageReader
 #
 struct ImageReader[color_space: ColorSpace, dtype: DType]:
+    """Reads images from a path."""
+
     #
     # Fields
     #
@@ -54,12 +65,14 @@ struct ImageReader[color_space: ColorSpace, dtype: DType]:
     # Initialization
     #
     def __init__(out self, path: Path):
+        """Creates a reader for `path`."""
         self._path = path
 
     #
     # Reading
     #
     def read(self) raises -> Image[Self.color_space, Self.dtype]:
+        """Reads and decodes the image, converting it to `color_space` and `dtype`."""
         # Read raw file data
         var raw_data = self._path.read_bytes()
 

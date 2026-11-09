@@ -5,6 +5,8 @@
 # Created by Christian Bator on 03/15/2025
 #
 
+"""Views into images."""
+
 from std.memory import Pointer
 from std.algorithm import vectorize
 from max.algorithm import parallelize
@@ -26,6 +28,8 @@ from .color_space import ColorSpace
 struct ImageSlice[mut: Bool, //, color_space: ColorSpace, dtype: DType, origin: Origin[mut=mut]](
     ImplicitlyCopyable, Movable, Writable
 ):
+    """A view of a strided range of rows and columns of an image, without copying."""
+
     #
     # Fields
     #
@@ -42,6 +46,7 @@ struct ImageSlice[mut: Bool, //, color_space: ColorSpace, dtype: DType, origin: 
         y_range: StridedRange,
         x_range: StridedRange,
     ) raises:
+        """Creates a view of `image` over `y_range` and `x_range`."""
         if y_range.end > image.height() or x_range.end > image.width():
             raise Error("Out of bounds image slice for image ", image, ": y_range: ", y_range, " x_range: ", x_range)
 
@@ -50,6 +55,7 @@ struct ImageSlice[mut: Bool, //, color_space: ColorSpace, dtype: DType, origin: 
         self._x_range = x_range
 
     def __init__(out self, existing: Self, y_range: StridedRange, x_range: StridedRange) raises:
+        """Creates a view of the rows and columns in `y_range` and `x_range` of `existing`, relative to it."""
         var new_y_range = StridedRange(
             existing._y_range.start + y_range.start * existing._y_range.step,
             existing._y_range.start + y_range.end * existing._y_range.step,
@@ -81,21 +87,26 @@ struct ImageSlice[mut: Bool, //, color_space: ColorSpace, dtype: DType, origin: 
     #
     @always_inline
     def y_range(self) -> StridedRange:
+        """The rows of the image this view covers."""
         return self._y_range
 
     @always_inline
     def x_range(self) -> StridedRange:
+        """The columns of the image this view covers."""
         return self._x_range
 
     @always_inline
     def height(self) -> Int:
+        """The height in pixels."""
         return self._y_range.count()
 
     @always_inline
     def width(self) -> Int:
+        """The width in pixels."""
         return self._x_range.count()
 
     def channels(self) -> Int:
+        """The number of channels."""
         return Self.color_space.channels()
 
     #
@@ -103,6 +114,7 @@ struct ImageSlice[mut: Bool, //, color_space: ColorSpace, dtype: DType, origin: 
     #
     @always_inline
     def __getitem__(self, y: Int, x: Int) raises -> Scalar[Self.dtype]:
+        """Returns the sample at `y`, `x` of a single-channel view."""
         comptime assert (
             Self.color_space.channels() == 1
         ), "Must specify channel for image slice in color space with channels > 1"
@@ -111,10 +123,12 @@ struct ImageSlice[mut: Bool, //, color_space: ColorSpace, dtype: DType, origin: 
 
     @always_inline
     def __getitem__(self, y: Int, x: Int, channel: Int) raises -> Scalar[Self.dtype]:
+        """Returns the sample at `y`, `x` in `channel`."""
         return self.strided_load(y=y, x=x, channel=channel)
 
     @always_inline
     def __setitem__(mut self, y: Int, x: Int, value: Scalar[Self.dtype]) raises where Self.mut:
+        """Sets the sample at `y`, `x` of a single-channel view."""
         comptime assert (
             Self.color_space.channels() == 1
         ), "Must specify channel for image slice in color space with channels > 1"
@@ -123,10 +137,12 @@ struct ImageSlice[mut: Bool, //, color_space: ColorSpace, dtype: DType, origin: 
 
     @always_inline
     def __setitem__(mut self, y: Int, x: Int, channel: Int, value: Scalar[Self.dtype]) raises where Self.mut:
+        """Sets the sample at `y`, `x` in `channel`."""
         self.strided_store(value, y=y, x=x, channel=channel)
 
     @always_inline
     def strided_load[width: Int = 1](self, y: Int, x: Int) raises -> SIMD[Self.dtype, width]:
+        """Loads `width` consecutive samples along the row of a single-channel view."""
         comptime assert (
             Self.color_space.channels() == 1
         ), "Must specify channel for image slice in color space with channels > 1"
@@ -135,6 +151,7 @@ struct ImageSlice[mut: Bool, //, color_space: ColorSpace, dtype: DType, origin: 
 
     @always_inline
     def strided_load[width: Int = 1](self, y: Int, x: Int, channel: Int) raises -> SIMD[Self.dtype, width]:
+        """Loads `width` consecutive samples of `channel` along the row."""
         return self._image[].strided_load[width](
             y=self._y_range.start + y * self._y_range.step,
             x=self._x_range.start + x * self._x_range.step,
@@ -145,6 +162,7 @@ struct ImageSlice[mut: Bool, //, color_space: ColorSpace, dtype: DType, origin: 
     def strided_store[
         width: SIMDLength, //
     ](mut self, value: SIMD[Self.dtype, width], y: Int, x: Int) raises where Self.mut:
+        """Stores the lanes of `value` in consecutive pixels along the row of a single-channel view."""
         comptime assert (
             Self.color_space.channels() == 1
         ), "Must specify channel for image slice in color space with channels > 1"
@@ -155,6 +173,7 @@ struct ImageSlice[mut: Bool, //, color_space: ColorSpace, dtype: DType, origin: 
     def strided_store[
         width: SIMDLength, //
     ](mut self, value: SIMD[Self.dtype, width], y: Int, x: Int, channel: Int) raises where Self.mut:
+        """Stores the lanes of `value` in `channel` of consecutive pixels along the row."""
         self._image.unsafe_mut_cast[True]()[].strided_store(
             value,
             y=self._y_range.start + y * self._y_range.step,
@@ -205,14 +224,17 @@ struct ImageSlice[mut: Bool, //, color_space: ColorSpace, dtype: DType, origin: 
     #
     @always_inline
     def __getitem__(self, y: Int, x_slice: Slice) raises -> Self:
+        """Returns a view of row `y` across the columns in `x_slice`."""
         return self[y : y + 1, x_slice]
 
     @always_inline
     def __getitem__(self, y_slice: Slice, x: Int) raises -> Self:
+        """Returns a view of column `x` across the rows in `y_slice`."""
         return self[y_slice, x : x + 1]
 
     @always_inline
     def __getitem__(self, y_slice: Slice, x_slice: Slice) raises -> Self:
+        """Returns a view of the rows and columns in `y_slice` and `x_slice`."""
         return self.slice(
             y_range=StridedRange(
                 slice=y_slice,
@@ -230,20 +252,24 @@ struct ImageSlice[mut: Bool, //, color_space: ColorSpace, dtype: DType, origin: 
 
     @always_inline
     def slice(self, y_range: StridedRange) raises -> Self:
+        """Returns a view of the rows in `y_range`."""
         return self.slice(y_range=y_range, x_range=StridedRange(self.width()))
 
     @always_inline
     def slice(self, *, x_range: StridedRange) raises -> Self:
+        """Returns a view of the columns in `x_range`."""
         return self.slice(y_range=StridedRange(self.height()), x_range=x_range)
 
     @always_inline
     def slice(self, y_range: StridedRange, x_range: StridedRange) raises -> Self:
+        """Returns a view of the rows and columns in `y_range` and `x_range`."""
         return Self(self, y_range=y_range, x_range=x_range)
 
     #
     # Deep Copy
     #
     def deep_copy(self) -> Image[Self.color_space, Self.dtype]:
+        """Copies the view into a new image."""
         var result = Image[Self.color_space, Self.dtype](height=self.height(), width=self.width())
 
         comptime for channel in range(Self.color_space.channels()):
@@ -272,15 +298,18 @@ struct ImageSlice[mut: Bool, //, color_space: ColorSpace, dtype: DType, origin: 
     # Saving to File
     #
     def save[file_type: ImageFile](self, path: String) raises:
+        """Saves the view to `path` as `file_type`."""
         self.deep_copy().save[file_type](path)
 
     def save[file_type: ImageFile](self, path: Path) raises:
+        """Saves the view to `path` as `file_type`."""
         self.deep_copy().save[file_type](path)
 
     #
     # Writable
     #
     def write_to[W: Writer](self, mut writer: W):
+        """Writes the view's ranges and image."""
         writer.write(
             "[ImageSlice: y_range = ",
             self._y_range,

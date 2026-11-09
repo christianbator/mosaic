@@ -5,6 +5,8 @@
 # Created by Christian Bator on 03/14/2025
 #
 
+"""Convolution kernels."""
+
 from std.os import abort
 from std.math import pi, exp
 
@@ -12,10 +14,13 @@ from mosaic.numeric import Matrix, Number
 
 
 struct Filters:
+    """Constructors for common convolution kernels."""
+
     @staticmethod
     def box_kernel_1d[
         dtype: DType, depth: Int = 1, complex: Bool = False
     ](size: Int) -> Matrix[dtype, depth, complex=complex]:
+        """Returns a `size`×1 box kernel whose weights sum to 1."""
         comptime assert dtype.is_floating_point(), "box_kernel_1d() is only available for floating point dtypes"
 
         return Matrix[dtype, depth, complex=complex](rows=size, cols=1, value=(1 / Float64(size)).cast[dtype]())
@@ -24,6 +29,7 @@ struct Filters:
     def box_kernel_2d[
         dtype: DType, depth: Int = 1, complex: Bool = False
     ](size: Int) -> Matrix[dtype, depth, complex=complex]:
+        """Returns a `size`×`size` box kernel whose weights sum to 1."""
         comptime assert dtype.is_floating_point(), "box_kernel_2d() is only available for floating point dtypes"
 
         return Matrix[dtype, depth, complex=complex](
@@ -34,6 +40,7 @@ struct Filters:
     def gaussian_kernel_1d[
         dtype: DType, depth: Int = 1, complex: Bool = False
     ](size: Int, std_dev: Optional[Float64] = None) -> Matrix[dtype, depth, complex=complex]:
+        """Returns a `size`×1 Gaussian kernel, with OpenCV's default standard deviation when `std_dev` is None."""
         comptime assert dtype.is_floating_point(), "gaussian_kernel_1d() is only available for floating point dtypes"
 
         if size == 1:
@@ -110,6 +117,7 @@ struct Filters:
     def gaussian_kernel_2d[
         dtype: DType, depth: Int = 1, complex: Bool = False
     ](size: Int, std_dev: Optional[Float64] = None) -> Matrix[dtype, depth, complex=complex]:
+        """Returns a `size`×`size` Gaussian kernel, the outer product of the 1-D kernel with itself."""
         comptime assert dtype.is_floating_point(), "gaussian_kernel_2d() is only available for floating point dtypes"
 
         var kernel = Self.gaussian_kernel_1d[dtype, depth, complex](size=size, std_dev=std_dev)

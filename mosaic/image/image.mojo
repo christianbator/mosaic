@@ -5,6 +5,8 @@
 # Created by Christian Bator on 12/14/2024
 #
 
+"""Images on the CPU."""
+
 from std.os import abort
 from std.pathlib import Path
 from std.algorithm import vectorize
@@ -33,10 +35,13 @@ from .interpolation import Interpolation
 struct Image[color_space: ColorSpace, dtype: DType](
     Absable, CeilDivable, Ceilable, Copyable, Equatable, Floorable, Movable, Roundable, Truncable, Writable
 ):
+    """An image in host memory, with `color_space` channels of `dtype` samples per pixel."""
+
     #
     # Fields
     #
     comptime optimal_simd_width = optimal_simd_width[Self.dtype]()
+    """The SIMD width image operations use."""
 
     var _matrix: Matrix[Self.dtype, Self.color_space.channels()]
 
@@ -44,26 +49,33 @@ struct Image[color_space: ColorSpace, dtype: DType](
     # Initialization
     #
     def __init__(out self, path: StringLiteral) raises:
+        """Reads the image at `path`, converting it to `color_space` and `dtype`."""
         self = Self(Path(path))
 
     def __init__(out self, path: Path) raises:
+        """Reads the image at `path`, converting it to `color_space` and `dtype`."""
         self = ImageReader[Self.color_space, Self.dtype](path).read()
 
     def __init__(out self, height: Int, width: Int):
+        """Creates a black image."""
         self._matrix = Matrix[Self.dtype, Self.color_space.channels()](rows=height, cols=width)
 
     # This is an unsafe convenience constructor
     def __init__(out self, height: Int, width: Int, var data: Pointer[Scalar[Self.dtype], MutUntrackedOrigin]):
+        """Creates an image that takes ownership of the samples at `data`."""
         self._matrix = Matrix[Self.dtype, Self.color_space.channels()](rows=height, cols=width, data=data)
 
     def __init__(out self, var matrix: Matrix[Self.dtype, Self.color_space.channels()]):
+        """Creates an image from a matrix with one component per channel."""
         self._matrix = matrix^
 
     def __init__(out self, *, deinit move: Self):
+        """Moves an image."""
         self._matrix = move._matrix^
 
     @staticmethod
     def with_single_channel_data[channel: Int](single_channel_matrix: Matrix[Self.dtype]) -> Self:
+        """Returns an image with `single_channel_matrix` in `channel` and zeros in the other channels."""
         return Self(single_channel_matrix.copied_to_component[channel, Self.color_space.channels()]())
 
     @staticmethod
@@ -74,6 +86,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
         lower_bound: Scalar[DType.int64],
         upper_bound: Scalar[DType.int64],
     ) -> Self:
+        """Returns the image whose spectrum is `spectrum`, mapped to `[lower_bound, upper_bound]`."""
         var real = spectrum.fourier_transform[inverse=True]().real()
         real.map_to_range(lower_bound.cast[fft_dtype](), upper_bound.cast[fft_dtype]())
 
@@ -85,6 +98,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
     ](
         spectrum: Matrix[spectrum_dtype, Self.color_space.channels(), complex=True], lower_bound: T, upper_bound: T
     ) -> Self:
+        """Returns the image whose spectrum is `spectrum`, mapped to `[lower_bound, upper_bound]`."""
         var real = spectrum.fourier_transform[inverse=True]().real()
         real.map_to_range(Float64(lower_bound).cast[fft_dtype](), Float64(upper_bound).cast[fft_dtype]())
 
@@ -95,28 +109,35 @@ struct Image[color_space: ColorSpace, dtype: DType](
     #
     @always_inline
     def height(self) -> Int:
+        """The height in pixels."""
         return self._matrix.rows()
 
     @always_inline
     def width(self) -> Int:
+        """The width in pixels."""
         return self._matrix.cols()
 
     @always_inline
     def pixels(self) -> Int:
+        """The number of pixels."""
         return self._matrix.strided_count()
 
     def channels(self) -> Int:
+        """The number of channels."""
         return Self.color_space.channels()
 
     @always_inline
     def samples(self) -> Int:
+        """The number of samples, `pixels * channels`."""
         return self._matrix.count()
 
     def bit_depth(self) -> Int:
+        """The bits per sample."""
         return bit_width_of[Self.dtype]()
 
     @always_inline
     def bytes(self) -> Int:
+        """The size of the samples in bytes."""
         return self.samples() * self.bit_depth() // 8
 
     #
@@ -124,6 +145,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
     #
     @always_inline
     def __getitem__(self, y: Int, x: Int) raises -> Scalar[Self.dtype]:
+        """Returns the sample at `y`, `x` of a single-channel image."""
         comptime assert (
             Self.color_space.channels() == 1
         ), "Must specify channel for image in color space with channels > 1"
@@ -132,10 +154,12 @@ struct Image[color_space: ColorSpace, dtype: DType](
 
     @always_inline
     def __getitem__(self, y: Int, x: Int, channel: Int) raises -> Scalar[Self.dtype]:
+        """Returns the sample at `y`, `x` in `channel`."""
         return self._matrix[y, x, channel].value
 
     @always_inline
     def __setitem__(mut self, y: Int, x: Int, value: Scalar[Self.dtype]) raises:
+        """Sets the sample at `y`, `x` of a single-channel image."""
         comptime assert (
             Self.color_space.channels() == 1
         ), "Must specify channel for image in color space with channels > 1"
@@ -144,10 +168,12 @@ struct Image[color_space: ColorSpace, dtype: DType](
 
     @always_inline
     def __setitem__(mut self, y: Int, x: Int, channel: Int, value: Scalar[Self.dtype]) raises:
+        """Sets the sample at `y`, `x` in `channel`."""
         self._matrix[y, x, channel] = value
 
     @always_inline
     def strided_load[width: Int = 1](self, y: Int, x: Int) raises -> SIMD[Self.dtype, width]:
+        """Loads `width` consecutive samples along the row of a single-channel image."""
         comptime assert (
             Self.color_space.channels() == 1
         ), "Must specify channel for image in color space with channels > 1"
@@ -156,10 +182,12 @@ struct Image[color_space: ColorSpace, dtype: DType](
 
     @always_inline
     def strided_load[width: Int = 1](self, y: Int, x: Int, channel: Int) raises -> SIMD[Self.dtype, width]:
+        """Loads `width` consecutive samples of `channel` along the row."""
         return self._matrix.strided_load[width](row=y, col=x, component=channel).value
 
     @always_inline
     def strided_store[width: SIMDLength](mut self, value: SIMD[Self.dtype, width], y: Int, x: Int) raises:
+        """Stores the lanes of `value` in consecutive pixels along the row of a single-channel image."""
         comptime assert (
             Self.color_space.channels() == 1
         ), "Must specify channel for image in color space with channels > 1"
@@ -168,6 +196,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
 
     @always_inline
     def strided_store[width: SIMDLength](mut self, value: SIMD[Self.dtype, width], y: Int, x: Int, channel: Int) raises:
+        """Stores the lanes of `value` in `channel` of consecutive pixels along the row."""
         self._matrix.strided_store(Number[Self.dtype, width](value), row=y, col=x, component=channel)
 
     #
@@ -202,16 +231,19 @@ struct Image[color_space: ColorSpace, dtype: DType](
     #
     @always_inline
     def unsafe_data_ptr(self) -> Pointer[Scalar[Self.dtype], MutUntrackedOrigin]:
+        """Returns a pointer to the samples, which is valid only while the image is alive."""
         return self._matrix.unsafe_data_ptr()
 
     @always_inline
     def unsafe_uint8_ptr(self) -> Pointer[UInt8, MutUntrackedOrigin]:
+        """Returns a byte pointer to the samples, which is valid only while the image is alive."""
         return self._matrix.unsafe_uint8_ptr()
 
     #
     # Lifetime Management
     #
     def keep(self):
+        """Keeps the image alive until this call, for code that uses its unsafe pointers."""
         pass
 
     #
@@ -221,18 +253,21 @@ struct Image[color_space: ColorSpace, dtype: DType](
     def __getitem__[
         mut: Bool, origin: Origin[mut=mut], //
     ](ref[origin] self, y: Int, x_slice: Slice) raises -> ImageSlice[Self.color_space, Self.dtype, origin]:
+        """Returns a view of row `y` across the columns in `x_slice`."""
         return self[y : y + 1, x_slice]
 
     @always_inline
     def __getitem__[
         mut: Bool, origin: Origin[mut=mut], //
     ](ref[origin] self, y_slice: Slice, x: Int) raises -> ImageSlice[Self.color_space, Self.dtype, origin]:
+        """Returns a view of column `x` across the rows in `y_slice`."""
         return self[y_slice, x : x + 1]
 
     @always_inline
     def __getitem__[
         mut: Bool, origin: Origin[mut=mut], //
     ](ref[origin] self, y_slice: Slice, x_slice: Slice) raises -> ImageSlice[Self.color_space, Self.dtype, origin]:
+        """Returns a view of the rows and columns in `y_slice` and `x_slice`."""
         return self.slice(
             y_range=StridedRange(
                 slice=y_slice,
@@ -252,12 +287,14 @@ struct Image[color_space: ColorSpace, dtype: DType](
     def slice[
         mut: Bool, origin: Origin[mut=mut], //
     ](ref[origin] self, y_range: StridedRange) raises -> ImageSlice[Self.color_space, Self.dtype, origin]:
+        """Returns a view of the rows in `y_range`."""
         return self.slice(y_range=y_range, x_range=StridedRange(self.width()))
 
     @always_inline
     def slice[
         mut: Bool, origin: Origin[mut=mut], //
     ](ref[origin] self, *, x_range: StridedRange) raises -> ImageSlice[Self.color_space, Self.dtype, origin]:
+        """Returns a view of the columns in `x_range`."""
         return self.slice(y_range=StridedRange(self.height()), x_range=x_range)
 
     @always_inline
@@ -266,6 +303,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
     ](ref[origin] self, y_range: StridedRange, x_range: StridedRange) raises -> ImageSlice[
         Self.color_space, Self.dtype, origin
     ]:
+        """Returns a view of the rows and columns in `y_range` and `x_range`."""
         return ImageSlice[Self.color_space, Self.dtype, origin](self, y_range=y_range, x_range=x_range)
 
     @always_inline
@@ -274,6 +312,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
     ](self) -> MatrixSlice[
         StridedRange(channel, channel + 1), Self.dtype, Self.color_space.channels(), False, origin_of(self._matrix)
     ]:
+        """Returns a view of one channel."""
         return self._matrix.component_slice[channel]()
 
     @always_inline
@@ -282,6 +321,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
     ](self, y_range: StridedRange) raises -> MatrixSlice[
         StridedRange(channel, channel + 1), Self.dtype, Self.color_space.channels(), False, origin_of(self._matrix)
     ]:
+        """Returns a view of one channel over the rows in `y_range`."""
         return self._matrix.component_slice[channel](y_range)
 
     @always_inline
@@ -290,6 +330,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
     ](self, *, x_range: StridedRange) raises -> MatrixSlice[
         StridedRange(channel, channel + 1), Self.dtype, Self.color_space.channels(), False, origin_of(self._matrix)
     ]:
+        """Returns a view of one channel over the columns in `x_range`."""
         return self._matrix.component_slice[channel](col_range=x_range)
 
     @always_inline
@@ -298,12 +339,14 @@ struct Image[color_space: ColorSpace, dtype: DType](
     ](self, y_range: StridedRange, x_range: StridedRange) raises -> MatrixSlice[
         StridedRange(channel, channel + 1), Self.dtype, Self.color_space.channels(), False, origin_of(self._matrix)
     ]:
+        """Returns a view of one channel over the rows and columns in `y_range` and `x_range`."""
         return self._matrix.component_slice[channel](row_range=y_range, col_range=x_range)
 
     @always_inline
     def strided_slice[
         channel_range: StridedRange
     ](self) -> MatrixSlice[channel_range, Self.dtype, Self.color_space.channels(), False, origin_of(self._matrix)]:
+        """Returns a view of the channels in `channel_range`."""
         return self._matrix.strided_slice[channel_range]()
 
     @always_inline
@@ -312,6 +355,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
     ](self, y_range: StridedRange) raises -> MatrixSlice[
         channel_range, Self.dtype, Self.color_space.channels(), False, origin_of(self._matrix)
     ]:
+        """Returns a view of the channels in `channel_range` over the rows in `y_range`."""
         return self._matrix.strided_slice[channel_range](y_range)
 
     @always_inline
@@ -320,6 +364,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
     ](self, *, x_range: StridedRange) raises -> MatrixSlice[
         channel_range, Self.dtype, Self.color_space.channels(), False, origin_of(self._matrix)
     ]:
+        """Returns a view of the channels in `channel_range` over the columns in `x_range`."""
         return self._matrix.strided_slice[channel_range](col_range=x_range)
 
     @always_inline
@@ -328,13 +373,16 @@ struct Image[color_space: ColorSpace, dtype: DType](
     ](self, y_range: StridedRange, x_range: StridedRange) raises -> MatrixSlice[
         channel_range, Self.dtype, Self.color_space.channels(), False, origin_of(self._matrix)
     ]:
+        """Returns a view of the channels in `channel_range` over the given rows and columns."""
         return self._matrix.strided_slice[channel_range](row_range=y_range, col_range=x_range)
 
     @always_inline
     def extract_channel[channel: Int](self) -> Matrix[Self.dtype]:
+        """Copies one channel into a new single-component matrix."""
         return self.channel_slice[channel]().deep_copy[rebound_depth=1]()
 
     def extract_channel(self, channel: Int) -> Matrix[Self.dtype]:
+        """Copies one channel into a new single-component matrix."""
         _assert(0 <= channel < Self.color_space.channels(), "Channel must be in color space channel bounds")
 
         if channel == 0:
@@ -347,9 +395,11 @@ struct Image[color_space: ColorSpace, dtype: DType](
             abort("Unimplemented runtime extract_channel")
 
     def store_sub_image(mut self, value: Self, y: Int, x: Int) raises:
+        """Copies `value` into this image with its top left at `y`, `x`."""
         self.store_sub_image(value[:, :], y=y, x=x)
 
     def store_sub_image(mut self, image_slice: ImageSlice[Self.color_space, Self.dtype, _], y: Int, x: Int) raises:
+        """Copies `image_slice` into this image with its top left at `y`, `x`."""
         if (image_slice.y_range().end > self.height()) or (image_slice.x_range().end > self.width()):
             raise Error("Out of bounds sub-image store")
 
@@ -373,6 +423,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
     def store_sub_matrix(
         mut self, value: Matrix[Self.dtype, Self.color_space.channels()], y: Int, x: Int, channel: Int = 0
     ) raises:
+        """Copies `value` into this image with its top left at `y`, `x`, starting at `channel`."""
         self._matrix.store_sub_matrix(value, row=y, col=x, component=channel)
 
     def store_sub_matrix(
@@ -382,15 +433,18 @@ struct Image[color_space: ColorSpace, dtype: DType](
         x: Int,
         channel: Int = 0,
     ) raises:
+        """Copies `value` into this image with its top left at `y`, `x`, starting at `channel`."""
         self._matrix.store_sub_matrix(value, row=y, col=x, component=channel)
 
     #
     # Copyable
     #
     def __init__(out self, *, copy: Self):
+        """Creates a deep copy."""
         self = Self(copy._matrix.copy())
 
     def copy_into(self, mut other: Self):
+        """Copies the pixels into `other`, which must have the same size."""
         self._matrix.copy_into(other._matrix)
 
     #
@@ -403,6 +457,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
         return not (self == other)
 
     def matches(self, other: Self, tolerance: Int = 1) -> Bool:
+        """Whether every sample is within `tolerance` of the corresponding sample in `other`."""
         return self._matrix.matches(other._matrix, tolerance)
 
     #
@@ -652,38 +707,50 @@ struct Image[color_space: ColorSpace, dtype: DType](
     # Numeric Methods
     #
     def log(self) -> Self where Self.dtype.is_floating_point():
+        """The natural logarithm of each sample."""
         return Self(self._matrix.log())
 
     def clamp(mut self, lower_bound: Scalar[Self.dtype], upper_bound: Scalar[Self.dtype]):
+        """Clamps each sample to `[lower_bound, upper_bound]`."""
         self._matrix.clamp(lower_bound=lower_bound, upper_bound=upper_bound)
 
     def clamped(self, lower_bound: Scalar[Self.dtype], upper_bound: Scalar[Self.dtype]) -> Self:
+        """Returns a copy with each sample clamped to `[lower_bound, upper_bound]`."""
         return Self(self._matrix.clamped(lower_bound=lower_bound, upper_bound=upper_bound))
 
     def strided_sum(self, channel: Int) -> Scalar[Self.dtype]:
+        """The sum of `channel` over every pixel."""
         return self._matrix.strided_sum(channel).value
 
     def strided_average(self, channel: Int) -> Scalar[DType.float64]:
+        """The average of `channel` over every pixel."""
         return self._matrix.strided_average(channel).value
 
     def strided_min(self, channel: Int) -> Scalar[Self.dtype]:
+        """The minimum of `channel` over every pixel."""
         return self._matrix.strided_min(channel).value
 
     def strided_max(self, channel: Int) -> Scalar[Self.dtype]:
+        """The maximum of `channel` over every pixel."""
         return self._matrix.strided_max(channel).value
 
     def strided_normalize(mut self):
+        """Divides each channel by its sum over every pixel, so each channel sums to 1."""
         self._matrix.strided_normalize()
 
     def strided_fill(mut self, value: Scalar[Self.dtype], channel: Int):
+        """Sets `channel` of every pixel to `value`."""
         self._matrix.strided_fill(value, component=channel)
 
     def fill(mut self, value: Scalar[Self.dtype]):
+        """Sets every sample to `value`."""
         self._matrix.fill(value)
 
     def strided_for_each[
         TransformerType: def[width: Int](value: SIMD[Self.dtype, width]) -> SIMD[Self.dtype, width], //
     ](mut self, transformer: TransformerType, channel: Int):
+        """Replaces `channel` of every pixel with `transformer` applied to it."""
+
         def number_transformer[width: Int](value: Number[Self.dtype, width]) {imm} -> Number[Self.dtype, width]:
             return Number[Self.dtype, width](transformer[width](value.value))
 
@@ -695,6 +762,8 @@ struct Image[color_space: ColorSpace, dtype: DType](
         ],
         //,
     ](mut self, transformer: TransformerType, other: Self, channel: Int):
+        """Replaces `channel` of every pixel with `transformer` applied to it and the same channel of `other`."""
+
         def number_transformer[
             width: Int
         ](value: Number[Self.dtype, width], rhs: Number[Self.dtype, width]) {imm} -> Number[Self.dtype, width]:
@@ -705,6 +774,8 @@ struct Image[color_space: ColorSpace, dtype: DType](
     def for_each[
         TransformerType: def[width: Int](value: SIMD[Self.dtype, width]) -> SIMD[Self.dtype, width], //
     ](mut self, transformer: TransformerType):
+        """Replaces every sample with `transformer` applied to it."""
+
         def number_transformer[width: Int](value: Number[Self.dtype, width]) {imm} -> Number[Self.dtype, width]:
             return Number[Self.dtype, width](transformer[width](value.value))
 
@@ -716,6 +787,8 @@ struct Image[color_space: ColorSpace, dtype: DType](
         ],
         //,
     ](mut self, transformer: TransformerType, other: Self):
+        """Replaces every sample with `transformer` applied to it and the corresponding sample of `other`."""
+
         def number_transformer[
             width: Int
         ](value: Number[Self.dtype, width], rhs: Number[Self.dtype, width]) {imm} -> Number[Self.dtype, width]:
@@ -724,6 +797,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
         self._matrix.for_each_zipped(number_transformer, other._matrix)
 
     def invert(mut self) where Self.dtype == DType.uint8:
+        """Inverts every sample, replacing `value` with `255 - value`."""
         # invert() is only available for UInt8 images, since inversion is ambiguous otherwise
 
         def transformer[width: Int](value: SIMD[Self.dtype, width]) {imm} -> SIMD[Self.dtype, width]:
@@ -732,52 +806,65 @@ struct Image[color_space: ColorSpace, dtype: DType](
         self.for_each(transformer)
 
     def inverted(self) -> Self where Self.dtype == DType.uint8:
+        """Returns a copy with every sample inverted."""
         var result = self.copy()
         result.invert()
 
         return result^
 
     def spectrum(self) -> Matrix[fft_dtype, Self.color_space.channels(), complex=True]:
+        """Returns the 2-D discrete Fourier transform of each channel."""
         return self._matrix.fourier_transform()
 
     #
     # Geometric Transformations
     #
     def flip_horizontally(mut self):
+        """Mirrors the image left to right."""
         self._matrix.flip_horizontally()
 
     def flipped_horizontally(self) -> Self:
+        """Returns a copy mirrored left to right."""
         return Self(self._matrix.flipped_horizontally())
 
     def flip_vertically(mut self):
+        """Mirrors the image top to bottom."""
         self._matrix.flip_vertically()
 
     def flipped_vertically(self) -> Self:
+        """Returns a copy mirrored top to bottom."""
         return Self(self._matrix.flipped_vertically())
 
     def rotate_90[*, clockwise: Bool](mut self):
+        """Rotates by 90 degrees, clockwise or counterclockwise."""
         self._matrix.rotate_90[clockwise=clockwise]()
 
     def rotated_90[*, clockwise: Bool](self) -> Self:
+        """Returns a copy rotated by 90 degrees, clockwise or counterclockwise."""
         return Self(self._matrix.rotated_90[clockwise=clockwise]())
 
     def rotate_180(mut self):
+        """Rotates by 180 degrees."""
         self._matrix.rotate_180()
 
     def rotated_180(self) -> Self:
+        """Returns a copy rotated by 180 degrees."""
         return Self(self._matrix.rotated_180())
 
     def scaled[interpolation: Interpolation = Interpolation.bilinear](self, factor: Float64) -> Self:
+        """Returns a copy resized by `factor`."""
         return self.resized[interpolation](
             height=Int(factor * Float64(self.height())), width=Int(factor * Float64(self.width()))
         )
 
     def scaled[T: Floatable, //, interpolation: Interpolation = Interpolation.bilinear](self, factor: T) -> Self:
+        """Returns a copy resized by `factor`."""
         return self.resized[interpolation](
             height=Int(Float64(factor) * Float64(self.height())), width=Int(Float64(factor) * Float64(self.width()))
         )
 
     def resized[interpolation: Interpolation = Interpolation.bilinear](self, height: Int, width: Int) -> Self:
+        """Returns a copy resized to `height`×`width`."""
         comptime if interpolation == Interpolation.nearest:
             return self._resized_nearest(height=height, width=width)
         elif interpolation == Interpolation.bilinear:
@@ -899,9 +986,11 @@ struct Image[color_space: ColorSpace, dtype: DType](
         return result^
 
     def padded[border: Border = Border.zero](self, size: Int) -> Self:
+        """Returns a copy with `size` pixels of border added on every side."""
         return self.padded[border](height=size, width=size)
 
     def padded[border: Border = Border.zero](self, height: Int, width: Int) -> Self:
+        """Returns a copy with `height` rows of border above and below and `width` columns on the left and right."""
         var result = Self(self._matrix.padded(rows=height, cols=width))
 
         comptime if border != Border.zero:
@@ -930,6 +1019,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
         return result^
 
     def padded_trailing[border: Border = Border.zero](self, height: Int, width: Int) -> Self:
+        """Returns a copy with `height` rows of border added below and `width` columns on the right."""
         var result = Self(self._matrix.padded_trailing(rows=height, cols=width))
 
         comptime if border != Border.zero:
@@ -949,26 +1039,32 @@ struct Image[color_space: ColorSpace, dtype: DType](
         return result^
 
     def horizontally_stacked(self, other: Self) -> Self:
+        """Returns this image with `other` placed to its right."""
         return Self(self._matrix.horizontally_stacked(other._matrix))
 
     def vertically_stacked(self, other: Self) -> Self:
+        """Returns this image with `other` placed below it."""
         return Self(self._matrix.vertically_stacked(other._matrix))
 
     #
     # Common Filters
     #
     def box_blur[border: Border](mut self, size: Int) raises:
+        """Blurs with a `size`×`size` box kernel."""
         self.filter[border](Filters.box_kernel_2d[Self.dtype, Self.color_space.channels()](size))
 
     def box_blurred[border: Border](self, size: Int) raises -> Self:
+        """Returns a copy blurred with a `size`×`size` box kernel."""
         return self.filtered[border](Filters.box_kernel_2d[Self.dtype, Self.color_space.channels()](size))
 
     def gaussian_blur[border: Border](mut self, size: Int, std_dev: Optional[Float64] = None) raises:
+        """Blurs with a `size`×`size` Gaussian kernel."""
         self.filter[border](
             Filters.gaussian_kernel_2d[Self.dtype, Self.color_space.channels()](size=size, std_dev=std_dev)
         )
 
     def gaussian_blurred[border: Border](self, size: Int, std_dev: Optional[Float64] = None) raises -> Self:
+        """Returns a copy blurred with a `size`×`size` Gaussian kernel."""
         return self.filtered[border](
             Filters.gaussian_kernel_2d[Self.dtype, Self.color_space.channels()](size=size, std_dev=std_dev)
         )
@@ -976,11 +1072,13 @@ struct Image[color_space: ColorSpace, dtype: DType](
     def bilateral_filter[
         border: Border
     ](mut self, radius: Int, color_std_dev: Float64, space_std_dev: Float64) raises where Self.dtype == DType.uint8:
+        """Smooths while preserving edges, weighting neighbors within `radius` by distance and color difference."""
         self.bilateral_filtered[border](radius, color_std_dev, space_std_dev).copy_into(self)
 
     def bilateral_filtered[
         border: Border
     ](self, radius: Int, color_std_dev: Float64, space_std_dev: Float64) raises -> Self where Self.dtype == DType.uint8:
+        """Returns a copy smoothed while preserving edges, like OpenCV's `bilateralFilter` with `d = 2 * radius + 1`."""
         if radius < 0:
             raise Error("Bilateral filter radius must not be negative")
 
@@ -1109,9 +1207,11 @@ struct Image[color_space: ColorSpace, dtype: DType](
     # General Filtering
     #
     def filter[border: Border](mut self, kernel: Matrix[Self.dtype, Self.color_space.channels()]) raises:
+        """Convolves with `kernel`."""
         self.filtered[border](kernel).copy_into(self)
 
     def filtered[border: Border](self, kernel: Matrix[Self.dtype, Self.color_space.channels()]) raises -> Self:
+        """Returns a copy convolved with `kernel`, using the FFT for large kernels."""
         if kernel.rows() > self.height() or kernel.cols() > self.width():
             raise Error("Kernel must not be larger than the image along any dimension")
 
@@ -1275,6 +1375,7 @@ struct Image[color_space: ColorSpace, dtype: DType](
     # Type Conversion
     #
     def as_type[new_dtype: DType](self) -> Image[Self.color_space, new_dtype]:
+        """Returns a copy with every sample converted to `new_dtype`."""
         comptime if new_dtype == Self.dtype:
             return rebind[Image[Self.color_space, new_dtype]](self).copy()
         else:
@@ -1285,12 +1386,14 @@ struct Image[color_space: ColorSpace, dtype: DType](
     #
     @always_inline
     def converted[new_color_space: ColorSpace](self) -> Image[new_color_space, Self.dtype]:
+        """Returns a copy converted to `new_color_space`."""
         comptime if new_color_space == Self.color_space:
             return rebind[Image[new_color_space, Self.dtype]](self).copy()
         else:
             return self.converted_as_type[new_color_space, Self.dtype]()
 
     def converted_as_type[new_color_space: ColorSpace, new_dtype: DType](self) -> Image[new_color_space, new_dtype]:
+        """Returns a copy converted to `new_color_space` and `new_dtype`."""
         comptime if new_dtype == Self.dtype and new_color_space == Self.color_space:
             return rebind[Image[new_color_space, new_dtype]](self).copy()
         elif new_color_space == Self.color_space:
@@ -1333,15 +1436,18 @@ struct Image[color_space: ColorSpace, dtype: DType](
     # Saving to File
     #
     def save[file_type: ImageFile](self, path: StringLiteral) raises:
+        """Saves the image to `path` as `file_type`."""
         self.save[file_type](Path(path))
 
     def save[file_type: ImageFile](self, path: Path) raises:
+        """Saves the image to `path` as `file_type`."""
         ImageWriter(path).write[file_type](self)
 
     #
     # Writable
     #
     def write_to[W: Writer](self, mut writer: W):
+        """Writes the image's size, color space and bit depth."""
         writer.write(
             "[Image: height = ",
             self.height(),

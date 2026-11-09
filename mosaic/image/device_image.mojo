@@ -5,6 +5,8 @@
 # Created by Christian Bator on 11/08/2026
 #
 
+"""Images on the GPU."""
+
 from std.math import ceildiv, isfinite, exp
 from std.bit import next_power_of_two
 from std.memory import unsafe_memcpy
@@ -28,6 +30,8 @@ from .color_space import ColorSpace
 # DeviceImage
 #
 struct DeviceImage[color_space: ColorSpace, dtype: DType]:
+    """An image on the GPU, in host memory the GPU uses directly on unified memory systems."""
+
     #
     # Fields
     #
@@ -47,11 +51,13 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
     # Initialization
     #
     def __init__(out self, height: Int, width: Int, ctx: DeviceContext) raises:
+        """Creates an uninitialized image on the GPU of `ctx`."""
         # Where the device and host share one memory pool, keep the image in host memory so moving data in and out is a
         # CPU copy instead of a slow device transfer
         self = Self(height, width, ctx, _host_memory=ctx.is_host_unified())
 
     def __init__(out self, height: Int, width: Int, ctx: DeviceContext, *, _host_memory: Bool) raises:
+        """Creates an uninitialized image, in host memory when `_host_memory` is set and device memory otherwise."""
         _assert(height > 0 and width > 0, "Height and width must be greater than 0")
 
         var count = height * width * Self.color_space.channels()
@@ -81,6 +87,7 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
         )
 
     def __init__(out self, image: Self._HostImage, ctx: DeviceContext) raises:
+        """Creates a copy of `image` on the GPU of `ctx`."""
         self = Self(image.height(), image.width(), ctx)
 
         # Copy image content
@@ -92,6 +99,7 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
             self.synchronize()
 
     def __deinit__(deinit self):
+        """Frees the image's memory, first waiting for pending GPU work when it's host memory."""
         if self._host_storage:
             var storage = self._host_storage.value()
 
@@ -115,25 +123,30 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
     #
     @always_inline
     def height(self) -> Int:
+        """The height in pixels."""
         return Int(self._tensor.dim[0]())
 
     @always_inline
     def width(self) -> Int:
+        """The width in pixels."""
         return Int(self._tensor.dim[1]())
 
     def channels(self) -> Int:
+        """The number of channels."""
         return Self.color_space.channels()
 
     #
     # Copying
     #
     def copy_into(self, mut other: Self) raises:
+        """Enqueues a copy of the pixels into `other`, which must have the same size."""
         self._buffer.enqueue_copy_to(other._buffer)
 
     #
     # Lifetime Management
     #
     def keep(self):
+        """Keeps the image alive until this call, for work that uses its memory without owning it."""
         pass
 
     #
@@ -141,9 +154,11 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
     #
     @always_inline
     def synchronize(self) raises:
+        """Waits for all work enqueued on the image's device context."""
         self._context.synchronize()
 
     def to_host(self) raises -> Self._HostImage:
+        """Waits for pending work and copies the image to the host."""
         var result = Self._HostImage(self.height(), self.width())
 
         if self._host_storage:
@@ -160,9 +175,11 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
     # Numeric Methods
     #
     def invert(mut self) raises where Self.dtype == DType.uint8:
+        """Enqueues an inversion of every sample, replacing `value` with `255 - value`."""
         self._enqueue_invert(result=self._tensor)
 
     def inverted(self) raises -> Self where Self.dtype == DType.uint8:
+        """Returns a copy with every sample inverted, enqueued on the GPU."""
         var result = Self(self.height(), self.width(), self._context)
         self._enqueue_invert(result=result._tensor)
 
@@ -194,11 +211,13 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
     def bilateral_filter[
         border: Border
     ](mut self, radius: Int, color_std_dev: Float64, space_std_dev: Float64) raises where Self.dtype == DType.uint8:
+        """Smooths while preserving edges, weighting neighbors within `radius` by distance and color difference."""
         self.bilateral_filtered[border](radius, color_std_dev, space_std_dev).copy_into(self)
 
     def bilateral_filtered[
         border: Border
     ](self, radius: Int, color_std_dev: Float64, space_std_dev: Float64) raises -> Self where Self.dtype == DType.uint8:
+        """Returns a copy smoothed while preserving edges, like OpenCV's `bilateralFilter` with `d = 2 * radius + 1`."""
         if radius < 0:
             raise Error("Bilateral filter radius must not be negative")
 

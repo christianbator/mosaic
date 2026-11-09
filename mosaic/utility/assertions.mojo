@@ -5,6 +5,8 @@
 # Created by Christian Bator on 05/08/2025
 #
 
+"""Runtime assertions."""
+
 from std.os import abort
 from std.sys.intrinsics import likely
 

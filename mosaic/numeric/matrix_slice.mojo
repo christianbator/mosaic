@@ -5,6 +5,8 @@
 # Created by Christian Bator on 03/15/2025
 #
 
+"""Views into matrices."""
+
 from std.memory import Pointer
 from std.algorithm import vectorize
 from max.algorithm import parallelize
@@ -28,6 +30,8 @@ struct MatrixSlice[
     complex: Bool,
     origin: Origin[mut=mut],
 ](ImplicitlyCopyable, Movable, Writable):
+    """A view of a strided range of rows, columns and components of a matrix, without copying."""
+
     #
     # Fields
     #
@@ -39,6 +43,7 @@ struct MatrixSlice[
     # Initialization
     #
     def __init__(out self, ref[Self.origin] matrix: Matrix[Self.dtype, Self.depth, complex=Self.complex]):
+        """Creates a view of the whole matrix."""
         comptime assert Self.depth_range.end <= Self.depth, (
             "Out of bounds component range for matrix with depth "
             + String(Self.depth)
@@ -56,6 +61,7 @@ struct MatrixSlice[
         row_range: StridedRange,
         col_range: StridedRange,
     ) raises:
+        """Creates a view of `matrix` over `row_range` and `col_range`."""
         comptime assert Self.depth_range.end <= Self.depth, (
             "Out of bounds component range for matrix with depth "
             + String(Self.depth)
@@ -82,6 +88,7 @@ struct MatrixSlice[
     def __init__[
         existing_depth_range: StridedRange
     ](out self, existing: MatrixSlice[existing_depth_range, Self.dtype, Self.depth, Self.complex, Self.origin]):
+        """Creates a view of a subset of the components of `existing`."""
         comptime assert (existing_depth_range.start + Self.depth_range.end * existing_depth_range.step) <= Self.depth, (
             "Out of bounds component range for matrix with depth "
             + String(Self.depth)
@@ -94,6 +101,7 @@ struct MatrixSlice[
         self._col_range = existing._col_range
 
     def __init__(out self, existing: Self, row_range: StridedRange, col_range: StridedRange) raises:
+        """Creates a view of the rows and columns in `row_range` and `col_range` of `existing`, relative to it."""
         comptime assert Self.depth_range.end <= Self.depth, (
             "Out of bounds component range for matrix with depth "
             + String(Self.depth)
@@ -137,6 +145,7 @@ struct MatrixSlice[
         row_range: StridedRange,
         col_range: StridedRange,
     ) raises:
+        """Creates a view of a subset of the components, rows and columns of `existing`."""
         comptime assert (existing_depth_range.start + Self.depth_range.end * existing_depth_range.step) <= Self.depth, (
             "Out of bounds component range for matrix with depth "
             + String(Self.depth)
@@ -177,24 +186,30 @@ struct MatrixSlice[
     #
     @always_inline
     def row_range(self) -> StridedRange:
+        """The rows of the matrix this view covers."""
         return self._row_range
 
     @always_inline
     def col_range(self) -> StridedRange:
+        """The columns of the matrix this view covers."""
         return self._col_range
 
     def component_range(self) -> StridedRange:
+        """The components of the matrix this view covers."""
         return Self.depth_range
 
     @always_inline
     def rows(self) -> Int:
+        """The number of rows."""
         return self._row_range.count()
 
     @always_inline
     def cols(self) -> Int:
+        """The number of columns."""
         return self._col_range.count()
 
     def components(self) -> Int:
+        """The number of components."""
         return Self.depth_range.count()
 
     #
@@ -202,12 +217,14 @@ struct MatrixSlice[
     #
     @always_inline
     def __getitem__(self, row: Int, col: Int) raises -> ScalarNumber[Self.dtype, complex=Self.complex]:
+        """Returns the number at `row`, `col` of a single-component view."""
         comptime assert Self.depth_range.count() == 1, "Must specify component for matrix slice with depth > 1"
 
         return self[row, col, 0]
 
     @always_inline
     def __getitem__(self, row: Int, col: Int, component: Int) raises -> ScalarNumber[Self.dtype, complex=Self.complex]:
+        """Returns the given component of the number at `row`, `col`."""
         return self.strided_load(row=row, col=col, component=component)
 
     @always_inline
@@ -217,6 +234,7 @@ struct MatrixSlice[
         col: Int,
         value: ScalarNumber[Self.dtype, complex=Self.complex],
     ) raises where Self.mut:
+        """Sets the number at `row`, `col` of a single-component view."""
         comptime assert Self.depth_range.count() == 1, "Must specify component for matrix slice with depth > 1"
 
         self[row, col, 0] = value
@@ -229,12 +247,14 @@ struct MatrixSlice[
         component: Int,
         value: ScalarNumber[Self.dtype, complex=Self.complex],
     ) raises where Self.mut:
+        """Sets the given component of the number at `row`, `col`."""
         self.strided_store(value, row=row, col=col, component=component)
 
     @always_inline
     def strided_load[
         width: Int = 1
     ](self, row: Int, col: Int) raises -> Number[Self.dtype, width, complex=Self.complex]:
+        """Loads `width` consecutive elements along the row of a single-component view."""
         comptime assert Self.depth_range.count() == 1, "Must specify component for matrix slice with depth > 1"
 
         return self.strided_load[width](row=row, col=col, component=0)
@@ -243,6 +263,7 @@ struct MatrixSlice[
     def strided_load[
         width: Int = 1
     ](self, row: Int, col: Int, component: Int) raises -> Number[Self.dtype, width, complex=Self.complex]:
+        """Loads one component of `width` consecutive elements along the row."""
         return self._matrix[].strided_load[width](
             row=self._row_range.start + row * self._row_range.step,
             col=self._col_range.start + col * self._col_range.step,
@@ -253,6 +274,7 @@ struct MatrixSlice[
     def strided_store[
         width: Int, //
     ](mut self, value: Number[Self.dtype, width, complex=Self.complex], row: Int, col: Int,) raises where Self.mut:
+        """Stores the lanes of `value` in consecutive elements along the row of a single-component view."""
         comptime assert Self.depth_range.count() == 1, "Must specify component for matrix slice with depth > 1"
 
         self.strided_store(value, row=row, col=col, component=0)
@@ -267,6 +289,7 @@ struct MatrixSlice[
         col: Int,
         component: Int,
     ) raises where Self.mut:
+        """Stores the lanes of `value` in one component of consecutive elements along the row."""
         self._matrix.unsafe_mut_cast[True]()[].strided_store(
             value,
             row=self._row_range.start + row * self._row_range.step,
@@ -323,14 +346,17 @@ struct MatrixSlice[
     #
     @always_inline
     def __getitem__(self, row: Int, col_slice: Slice) raises -> Self:
+        """Returns a view of `row` across the columns in `col_slice`."""
         return self[row : row + 1, col_slice]
 
     @always_inline
     def __getitem__(self, row_slice: Slice, col: Int) raises -> Self:
+        """Returns a view of `col` across the rows in `row_slice`."""
         return self[row_slice, col : col + 1]
 
     @always_inline
     def __getitem__(self, row_slice: Slice, col_slice: Slice) raises -> Self:
+        """Returns a view of the rows and columns in `row_slice` and `col_slice`."""
         return self.slice(
             row_range=StridedRange(
                 slice=row_slice,
@@ -348,14 +374,17 @@ struct MatrixSlice[
 
     @always_inline
     def slice(self, row_range: StridedRange) raises -> Self:
+        """Returns a view of the rows in `row_range`."""
         return self.slice(row_range=row_range, col_range=StridedRange(self.cols()))
 
     @always_inline
     def slice(self, *, col_range: StridedRange) raises -> Self:
+        """Returns a view of the columns in `col_range`."""
         return self.slice(row_range=StridedRange(self.rows()), col_range=col_range)
 
     @always_inline
     def slice(self, row_range: StridedRange, col_range: StridedRange) raises -> Self:
+        """Returns a view of the rows and columns in `row_range` and `col_range`."""
         return Self(self, row_range=row_range, col_range=col_range)
 
     @always_inline
@@ -371,6 +400,7 @@ struct MatrixSlice[
         Self.complex,
         Self.origin,
     ]:
+        """Returns a view of one component."""
         return MatrixSlice[
             StridedRange(
                 Self.depth_range.start + component * Self.depth_range.step,
@@ -395,6 +425,7 @@ struct MatrixSlice[
         Self.complex,
         Self.origin,
     ]:
+        """Returns a view of one component over the rows in `row_range`."""
         return self.component_slice[component](row_range=row_range, col_range=StridedRange(self.cols()))
 
     @always_inline
@@ -410,6 +441,7 @@ struct MatrixSlice[
         Self.complex,
         Self.origin,
     ]:
+        """Returns a view of one component over the columns in `col_range`."""
         return self.component_slice[component](row_range=StridedRange(self.rows()), col_range=col_range)
 
     @always_inline
@@ -425,6 +457,7 @@ struct MatrixSlice[
         Self.complex,
         Self.origin,
     ]:
+        """Returns a view of one component over the rows and columns in `row_range` and `col_range`."""
         return MatrixSlice[
             StridedRange(
                 Self.depth_range.start + component * Self.depth_range.step,
@@ -450,6 +483,7 @@ struct MatrixSlice[
         Self.complex,
         Self.origin,
     ]:
+        """Returns a view of the components in `new_depth_range`."""
         return MatrixSlice[
             StridedRange(
                 Self.depth_range.start + new_depth_range.start * Self.depth_range.step,
@@ -476,6 +510,7 @@ struct MatrixSlice[
         Self.complex,
         Self.origin,
     ]:
+        """Returns a view of the components in `new_depth_range` over the rows in `row_range`."""
         return self.strided_slice[new_depth_range](row_range=row_range, col_range=StridedRange(self.cols()))
 
     @always_inline
@@ -492,6 +527,7 @@ struct MatrixSlice[
         Self.complex,
         Self.origin,
     ]:
+        """Returns a view of the components in `new_depth_range` over the columns in `col_range`."""
         return self.strided_slice[new_depth_range](row_range=StridedRange(self.rows()), col_range=col_range)
 
     @always_inline
@@ -508,6 +544,7 @@ struct MatrixSlice[
         Self.complex,
         Self.origin,
     ]:
+        """Returns a view of the components in `new_depth_range` over the given rows and columns."""
         return MatrixSlice[
             StridedRange(
                 Self.depth_range.start + new_depth_range.start * Self.depth_range.step,
@@ -526,6 +563,7 @@ struct MatrixSlice[
     def deep_copy[
         *, rebound_depth: Int = Self.depth_range.count()
     ](self) -> Matrix[Self.dtype, rebound_depth, complex=Self.complex]:
+        """Copies the view into a new matrix."""
         comptime assert rebound_depth == Self.depth_range.count(), "rebound_depth must equal matrix slice depth"
 
         var result = Matrix[Self.dtype, rebound_depth, complex=Self.complex](rows=self.rows(), cols=self.cols())
@@ -560,6 +598,7 @@ struct MatrixSlice[
     # Numeric Methods
     #
     def fill(mut self, value: ScalarNumber[Self.dtype, complex=Self.complex]) where Self.mut:
+        """Sets every component in the view to `value`."""
         comptime for component in range(Self.depth_range.count()):
 
             def fill_row(row: Int) {mut self, imm}:
@@ -578,6 +617,7 @@ struct MatrixSlice[
     # Writable
     #
     def write_to[W: Writer](self, mut writer: W):
+        """Writes the view's ranges and elements."""
         writer.write("[MatrixSlice:\n  [\n")
 
         for row in range(self.rows()):

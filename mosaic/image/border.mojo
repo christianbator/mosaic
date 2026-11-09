@@ -5,6 +5,8 @@
 # Created by Christian Bator on 02/27/2025
 #
 
+"""Border modes for reading outside an image."""
+
 from std.os import abort
 
 
@@ -12,12 +14,17 @@ from std.os import abort
 # Border
 #
 struct Border(Equatable, ImplicitlyCopyable, Movable, Writable):
+    """How filters read pixels outside an image's bounds."""
+
     #
     # Supported Borders
     #
     comptime zero = Self(0)
+    """Reads zero outside the image."""
     comptime wrap = Self(1)
+    """Wraps around to the opposite edge."""
     comptime reflect = Self(2)
+    """Mirrors at the edge without repeating the edge pixel, like OpenCV's `BORDER_REFLECT_101`."""
 
     #
     # Fields
@@ -28,6 +35,7 @@ struct Border(Equatable, ImplicitlyCopyable, Movable, Writable):
     # Initialization
     #
     def __init__(out self, raw_value: Int):
+        """Creates a border from its raw value, aborting for unsupported values."""
         self._raw_value = raw_value
 
         if raw_value not in [0, 1, 2]:
@@ -41,6 +49,7 @@ struct Border(Equatable, ImplicitlyCopyable, Movable, Writable):
     def load[
         dtype: DType, Loader: def(Int, Int, Int) -> Scalar[dtype], //, border: Border
     ](loader: Loader, y: Int, x: Int, channel: Int, height: Int, width: Int) -> Scalar[dtype]:
+        """Loads a sample through `loader`, mapping out-of-bounds coordinates according to `border`."""
         comptime if border == Border.zero:
             if y >= 0 and y < height and x >= 0 and x < width:
                 return loader(y, x, channel)
@@ -59,11 +68,13 @@ struct Border(Equatable, ImplicitlyCopyable, Movable, Writable):
     @staticmethod
     @always_inline
     def wrapped(index: Int, size: Int) -> Int:
+        """Maps `index` into `[0, size)` by wrapping around."""
         return index % size
 
     @staticmethod
     @always_inline
     def reflected(index: Int, size: Int) -> Int:
+        """Maps `index` into `[0, size)` by reflecting at the edges."""
         # Fast path for indices in bounds
         if UInt(index) < UInt(size):
             return index
@@ -89,6 +100,7 @@ struct Border(Equatable, ImplicitlyCopyable, Movable, Writable):
     # Writable
     #
     def write_to[W: Writer](self, mut writer: W):
+        """Writes the border's name."""
         writer.write("[Border: ")
 
         if self == Border.zero:

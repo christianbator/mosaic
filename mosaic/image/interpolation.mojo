@@ -5,6 +5,8 @@
 # Created by Christian Bator on 03/20/2025
 #
 
+"""Interpolation methods for resampling."""
+
 from std.os import abort
 
 
@@ -12,14 +14,21 @@ from std.os import abort
 # Interpolation
 #
 struct Interpolation(Equatable, ImplicitlyCopyable, Movable, Writable):
+    """How resizing samples values between pixels."""
+
     #
     # Supported Interpolations
     #
     comptime nearest = Self(0)
+    """Nearest neighbor."""
     comptime bilinear = Self(1)
+    """Bilinear, with half-pixel centers."""
     comptime bicubic = Self(2)
+    """Bicubic (not implemented yet)."""
     comptime lanczos4 = Self(3)
+    """Lanczos over an 8×8 neighborhood (not implemented yet)."""
     comptime area = Self(4)
+    """Area averaging (not implemented yet)."""
 
     #
     # Fields
@@ -30,6 +39,7 @@ struct Interpolation(Equatable, ImplicitlyCopyable, Movable, Writable):
     # Initialization
     #
     def __init__(out self, raw_value: Int):
+        """Creates an interpolation from its raw value, aborting for unsupported values."""
         self._raw_value = raw_value
 
         if raw_value not in [0, 1, 2, 3, 4]:
@@ -48,6 +58,7 @@ struct Interpolation(Equatable, ImplicitlyCopyable, Movable, Writable):
     # Writable
     #
     def write_to[W: Writer](self, mut writer: W):
+        """Writes the interpolation's name."""
         writer.write("[Interpolation: ")
 
         if self == Interpolation.nearest:

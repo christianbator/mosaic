@@ -19,6 +19,13 @@ benchmark/data/
 benchmark/input/
 benchmark/output/
 
+# Documentation
+docs/node_modules/
+docs/.vitepress/cache/
+docs/.vitepress/dist/
+docs/.vitepress/api-sidebar.json
+docs/api/
+
 # Development
 main.mojo
 /*.png

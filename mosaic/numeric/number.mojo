@@ -5,6 +5,8 @@
 # Created by Christian Bator on 03/04/2025
 #
 
+"""SIMD vectors of real or complex numbers."""
+
 import std.math as math
 from std.math import sqrt, log, atan2, Ceilable, CeilDivable, Floorable, Truncable, isclose
 from std.complex import ComplexSIMD
@@ -18,11 +20,13 @@ from std.hash import Hasher
 # Type Aliases
 #
 comptime ScalarNumber = Number[_, width=1, complex=_]
+"""A `Number` with a single lane."""
 
 #
 # Print Precision
 #
 comptime print_precision = 3
+"""The number of decimal places used when writing floating point numbers."""
 
 
 #
@@ -44,37 +48,49 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     Truncable,
     Writable,
 ):
+    """A SIMD vector of `width` real or complex numbers, stored as interleaved real and imaginary parts when complex."""
+
     #
     # Fields
     #
     comptime Value = SIMD[Self.dtype, 2 * Self.width if Self.complex else Self.width]
+    """The underlying SIMD type, twice as wide when complex."""
 
     comptime MAX = Self._max()
+    """The largest representable value."""
     comptime MIN = Self(Self.Value.MIN)
+    """The smallest representable value."""
     comptime MAX_FINITE = Self(Self.Value.MAX_FINITE)
+    """The largest finite value."""
     comptime MIN_FINITE = Self(Self.Value.MIN_FINITE)
+    """The smallest finite value."""
 
     var value: Self.Value
+    """The underlying SIMD vector."""
 
     #
     # Initialization
     #
     @always_inline
     def __init__(out self):
+        """Creates a number with every lane set to zero."""
         self.value = Self.Value(0)
 
     @always_inline
     @implicit
     def __init__(out self, value: Self.Value):
+        """Creates a number from its underlying SIMD vector."""
         self.value = value
 
     @always_inline
     def __init__[other_dtype: DType, //](out self, value: Number[other_dtype, Self.width, complex=Self.complex]):
+        """Creates a number by casting each lane of `value`."""
         self.value = value.value.cast[Self.dtype]()
 
     @always_inline
     @implicit
     def __init__(out self, value: UInt):
+        """Creates a number with every lane set to `value`."""
         comptime if Self.complex:
             self = Self(real=SIMD[Self.dtype, Self.width](value), imaginary=0)
         else:
@@ -83,6 +99,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     @always_inline
     @implicit
     def __init__(out self, value: Int):
+        """Creates a number with every lane set to `value`."""
         comptime if Self.complex:
             self = Self(real=SIMD[Self.dtype, Self.width](value), imaginary=0)
         else:
@@ -90,6 +107,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     def __init__[T: Floatable](out self: ScalarNumber[DType.float64, complex=Self.complex], value: T):
+        """Creates a float64 number from `value`."""
         comptime if Self.complex:
             self.value = ScalarNumber[DType.float64, complex=Self.complex].Value(value.__float__(), 0.0)
         else:
@@ -97,6 +115,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     def __init__[T: FloatableRaising](out self: ScalarNumber[DType.float64, complex=Self.complex], value: T) raises:
+        """Creates a float64 number from `value`."""
         comptime if Self.complex:
             self.value = ScalarNumber[DType.float64, complex=Self.complex].Value(value.__float__(), 0.0)
         else:
@@ -105,6 +124,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     @always_inline
     @implicit
     def __init__(out self, value: IntLiteral):
+        """Creates a number with every lane set to `value`."""
         comptime if Self.complex:
             self.value = Self.Value(value, 0)
         else:
@@ -113,6 +133,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     @always_inline
     @implicit
     def __init__(out self, value: FloatLiteral):
+        """Creates a number with every lane set to `value`."""
         comptime if Self.complex:
             self.value = Self.Value(value, 0)
         else:
@@ -121,11 +142,13 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     @always_inline
     @implicit
     def __init__(out self: Number[DType.bool, Self.width, complex=False], value: Bool, /):
+        """Creates a boolean number with every lane set to `value`."""
         self.value = value
 
     @always_inline
     @implicit
     def __init__(out self, value: ScalarNumber[Self.dtype, complex=Self.complex], /):
+        """Creates a number with every lane set to the scalar `value`."""
         comptime if Self.complex:
             self.value = rebind[Self.Value](
                 SIMD[Self.dtype, Self.width](value.value[0]).interleave(SIMD[Self.dtype, Self.width](value.value[1]))
@@ -136,6 +159,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     @always_inline
     @implicit
     def __init__(out self, *elems: Scalar[Self.dtype]):
+        """Creates a number from one scalar per lane."""
         # TODO: Make this a compile-time check when possible
         debug_assert(Self.width == len(elems), "Mismatch in the number of elements in the Number variadic constructor")
 
@@ -150,6 +174,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     def __init__(out self, real: SIMD[Self.dtype, Self.width], imaginary: SIMD[Self.dtype, Self.width]):
+        """Creates a complex number from its real and imaginary parts."""
         comptime assert Self.complex, "__init__(real, imaginary) is only available for complex numbers"
 
         self.value = rebind[Self.Value](real.interleave(imaginary))
@@ -157,6 +182,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     @always_inline
     @implicit
     def __init__(out self, tuple: Tuple[SIMD[Self.dtype, Self.width], SIMD[Self.dtype, Self.width]]):
+        """Creates a complex number from a `(real, imaginary)` tuple."""
         comptime assert Self.complex, "__init__(tuple) is only available for complex numbers"
 
         self = Self(real=tuple[0], imaginary=tuple[1])
@@ -165,6 +191,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     def from_bits[
         int_type: DType, //
     ](value: SIMD[int_type, Self.Value.length]) -> Number[Self.dtype, Self.width, complex=Self.complex]:
+        """Creates a number by reinterpreting the bits of `value`."""
         return Self(Self.Value(from_bits=value))
 
     @staticmethod
@@ -196,6 +223,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     #
     @always_inline
     def __getitem__(self, index: Int) -> ScalarNumber[Self.dtype, complex=Self.complex]:
+        """Returns the lane at `index`."""
         comptime if Self.complex:
             return ScalarNumber[Self.dtype, complex=Self.complex](
                 real=self.value[index], imaginary=self.value[index + 1]
@@ -205,6 +233,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     def __setitem__(mut self, index: Int, value: ScalarNumber[Self.dtype, complex=Self.complex]):
+        """Sets the lane at `index`."""
         comptime if Self.complex:
             self.value[index] = value.value[0]
             self.value[index + 1] = value.value[1]
@@ -212,6 +241,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
             self.value[index] = value.value[0]
 
     def __contains__(self, value: ScalarNumber[Self.dtype, complex=Self.complex]) -> Bool:
+        """Whether any lane equals `value`."""
         comptime if Self.complex:
             comptime for i in range(Self.width):
                 if self[i] == value:
@@ -223,12 +253,14 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     def real(self) -> SIMD[Self.dtype, Self.width]:
+        """The real parts."""
         comptime assert Self.complex, "real() is only available for complex numbers"
 
         return rebind[SIMD[Self.dtype, Self.width]](self.value.deinterleave()[0])
 
     @always_inline
     def imaginary(self) -> SIMD[Self.dtype, Self.width]:
+        """The imaginary parts, or zeros when the number isn't complex."""
         comptime assert Self.complex, "imaginary() is only available for complex numbers"
 
         return rebind[SIMD[Self.dtype, Self.width]](self.value.deinterleave()[1])
@@ -542,6 +574,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     def to_bits[
         int_dtype: DType = _integral_type_of[Self.dtype]()
     ](self) -> Number[int_dtype, Self.width, complex=Self.complex]:
+        """Reinterprets the bits as an integer type."""
         return Number[int_dtype, Self.width, complex=Self.complex](self.value.to_bits())
 
     # @staticmethod
@@ -562,6 +595,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
         lower_bound: Number[Self.dtype, Self.width, complex=False],
         upper_bound: Number[Self.dtype, Self.width, complex=False],
     ) -> Self:
+        """Clamps each lane to `[lower_bound, upper_bound]`."""
         comptime assert not Self.complex, "clamp() is only available for non-complex numbers"
 
         return Self(
@@ -572,6 +606,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     def fma(self, multiplier: Self, accumulator: Self) -> Self:
+        """Returns `self * multiplier + accumulator`, fused where the hardware supports it."""
         comptime if Self.complex:
             var result = ComplexSIMD(re=self.real(), im=self.imaginary()).fma(
                 b=ComplexSIMD(re=multiplier.real(), im=multiplier.imaginary()),
@@ -584,10 +619,12 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     def shuffle[*mask: SIMDLength](self) -> Self:
+        """Reorders the lanes by `mask`."""
         return self.shuffle[*mask](self)
 
     @always_inline
     def shuffle[*mask: SIMDLength](self, other: Self) -> Self:
+        """Selects lanes from `self` and `other` by `mask`, where indices past `width` select from `other`."""
         comptime if Self.complex:
             return Self(
                 real=self.real().shuffle[*mask](other.real()),
@@ -598,10 +635,12 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     def shuffle[mask: IndexList[Self.width, element_type=_]](self) -> Self:
+        """Reorders the lanes by `mask`."""
         return self.shuffle[mask=mask](self)
 
     @always_inline
     def shuffle[mask: IndexList[Self.width, element_type=_]](self, other: Self) -> Self:
+        """Selects lanes from `self` and `other` by `mask`, where indices past `width` select from `other`."""
         comptime if Self.complex:
             return Self(
                 real=self.real().shuffle[mask=mask](other.real()),
@@ -618,6 +657,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     def slice[output_width: Int, /, *, offset: Int = 0](self) -> Number[Self.dtype, output_width, complex=Self.complex]:
+        """Returns `output_width` lanes starting at lane `offset`."""
         return Number[Self.dtype, output_width, complex=Self.complex](
             rebind[Number[Self.dtype, output_width, complex=Self.complex].Value](
                 self.value.slice[
@@ -628,16 +668,19 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     def insert[*, offset: Int = 0](self, value: Number[Self.dtype, _, complex=Self.complex]) -> Self:
+        """Returns a copy with the lanes of `value` written starting at lane `offset`."""
         return Self(self.value.insert[offset=2 * offset if Self.complex else offset](value.value))
 
     @always_inline
     def join(self, other: Self, out result: Number[Self.dtype, 2 * Self.width, complex=Self.complex]):
+        """Concatenates the lanes of `self` and `other`."""
         result = Number[Self.dtype, 2 * Self.width, complex=Self.complex](
             rebind[Number[Self.dtype, 2 * Self.width, complex=Self.complex].Value](self.value.join(other.value))
         )
 
     @always_inline
     def interleave(self, other: Self) -> Number[Self.dtype, 2 * Self.width, complex=Self.complex]:
+        """Alternates the lanes of `self` and `other`."""
         comptime if Self.complex:
             return Number[Self.dtype, 2 * Self.width, complex=Self.complex](
                 real=self.real().interleave(other.real()), imaginary=self.imaginary().interleave(other.imaginary())
@@ -656,6 +699,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
         Number[Self.dtype, Self.width // 2, complex=Self.complex],
         Number[Self.dtype, Self.width // 2, complex=Self.complex],
     ]:
+        """Splits the lanes into the first and second halves."""
         var split = self.value.split()
 
         return (
@@ -674,6 +718,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
         Number[Self.dtype, Self.width // 2, complex=Self.complex],
         Number[Self.dtype, Self.width // 2, complex=Self.complex],
     ]:
+        """Splits the lanes into the even and odd lanes."""
         comptime if Self.complex:
             var real = self.real().deinterleave()
             var imaginary = self.imaginary().deinterleave()
@@ -707,6 +752,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
         ) thin -> Number[dtype, width, complex=Self.complex],
         size_out: Int = 1,
     ](self) -> Number[Self.dtype, size_out, complex=Self.complex]:
+        """Reduces the lanes pairwise with `func` until `size_out` lanes remain."""
         comptime assert size_out <= Self.width, "Reduce must specify width less than original number width"
 
         comptime if Self.width == size_out:
@@ -720,6 +766,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     def reduce_max[size_out: Int = 1](self) -> Number[Self.dtype, size_out, complex=Self.complex]:
+        """Reduces the lanes by maximum."""
         comptime assert not Self.complex, "reduce_max() is only available for non-complex numbers"
 
         return Number[Self.dtype, size_out, complex=Self.complex](
@@ -728,6 +775,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     def reduce_min[size_out: Int = 1](self) -> Number[Self.dtype, size_out, complex=Self.complex]:
+        """Reduces the lanes by minimum."""
         comptime assert not Self.complex, "reduce_min() is only available for non-complex numbers"
 
         return Number[Self.dtype, size_out, complex=Self.complex](
@@ -736,6 +784,8 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     def reduce_add[size_out: Int = 1](self) -> Number[Self.dtype, size_out, complex=Self.complex]:
+        """Reduces the lanes by addition."""
+
         @always_inline
         def reduce_add_body[
             dtype: DType, width: Int
@@ -748,6 +798,8 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     def reduce_mul[size_out: Int = 1](self) -> Number[Self.dtype, size_out, complex=Self.complex]:
+        """Reduces the lanes by multiplication."""
+
         @always_inline
         def reduce_mul_body[
             dtype: DType, width: Int
@@ -760,6 +812,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     def reduce_and[size_out: Int = 1](self) -> Number[Self.dtype, size_out, complex=Self.complex]:
+        """Reduces the lanes by bitwise and."""
         comptime assert not Self.complex, "reduce_and() is only available for non-complex numbers"
 
         return Number[Self.dtype, size_out, complex=Self.complex](
@@ -768,6 +821,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     def reduce_or[size_out: Int = 1](self) -> Number[Self.dtype, size_out, complex=Self.complex]:
+        """Reduces the lanes by bitwise or."""
         comptime assert not Self.complex, "reduce_or() is only available for non-complex numbers"
 
         return Number[Self.dtype, size_out, complex=Self.complex](
@@ -776,6 +830,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     def reduce_bit_count(self) -> Int:
+        """Counts the set bits across all lanes."""
         return self.value.reduce_bit_count()
 
     @always_inline
@@ -786,6 +841,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
         true_case: Number[dtype_out, Self.width, complex=complex_out],
         false_case: Number[dtype_out, Self.width, complex=complex_out],
     ) -> Number[dtype_out, Self.width, complex=complex_out]:
+        """Selects `true_case` where the lane is true and `false_case` elsewhere."""
         comptime assert (
             Self.dtype == DType.bool and not Self.complex
         ), "select() is only available for bool, non-complex numbers"
@@ -809,21 +865,26 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     def rotate_left[shift: Int](self) -> Self:
+        """Rotates the lanes left by `shift`."""
         return Self(self.value.rotate_left[2 * shift if Self.complex else shift]())
 
     @always_inline
     def rotate_right[shift: Int](self) -> Self:
+        """Rotates the lanes right by `shift`."""
         return Self(self.value.rotate_right[2 * shift if Self.complex else shift]())
 
     @always_inline
     def shift_left[shift: Int](self) -> Self:
+        """Shifts the lanes left by `shift`, filling with zeros."""
         return Self(self.value.shift_left[2 * shift if Self.complex else shift]())
 
     @always_inline
     def shift_right[shift: Int](self) -> Self:
+        """Shifts the lanes right by `shift`, filling with zeros."""
         return Self(self.value.shift_right[2 * shift if Self.complex else shift]())
 
     def reversed(self) -> Self:
+        """Reverses the order of the lanes."""
         comptime if Self.complex:
             return Self(real=self.real().reversed(), imaginary=self.imaginary().reversed())
         else:
@@ -831,24 +892,28 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     def squared_norm(self) -> Number[Self.dtype, Self.width, complex=False]:
+        """The squared magnitude of each lane."""
         comptime assert Self.complex, "squared_norm() is only available for complex numbers"
 
         return self.real() * self.real() + self.imaginary() * self.imaginary()
 
     @always_inline
     def norm(self) -> Number[Self.dtype, Self.width, complex=False]:
+        """The magnitude of each lane."""
         comptime assert Self.complex, "norm() is only available for complex numbers"
 
         return sqrt(self.squared_norm().value)
 
     @always_inline
     def phase(self) -> Number[Self.dtype, Self.width, complex=False] where Self.dtype.is_floating_point():
+        """The phase angle of each lane, in radians."""
         comptime assert Self.complex, "phase() is only available for complex numbers"
 
         return atan2(self.imaginary(), self.real())
 
     @always_inline
     def log(self) -> Self where Self.dtype.is_floating_point():
+        """The natural logarithm of each lane."""
         comptime if Self.complex:
             return Self(real=math.log(self.norm().value), imaginary=self.phase().value)
         else:
@@ -859,6 +924,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     #
     @always_inline
     def cast[new_dtype: DType](self) -> Number[new_dtype, Self.width, complex=Self.complex]:
+        """Casts each lane to `new_dtype`."""
         comptime if new_dtype == Self.dtype:
             return rebind[Number[new_dtype, Self.width, complex=Self.complex]](self)
         else:
@@ -866,6 +932,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
 
     @always_inline
     def as_complex[new_dtype: DType = Self.dtype](self) -> Number[new_dtype, Self.width, complex=True]:
+        """Converts to a complex number, with zero imaginary parts if not already complex."""
         comptime if Self.complex and new_dtype == Self.dtype:
             return rebind[Number[new_dtype, Self.width, complex=True]](self)
         elif Self.complex:
@@ -881,6 +948,7 @@ struct Number[dtype: DType, width: Int, *, complex: Bool = False](
     #
     @no_inline
     def write_to[W: Writer](self, mut writer: W):
+        """Writes the number."""
         comptime if Self.complex:
             comptime if Self.width > 1:
                 writer.write("[")

@@ -5,6 +5,8 @@
 # Created by Christian Bator on 12/14/2024
 #
 
+"""Showing images in windows."""
+
 from std.os import abort
 from std.ffi import _Global, OwnedDLHandle, _get_dylib_function, c_int, c_char, c_float
 
@@ -28,16 +30,20 @@ def _load_libvisualizer() -> OwnedDLHandle:
 # Visualizer
 #
 struct Visualizer:
+    """Shows images in windows."""
+
     #
     # Fields
     #
     comptime display_dtype = DType.uint8
+    """The element type windows display."""
 
     #
     # ImageSlice
     #
     @staticmethod
     def show(image_slice: ImageSlice, window_title: String):
+        """Shows a copy of `image_slice` in a window titled `window_title`."""
         Self.show(image=image_slice.deep_copy(), window_title=window_title)
 
     #
@@ -45,6 +51,7 @@ struct Visualizer:
     #
     @staticmethod
     def show[dtype: DType, color_space: ColorSpace, //](image: Image[color_space, dtype], window_title: String):
+        """Shows `image` in a window titled `window_title`, converting it for display if needed."""
         comptime if color_space.is_display_color_space() and dtype == Self.display_dtype:
             Self._show(image=image, window_title=window_title)
         elif color_space.is_display_color_space():
@@ -88,10 +95,12 @@ struct Visualizer:
     #
     @staticmethod
     def wait():
+        """Handles window events until every window is closed."""
         _ = Self.wait(c_float.MAX_FINITE)
 
     @staticmethod
     def wait(timeout: Float32) -> Bool:
+        """Handles window events for up to `timeout` seconds, returning whether any window is still open."""
         try:
             var wait = _get_dylib_function[_libvisualizer, "wait", def(timeout: c_float) thin abi("C") -> Bool]()
 

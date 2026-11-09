@@ -5,6 +5,8 @@
 # Created by Christian Bator on 05/03/2025
 #
 
+"""Image file formats."""
+
 from std.os import abort
 from std.ffi import _Global, OwnedDLHandle
 
@@ -28,11 +30,15 @@ def _load_libcodec() -> OwnedDLHandle:
 # ImageFile
 #
 struct ImageFile(Equatable, ImplicitlyCopyable, Movable, Writable):
+    """An image file format."""
+
     #
     # Supported File Types
     #
     comptime png = Self(ImageFile._png)
+    """PNG."""
     comptime jpeg = Self(ImageFile._jpeg)
+    """JPEG."""
 
     #
     # Fields
@@ -48,6 +54,7 @@ struct ImageFile(Equatable, ImplicitlyCopyable, Movable, Writable):
     # Initialization
     #
     def __init__(out self, raw_value: String):
+        """Creates a file format from its raw value, aborting for unsupported values."""
         self._raw_value = raw_value
 
         if raw_value not in materialize[Self._supported_image_file_types]():
@@ -57,6 +64,7 @@ struct ImageFile(Equatable, ImplicitlyCopyable, Movable, Writable):
     # Properties
     #
     def extension(self) -> String:
+        """The default file extension, including the dot."""
         if self == Self.png:
             return ".png"
         elif self == Self.jpeg:
@@ -65,10 +73,11 @@ struct ImageFile(Equatable, ImplicitlyCopyable, Movable, Writable):
             abort("Unimplemented extension() for image file type: " + self._raw_value)
 
     def valid_extensions(self) -> List[String]:
+        """The file extensions recognized for this format."""
         if self == Self.png:
             return [".png"]
         elif self == Self.jpeg:
-            return [".jpeg", "jpg"]
+            return [".jpeg", ".jpg"]
         else:
             abort("Unimplemented valid_extensions() for image file type: " + self._raw_value)
 
@@ -85,4 +94,5 @@ struct ImageFile(Equatable, ImplicitlyCopyable, Movable, Writable):
     # Writable
     #
     def write_to[W: Writer](self, mut writer: W):
+        """Writes the file format."""
         writer.write("[ImageFile: ", self._raw_value, "]")

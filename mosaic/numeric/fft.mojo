@@ -5,6 +5,8 @@
 # Created by Christian Bator on 04/01/2025
 #
 
+"""Fast Fourier transforms."""
+
 from std.os import abort
 from std.ffi import _Global, OwnedDLHandle, _get_dylib_function, c_int
 
@@ -32,11 +34,13 @@ comptime _fft_func_name = "fft_" + String(fft_dtype)
 # FFT
 #
 comptime fft_dtype = DType.float32
+"""The element type of Fourier transform results."""
 
 
 def fft[
     dtype: DType, depth: Int, complex: Bool, //, *, inverse: Bool = False
 ](matrix: Matrix[dtype, depth, complex=complex]) -> Matrix[fft_dtype, depth, complex=True]:
+    """Returns the 2-D discrete Fourier transform of each component of `matrix`, or its inverse."""
     try:
         var fft = _get_dylib_function[
             _libfft,

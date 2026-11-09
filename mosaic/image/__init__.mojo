@@ -5,6 +5,8 @@
 # Created by Christian Bator on 02/27/2025
 #
 
+"""Images on the CPU and the GPU, their file formats, color spaces and filters."""
+
 #
 # Image
 #

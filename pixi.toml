@@ -18,7 +18,7 @@ license = "Apache-2.0"
 license-file = "LICENSE"
 description = "An image processing library in Mojo" # This is "summary" in recipe.yaml
 repository = "https://github.com/christianbator/mosaic"
-documentation = "https://github.com/christianbator/mosaic"
+documentation = "https://christianbator.github.io/mosaic"
 
 # These should match rattler-build/recipe.yaml > extra
 name = "mosaic"
@@ -39,6 +39,7 @@ channels = [
 mojo = ">=1.0,<2"
 max-core = ">=26.7.0,<27"
 clangxx = ">=22.1.0,<23"
+nodejs = ">=24.0,<25"
 
 #
 # Tasks 
@@ -62,6 +63,30 @@ cmd = """ bash -c '
 
 [tasks.package]
 cmd = "rattler-build build --recipe rattler-build/recipe.yaml -c https://conda.modular.com/max -c conda-forge"
+
+#
+# Documentation
+#
+[tasks.docs-install]
+inputs = ["docs/package.json", "docs/package-lock.json"]
+outputs = ["docs/node_modules/.package-lock.json"]
+cmd = "npm --prefix docs install --no-audit --no-fund"
+
+# Generates the API reference pages from the docstrings
+[tasks.docs-api]
+inputs = ["mosaic/**/*.mojo", "docs/scripts/generate_api.mjs"]
+outputs = ["docs/api/**/*.md", "docs/.vitepress/api-sidebar.json"]
+cmd = "mkdir -p docs/.vitepress/cache && mojo doc mosaic -o docs/.vitepress/cache/mojo-doc.json && node docs/scripts/generate_api.mjs docs/.vitepress/cache/mojo-doc.json"
+
+# Serves the docs locally, reloading on changes to the markdown (rerun docs-api after changing docstrings)
+[tasks.docs]
+depends-on = ["docs-install", "docs-api"]
+cmd = "npm --prefix docs run dev"
+
+# Builds the static site into docs/.vitepress/dist
+[tasks.docs-build]
+depends-on = ["docs-install", "docs-api"]
+cmd = "npm --prefix docs run build"
 
 #
 # Benchmarks
