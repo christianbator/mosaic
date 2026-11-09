@@ -29,6 +29,7 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
     comptime _Tensor = TileTensor[Self.dtype, Self._Layout, MutUntrackedOrigin]
     comptime _HostImage = Image[Self.color_space, Self.dtype]
     comptime _tile_size = Size(width=16, height=16)
+    comptime _bilateral_pixels_per_thread = 4
 
     var _context: DeviceContext
     var _buffer: DeviceBuffer[Self.dtype]
@@ -158,7 +159,10 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
         var result = Self(self.height(), self.width(), self._context)
 
         # Pad on the device first so the filter kernel needs no border logic
-        var padded = Self(self.height() + 2 * radius, self.width() + 2 * radius, self._context)
+        # The right side gets extra columns for the last thread in each row, which filters pixels past the right edge
+        # (reading valid padded memory) and only stores the ones inside the image
+        comptime pixels_per_thread = Self._bilateral_pixels_per_thread
+        var padded = Self(self.height() + 2 * radius, self.width() + 2 * radius + pixels_per_thread - 1, self._context)
 
         self._context.enqueue_function[Self._pad[border]](
             self._tensor,
@@ -202,7 +206,10 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
             Int32(space_count),
             color_weights,
             result._tensor,
-            grid_dim=(ceildiv(self.width(), Self._tile_size.width), ceildiv(self.height(), Self._tile_size.height)),
+            grid_dim=(
+                ceildiv(self.width(), Self._tile_size.width * pixels_per_thread),
+                ceildiv(self.height(), Self._tile_size.height),
+            ),
             block_dim=(Self._tile_size.width, Self._tile_size.height),
         )
 
@@ -232,42 +239,53 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
         color_weights: Pointer[Float32, ImmutAnyOrigin],
         result: Self._Tensor,
     ) where Self.dtype == DType.uint8:
+        # Each thread filters a run of adjacent pixels in one row, sharing each window point's table loads among them
+        comptime pixels = Self._bilateral_pixels_per_thread
         var y = global_idx.y
-        var x = global_idx.x
+        var x = global_idx.x * pixels
+        var width = Int(result.dim[1]())
 
-        if y >= Int(result.dim[0]()) or x >= Int(result.dim[1]()):
+        if y >= Int(result.dim[0]()) or x >= width:
             return
 
         comptime channels = Self.color_space.channels()
         comptime channel_size = next_power_of_two(channels)
+        comptime Pixel = SIMD[DType.float32, channel_size]
 
-        # The center pixel in the padded image, which every neighbor is a fixed linear offset from
+        # The first center pixel in the padded image, which every neighbor of every pixel is a fixed linear offset from
         var center_ptr = padded.ptr.unsafe_offset(((y + Int(radius)) * Int(padded.dim[1]()) + x + Int(radius)) * channels)
-        var center = SIMD[DType.float32, channel_size](0)
+        var centers = Array[Pixel, pixels](fill=Pixel(0))
 
-        comptime for channel in range(channels):
-            center[channel] = center_ptr[unsafe_offset=channel].cast[DType.float32]()
+        comptime for pixel in range(pixels):
+            comptime for channel in range(channels):
+                centers[pixel][channel] = center_ptr[unsafe_offset=pixel * channels + channel].cast[DType.float32]()
 
-        var sums = SIMD[DType.float32, channel_size](0)
-        var weight_sum = Float32(0)
+        var sums = Array[Pixel, pixels](fill=Pixel(0))
+        var weight_sums = Array[Float32, pixels](fill=0)
 
         for index in range(space_count):
             var offset = Int(space_offsets[unsafe_offset=index])
-            var neighbor = SIMD[DType.float32, channel_size](0)
+            var space_weight = space_weights[unsafe_offset=index]
 
-            comptime for channel in range(channels):
-                neighbor[channel] = center_ptr[unsafe_offset=offset + channel].cast[DType.float32]()
+            comptime for pixel in range(pixels):
+                var neighbor = Pixel(0)
 
-            var color_distance = Int(abs(neighbor - center).reduce_add())
-            var weight = space_weights[unsafe_offset=index] * color_weights[unsafe_offset=color_distance]
+                comptime for channel in range(channels):
+                    neighbor[channel] = center_ptr[unsafe_offset=offset + pixel * channels + channel].cast[DType.float32]()
 
-            weight_sum += weight
-            sums = neighbor.fma(weight, sums)
+                # Float to Int32, since converting to the 64-bit Int is emulated on the GPU and costs as much as the rest of the loop
+                var color_distance = abs(neighbor - centers[pixel]).reduce_add().cast[DType.int32]()
+                var weight = space_weight * color_weights[unsafe_offset=Int(color_distance)]
 
-        var filtered_pixel = round(sums * (1 / weight_sum))
+                weight_sums[pixel] += weight
+                sums[pixel] = neighbor.fma(weight, sums[pixel])
 
-        comptime for channel in range(channels):
-            result[y, x, channel] = filtered_pixel[channel].cast[Self.dtype]()
+        comptime for pixel in range(pixels):
+            if x + pixel < width:
+                var filtered_pixel = round(sums[pixel] * (1 / weight_sums[pixel]))
+
+                comptime for channel in range(channels):
+                    result[y, x + pixel, channel] = filtered_pixel[channel].cast[Self.dtype]()
 
     #
     # Filter Utilities
