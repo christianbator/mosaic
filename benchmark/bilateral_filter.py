@@ -76,13 +76,11 @@ def measure(operation: Callable[[], object]) -> float:
     return statistics.median(durations) / 1e6
 
 
-def run_on_cpu(image: np.ndarray, threads: int) -> tuple[float, np.ndarray]:
+def reference_output(image: np.ndarray) -> np.ndarray:
+    # OpenCV's CPU output, the reference both GPU implementations are checked against
     cv2.ocl.setUseOpenCL(False)
-    cv2.setNumThreads(threads)
 
-    duration = measure(lambda: bilateral_filter(image))
-
-    return duration, bilateral_filter(image)
+    return bilateral_filter(image)
 
 
 def run_on_opencl(image: np.ndarray) -> tuple[float, float, np.ndarray]:
@@ -101,14 +99,10 @@ def run_on_opencl(image: np.ndarray) -> tuple[float, float, np.ndarray]:
 #
 # Reporting
 #
-def print_header(default_threads: int):
-    print(f"OpenCV {cv2.__version__} | CPU threads: {default_threads}", end="")
+def print_header():
+    device = cv2.ocl.Device.getDefault()
 
-    if cv2.ocl.haveOpenCL():
-        device = cv2.ocl.Device.getDefault()
-        print(f" | OpenCL: {device.name()} ({device.OpenCLVersion()})")
-    else:
-        print(" | OpenCL: unavailable")
+    print(f"OpenCV {cv2.__version__} | OpenCL: {device.name()} ({device.OpenCLVersion()})")
 
     print(f"bilateralFilter(d={DIAMETER}, sigmaColor={SIGMA_COLOR}, sigmaSpace={SIGMA_SPACE}), median of {ITERATIONS} runs\n")
     print(f"{'size':>12} {'MP':>6}  {'mode':<22} {'ms':>9} {'MP/s':>8} {'max diff':>9}")
@@ -149,30 +143,24 @@ def write_results(results: list[dict]):
 def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    default_threads = cv2.getNumThreads()
-    print_header(default_threads)
+    if not cv2.ocl.haveOpenCL():
+        raise RuntimeError("OpenCL is unavailable, so there's no OpenCV GPU implementation to benchmark")
+
+    print_header()
 
     results = []
 
     for path in input_paths():
         image = cv2.imread(str(path), cv2.IMREAD_COLOR)
+        reference = reference_output(image)
 
-        cpu_duration, cpu_result = run_on_cpu(image, threads=default_threads)
-        report(results, image, f"cpu ({default_threads} threads)", cpu_duration)
-
-        single_thread_duration, _ = run_on_cpu(image, threads=1)
-        report(results, image, "cpu (1 thread)", single_thread_duration)
-
-        cv2.setNumThreads(default_threads)
-
-        if cv2.ocl.haveOpenCL():
-            end_to_end_duration, resident_duration, opencl_result = run_on_opencl(image)
-            max_difference = int(np.max(cv2.absdiff(opencl_result, cpu_result)))
-            report(results, image, "opencl (end-to-end)", end_to_end_duration, max_difference)
-            report(results, image, "opencl (resident)", resident_duration, max_difference)
+        end_to_end_duration, resident_duration, opencl_result = run_on_opencl(image)
+        max_difference = int(np.max(cv2.absdiff(opencl_result, reference)))
+        report(results, image, "opencl (end-to-end)", end_to_end_duration, max_difference)
+        report(results, image, "opencl (resident)", resident_duration, max_difference)
 
         # Reference output, for comparing against mosaic
-        cv2.imwrite(str(reference_path(path)), cpu_result)
+        cv2.imwrite(str(reference_path(path)), reference)
 
         print()
 

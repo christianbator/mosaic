@@ -7,11 +7,17 @@
 
 from std.math import ceildiv, isfinite, exp
 from std.bit import next_power_of_two
+from std.memory import unsafe_memcpy
+from std.memory.alloc import unsafe_alloc
+from std.sys.info import size_of
+from std.ffi import external_call
+from std.os import abort
 from max.gpu import global_idx
 from max.gpu.host import DeviceContext, DeviceBuffer
 from layout import ComptimeInt, Idx, TileTensor, row_major, RowMajorLayout
 
 from mosaic.numeric import Size
+from mosaic.utility import _assert
 
 from .image import Image
 from .border import Border
@@ -32,6 +38,8 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
     comptime _bilateral_pixels_per_thread = 4
 
     var _context: DeviceContext
+    # Host memory this image owns and the device uses in place, or None when the image lives in device memory
+    var _host_storage: Optional[Pointer[Scalar[Self.dtype], MutUntrackedOrigin]]
     var _buffer: DeviceBuffer[Self.dtype]
     var _tensor: Self._Tensor
 
@@ -39,20 +47,62 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
     # Initialization
     #
     def __init__(out self, height: Int, width: Int, ctx: DeviceContext) raises:
+        # Where the device and host share one memory pool, keep the image in host memory so moving data in and out is a
+        # CPU copy instead of a slow device transfer
+        self = Self(height, width, ctx, _host_memory=ctx.is_host_unified())
+
+    def __init__(out self, height: Int, width: Int, ctx: DeviceContext, *, _host_memory: Bool) raises:
+        _assert(height > 0 and width > 0, "Height and width must be greater than 0")
+
+        var count = height * width * Self.color_space.channels()
         self._context = ctx
-        self._buffer = self._context.enqueue_create_buffer[Self.dtype](height * width * Self.color_space.channels())
+
+        if _host_memory:
+            # The device can only use whole pages of host memory, starting at a page boundary
+            var page_size = Int(external_call["getpagesize", Int32]())
+            var byte_count = ceildiv(count * size_of[Scalar[Self.dtype]](), page_size) * page_size
+            var allocated_count = byte_count // size_of[Scalar[Self.dtype]]()
+            var storage = unsafe_alloc[Scalar[Self.dtype]](allocated_count, alignment=page_size)
+
+            try:
+                self._buffer = self._context.wrap_host_memory(storage, allocated_count)
+            except e:
+                storage.unsafe_free()
+                raise e^
+
+            self._host_storage = storage
+        else:
+            self._host_storage = None
+            self._buffer = self._context.enqueue_create_buffer[Self.dtype](count)
+
+        # The device address of the memory, which differs from the host address for host memory
         self._tensor = Self._Tensor(self._buffer.unsafe_ptr().unsafe_origin_cast[MutUntrackedOrigin](), Self._layout(height, width))
 
     def __init__(out self, image: Self._HostImage, ctx: DeviceContext) raises:
-        self._context = ctx
-        self._buffer = self._context.enqueue_create_buffer[Self.dtype](image.samples())
-        self._tensor = Self._Tensor(
-            self._buffer.unsafe_ptr().unsafe_origin_cast[MutUntrackedOrigin](), Self._layout(image.height(), image.width())
-        )
+        self = Self(image.height(), image.width(), ctx)
 
         # Copy image content
-        self._buffer.enqueue_copy_from(image.unsafe_data_ptr())
-        self.synchronize()
+        if self._host_storage:
+            # No kernel has used the new memory yet, so the CPU can write it directly
+            unsafe_memcpy(dest=self._host_storage.value(), src=image.unsafe_data_ptr(), count=image.samples())
+        else:
+            self._buffer.enqueue_copy_from(image.unsafe_data_ptr())
+            self.synchronize()
+
+    def __deinit__(deinit self):
+        if self._host_storage:
+            var storage = self._host_storage.value()
+
+            # Release the device's access to the memory, then wait for that and for every kernel or copy still using it
+            # before freeing, since unlike a device buffer, a host free isn't ordered with the device's queued work
+            _ = self._buffer^
+
+            try:
+                self._context.synchronize()
+            except e:
+                abort(String("DeviceImage: synchronize failed before freeing host memory: ", e))
+
+            storage.unsafe_free()
 
     @staticmethod
     def _layout(height: Int, width: Int) -> Self._Layout:
@@ -94,8 +144,13 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
     def to_host(self) raises -> Self._HostImage:
         var result = Self._HostImage(self.height(), self.width())
 
-        self._buffer.enqueue_copy_to(result.unsafe_data_ptr())
-        self.synchronize()
+        if self._host_storage:
+            # Wait for the kernels writing this image, then read its memory directly
+            self.synchronize()
+            unsafe_memcpy(dest=result.unsafe_data_ptr(), src=self._host_storage.value(), count=result.samples())
+        else:
+            self._buffer.enqueue_copy_to(result.unsafe_data_ptr())
+            self.synchronize()
 
         return result^
 
@@ -162,7 +217,9 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
         # The right side gets extra columns for the last thread in each row, which filters pixels past the right edge
         # (reading valid padded memory) and only stores the ones inside the image
         comptime pixels_per_thread = Self._bilateral_pixels_per_thread
-        var padded = Self(self.height() + 2 * radius, self.width() + 2 * radius + pixels_per_thread - 1, self._context)
+        # The padded image never leaves the device, so it uses device memory, whose free is ordered after the kernels
+        # without waiting for them
+        var padded = Self(self.height() + 2 * radius, self.width() + 2 * radius + pixels_per_thread - 1, self._context, _host_memory=False)
 
         self._context.enqueue_function[Self._pad[border]](
             self._tensor,

@@ -41,7 +41,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     #
     def __init__(out self, *, rows: Int, cols: Int):
         comptime assert Self.depth > 0
-        _assert(rows > 0 and cols > 0, "Rows and cols must be greather than 0")
+        _assert(rows > 0 and cols > 0, "Rows and cols must be greater than 0")
 
         self._rows = rows
         self._cols = cols
@@ -49,7 +49,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
 
     def __init__(out self, *, rows: Int, cols: Int, value: ScalarNumber[Self.dtype, complex=Self.complex]):
         comptime assert Self.depth > 0
-        _assert(rows > 0 and cols > 0, "Rows and cols must be greather than 0")
+        _assert(rows > 0 and cols > 0, "Rows and cols must be greater than 0")
 
         self._rows = rows
         self._cols = cols
@@ -77,7 +77,7 @@ struct Matrix[dtype: DType, depth: Int = 1, *, complex: Bool = False](
     # This is an unsafe convenience constructor
     def __init__(out self, rows: Int, cols: Int, var data: Pointer[Scalar[Self.dtype], MutUntrackedOrigin]):
         comptime assert Self.depth > 0
-        _assert(rows > 0 and cols > 0, "Rows and cols must be greather than 0")
+        _assert(rows > 0 and cols > 0, "Rows and cols must be greater than 0")
 
         self._rows = rows
         self._cols = cols
