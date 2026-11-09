@@ -157,10 +157,22 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
 
         var result = Self(self.height(), self.width(), self._context)
 
-        # Window offsets inside the circle of the given radius, packed as (dy, dx) pairs, with a spatial weight for each
+        # Pad on the device first so the filter kernel needs no border logic
+        var padded = Self(self.height() + 2 * radius, self.width() + 2 * radius, self._context)
+
+        self._context.enqueue_function[Self._pad[border]](
+            self._tensor,
+            Int32(radius),
+            padded._tensor,
+            grid_dim=(ceildiv(padded.width(), Self._tile_size.width), ceildiv(padded.height(), Self._tile_size.height)),
+            block_dim=(Self._tile_size.width, Self._tile_size.height),
+        )
+
+        # Window offsets inside the circle of the given radius, as linear sample offsets from the center pixel in the padded
+        # image, with a spatial weight for each
         # Sized for the full square window, since the number of points inside the circle isn't known up front
         var side = 2 * radius + 1
-        var space_offsets = self._context.enqueue_create_buffer[DType.int32](2 * side**2)
+        var space_offsets = self._context.enqueue_create_buffer[DType.int32](side**2)
         var space_weights = self._context.enqueue_create_buffer[DType.float32](side**2)
         var space_count = 0
 
@@ -170,8 +182,7 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
                     var distance_squared = dy**2 + dx**2
 
                     if distance_squared <= radius**2:
-                        host_offsets[2 * space_count] = Int32(dy)
-                        host_offsets[2 * space_count + 1] = Int32(dx)
+                        host_offsets[space_count] = Int32((dy * padded.width() + dx) * Self.color_space.channels())
                         host_space_weights[space_count] = exp(space_coeff * Float32(distance_squared))
                         space_count += 1
 
@@ -183,8 +194,9 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
             for color_distance in range(color_distance_count):
                 host_color_weights[color_distance] = exp(color_coeff * Float32(color_distance**2))
 
-        self._context.enqueue_function[Self._bilateral_filter[border]](
-            self._tensor,
+        self._context.enqueue_function[Self._bilateral_filter](
+            padded._tensor,
+            Int32(radius),
             space_offsets,
             space_weights,
             Int32(space_count),
@@ -194,41 +206,57 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
             block_dim=(Self._tile_size.width, Self._tile_size.height),
         )
 
+        # The kernels only hold an untracked tensor, so keep the padded image alive until both are enqueued
+        padded.keep()
+
         return result^
 
     @staticmethod
-    def _bilateral_filter[
-        border: Border
-    ](
-        source: Self._Tensor,
+    def _pad[border: Border](source: Self._Tensor, radius: Int32, result: Self._Tensor):
+        var y = global_idx.y
+        var x = global_idx.x
+
+        if y >= Int(result.dim[0]()) or x >= Int(result.dim[1]()):
+            return
+
+        comptime for channel in range(Self.color_space.channels()):
+            result[y, x, channel] = Self._bordered_load[border](source, y - Int(radius), x - Int(radius), channel)
+
+    @staticmethod
+    def _bilateral_filter(
+        padded: Self._Tensor,
+        radius: Int32,
         space_offsets: Pointer[Int32, ImmutAnyOrigin],
         space_weights: Pointer[Float32, ImmutAnyOrigin],
         space_count: Int32,
         color_weights: Pointer[Float32, ImmutAnyOrigin],
         result: Self._Tensor,
-    ) where (Self.dtype == DType.uint8):
+    ) where Self.dtype == DType.uint8:
         var y = global_idx.y
         var x = global_idx.x
 
-        if y >= Int(source.dim[0]()) or x >= Int(source.dim[1]()):
+        if y >= Int(result.dim[0]()) or x >= Int(result.dim[1]()):
             return
 
-        comptime channel_size = next_power_of_two(Self.color_space.channels())
+        comptime channels = Self.color_space.channels()
+        comptime channel_size = next_power_of_two(channels)
+
+        # The center pixel in the padded image, which every neighbor is a fixed linear offset from
+        var center_ptr = padded.ptr.unsafe_offset(((y + Int(radius)) * Int(padded.dim[1]()) + x + Int(radius)) * channels)
         var center = SIMD[DType.float32, channel_size](0)
 
-        comptime for channel in range(Self.color_space.channels()):
-            center[channel] = source[y, x, channel].cast[DType.float32]()
+        comptime for channel in range(channels):
+            center[channel] = center_ptr[unsafe_offset=channel].cast[DType.float32]()
 
         var sums = SIMD[DType.float32, channel_size](0)
         var weight_sum = Float32(0)
 
         for index in range(space_count):
+            var offset = Int(space_offsets[unsafe_offset=index])
             var neighbor = SIMD[DType.float32, channel_size](0)
 
-            comptime for channel in range(Self.color_space.channels()):
-                neighbor[channel] = Self._bordered_load[border](
-                    source, y + Int(space_offsets[unsafe_offset=2 * index]), x + Int(space_offsets[unsafe_offset=2 * index + 1]), channel
-                ).cast[DType.float32]()
+            comptime for channel in range(channels):
+                neighbor[channel] = center_ptr[unsafe_offset=offset + channel].cast[DType.float32]()
 
             var color_distance = Int(abs(neighbor - center).reduce_add())
             var weight = space_weights[unsafe_offset=index] * color_weights[unsafe_offset=color_distance]
@@ -238,7 +266,7 @@ struct DeviceImage[color_space: ColorSpace, dtype: DType]:
 
         var filtered_pixel = round(sums * (1 / weight_sum))
 
-        comptime for channel in range(Self.color_space.channels()):
+        comptime for channel in range(channels):
             result[y, x, channel] = filtered_pixel[channel].cast[Self.dtype]()
 
     #
